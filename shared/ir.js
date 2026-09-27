@@ -16,7 +16,7 @@ export function newProject(){
   };
 }
 export function validateProject(p){
-  if(!p || p.schema!=="cvd.graph") throw new Error("Projet Code Vibe Designer invalide");
+  if(!p || p.schema!=="cvd.graph") throw new Error("Projet No-de Vibe Designer invalide");
   p.nodes ||= []; p.edges ||= []; p.timeline ||= []; p.controls ||= [];
   p.resources ||= []; p.devices ||= [];
   p.output ||= {width:1280,height:720,fps:60,background:"#090b0d"};

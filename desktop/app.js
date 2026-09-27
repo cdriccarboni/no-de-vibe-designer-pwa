@@ -250,4 +250,4 @@ buildLibrary();
 const autosave=localStorage.getItem("cvd.autosave");
 if(autosave){try{project=validateProject(JSON.parse(autosave));log("Autosave restaurée")}catch{}}
 if(project.nodes.length===0){addNode("camera",40,55);addNode("tracking",220,110);addNode("shader",400,170);addClip(1,10,5,"Anim points","effect");addClip(2,18,10,"Shader eau","shader");addClip(4,9,1.5,"Top craie finie","cue")}
-redraw();log("Code Vibe Designer · PHASE 1 démarrée");
+redraw();log("No-de Vibe Designer · PHASE 1 démarrée");

@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")"
 PORT="${CVD_PORT:-4173}"
-python3 -m http.server "$PORT" --bind 127.0.0.1 >/tmp/code-vibe-designer.log 2>&1 &
+python3 -m http.server "$PORT" --bind 127.0.0.1 >/tmp/no-de-vibe-designer.log 2>&1 &
 PID=$!
 sleep 1
 open "http://127.0.0.1:$PORT/desktop/"

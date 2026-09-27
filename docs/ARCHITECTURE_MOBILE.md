@@ -1,7 +1,7 @@
 # Architecture V0.5 — Desktop + Mobile
 
 ```text
-Code Vibe Designer
+No-de Vibe Designer
 ├── shared/
 │   ├── ir.js
 │   ├── node-specs.js
@@ -17,7 +17,7 @@ Code Vibe Designer
 │   ├── mobile.js
 │   ├── mobile.css
 │   └── README_ANDROID.md
-└── LANCER-Code-Vibe-Designer.command
+└── LANCER-No-de-Vibe-Designer.command
 ```
 
 Invariant :

@@ -1,10 +1,10 @@
-# Code Vibe Designer V0.5
+# No-de Vibe Designer V0.5
 
 Structure prête pour développement desktop + mobile sur la même branche.
 
 ## Lancer
 ```bash
-./LANCER-Code-Vibe-Designer.command
+./LANCER-No-de-Vibe-Designer.command
 ```
 
 Desktop :
