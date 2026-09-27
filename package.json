@@ -1,13 +1,86 @@
 {
   "name": "no-de-vibe-designer",
   "productName": "No-de Vibe Designer",
-  "version": "0.8.0",
+  "version": "0.9.4",
+  "description": "No-de Vibe Designer — environnement de patch nodal pour le spectacle vivant",
+  "author": "Acousmatic / No-de Vibe Designer",
+  "license": "UNLICENSED",
   "private": true,
-  "description": "No-code + node visual patch environment for live performance",
-  "main": "app/main.cjs",
+  "main": "electron/main.cjs",
   "scripts": {
-    "test": "node --test test/*.test.mjs",
-    "check": "node --check app/main.cjs && node --check app/preload.cjs && node --check app/desktop/app.js && node --check app/shared/graph.js && node --check app/shared/runtime-core.js && node --check app/shared/vibe.js && node --check app/shared/exporters.js"
+    "start": "electron .",
+    "test": "node tests/run.mjs",
+    "check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check desktop/app.js",
+    "pack:mac": "electron-builder --mac dir --arm64",
+    "dist:mac": "electron-builder --mac zip --arm64",
+    "pack:linux": "electron-builder --linux zip --x64"
   },
-  "type": "module"
+  "build": {
+    "appId": "fr.acousmatic.nodevibedesigner",
+    "productName": "No-de Vibe Designer",
+    "copyright": "Copyright © No-de Vibe Designer",
+    "directories": {
+      "output": "dist/electron",
+      "buildResources": "packaging/mac"
+    },
+    "files": [
+      "electron/**/*",
+      "desktop/**/*",
+      "shared/**/*",
+      "docs/**/*",
+      "examples/**/*",
+      "mobile/**/*",
+      "index.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "packaging/mac/VibeDesigner.icns",
+        "to": "VibeDesigner.icns"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "icon": "packaging/mac/VibeDesigner.icns",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "NSCameraUsageDescription": "No-de Vibe Designer utilise la caméra pour les nodes vidéo, tracking et retours scène.",
+        "NSMicrophoneUsageDescription": "No-de Vibe Designer utilise le micro pour les nodes audio et communications temps réel."
+      }
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Graphics",
+      "artifactName": "No-de-Vibe-Designer-${version}-${arch}-linux.${ext}"
+    },
+    "asar": true
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
 }

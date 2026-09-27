@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>No-de Vibe Designer</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body data-theme="stage" data-workspace="bureau">
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><div class="brandmark">◒</div><div><b>No-de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
+    <span class="badge">v0.9.4</span>
+    <div class="spacer"></div>
+    <div class="themes workspace-modes"><button id="modeBureau" class="active">Bureau</button><button id="modePlateau">Plateau</button></div>
+    <button id="preferencesBtn" class="btn">Préférences</button>
+    <button id="saveProject" class="btn">Enregistrer</button>
+    <button id="loadProject" class="btn">Ouvrir</button>
+    <input id="projectFile" type="file" accept=".cvd.json,application/json" hidden>
+    <button id="outputBtn" class="btn primary">OUTPUT ↗</button>
+  </header>
+
+  <section class="workspace">
+    <aside class="panel library resizable-x">
+      <div class="panel-head">Library <span class="sub">＋ exécutable · ○ indisponible</span></div>
+      <div class="search"><input id="search" placeholder="Rechercher…"></div>
+      <div id="libraryList" class="panel-body libscroll"></div>
+    </aside>
+
+    <main class="center">
+      <div class="upper">
+        <section class="panel patch resizable-both" id="patchPanel">
+          <div class="panel-head">Patch Canvas <span class="sub">source de vérité · molette = zoom · clic milieu = pan</span>
+            <div class="tools">
+              <button type="button" id="zoomOut" class="iconbtn" title="Zoom −">−</button>
+              <button type="button" id="zoomReset" class="iconbtn" title="Reset zoom">1:1</button>
+              <button type="button" id="zoomIn" class="iconbtn" title="Zoom +">+</button>
+              <button type="button" class="iconbtn collapse">−</button>
+            </div>
+          </div>
+          <div id="graphPath" class="graph-path"></div>
+          <div id="patchSpace" class="panel-body patch-space"></div>
+        </section>
+
+        <section class="panel preview resizable-both">
+          <div class="panel-head">Preview <span class="sub"><span class="live">● RENDER</span> · clic = point</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
+          <div class="panel-body preview-body">
+            <canvas id="previewCanvas" width="1280" height="720"></canvas>
+            <div id="previewOverlay" class="preview-overlay"></div>
+            <div class="preview-foot"><span id="previewInfo">1280×720 · 60 fps</span><span class="spacer"></span><button id="clearPoints" class="smallbtn">Effacer points</button></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel vibe resizable-y">
+        <div class="panel-head">Vibe <span class="sub">Entrée = envoyer · Shift+Entrée = nouvelle ligne</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
+        <div class="panel-body vibe-body">
+          <textarea id="vibeText" placeholder="Ex. : Crée une caméra reliée à un shader">Crée une caméra reliée à un shader, ajoute MIDI vers l’intensité du shader.</textarea>
+          <button id="applyVibe" class="generate">Envoyer ↵</button>
+          <div id="vibePreview" class="vibe-preview hidden"></div>
+        </div>
+      </section>
+
+      <section class="panel timeline resizable-y" id="timelinePanel">
+        <div class="panel-head">Timeline <span class="sub">déplacer · retimer · réduire</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
+        <div class="panel-body timeline-shell">
+          <div class="timeline-toolbar">
+            <button id="play" class="smallbtn">▶</button>
+            <button id="stop" class="smallbtn">■</button>
+            <span id="timecode">00:00.0</span>
+            <div class="spacer"></div>
+            <button id="addCue" class="smallbtn">+ Cue</button>
+            <button id="addEffect" class="smallbtn">+ Effet</button>
+          </div>
+          <div class="timeline-routing-wrap">
+            <div id="timelineBody" class="timeline-body">
+              <div class="timeline-inner">
+                <div id="playhead" class="playhead"></div>
+                <div class="track-labels">
+                  <div class="track-label">Vidéo</div><div class="track-label">Effets</div><div class="track-label">Shader</div>
+                  <div class="track-label">Ombre</div><div class="track-label">Cues</div><div class="track-label">Bridges</div>
+                </div>
+                <div id="tracks" class="tracks">
+                  <div class="track" data-track="0"></div><div class="track" data-track="1"></div><div class="track" data-track="2"></div>
+                  <div class="track" data-track="3"></div><div class="track" data-track="4"></div><div class="track" data-track="5"></div>
+                </div>
+              </div>
+            </div>
+            <div class="route-strip">
+              <div class="route-title">SORTIE</div>
+              <button class="route-btn" data-track-route="0">Principal</button>
+              <button class="route-btn" data-track-route="1">Principal</button>
+              <button class="route-btn" data-track-route="2">Principal</button>
+              <button class="route-btn" data-track-route="3">Principal</button>
+              <button class="route-btn" data-track-route="4">Principal</button>
+              <button class="route-btn" data-track-route="5">Principal</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="panel inspector resizable-x">
+      <div class="panel-head">Inspector <span id="inspectorType" class="sub">Aucun</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
+      <div id="inspectorBody" class="panel-body inspector-body">
+        <p>Sélectionne un node.</p>
+      </div>
+    </aside>
+  </section>
+
+  <section class="terminal resizable-y">
+    <div class="term-tabs"><span>Console</span><span class="live">● READY</span><span>PATCH</span><span>OUTPUT</span><span>OSC</span><span>MIDI</span><span>DMX</span></div>
+    <div id="termLog" class="term-log"></div>
+    <div class="term-input"><input id="termCmd" placeholder="demo · midi connect · bridge connect ws://… · output"><button id="termSend">↵</button></div>
+  </section>
+</div>
+
+<div id="preferencesModal" class="preferences-modal hidden">
+  <div class="preferences-card wide">
+    <div class="preferences-head"><b>Préférences</b><button id="preferencesClose" type="button">×</button></div>
+    <div class="preferences-tabs">
+      <button type="button" data-pref-tab="general" class="active">Général</button>
+      <button type="button" data-pref-tab="appearance">Interface</button>
+      <button type="button" data-pref-tab="canvas">Patch Canvas</button>
+      <button type="button" data-pref-tab="ai">IA / Vibe</button>
+      <button type="button" data-pref-tab="io">Moteurs / I/O</button>
+      <button type="button" data-pref-tab="backup">Sauvegardes</button>
+      <button type="button" data-pref-tab="manual">Manuel</button>
+      <button type="button" data-pref-tab="about">Version</button>
+    </div>
+    <div class="preferences-body">
+      <div data-pref-panel="general">
+        <p class="hint">Langue d’interface : français. Démarrage : restaurer l’autosave si disponible.</p>
+        <label>Restaurer l’autosave au lancement <input id="prefRestoreAutosave" type="checkbox" checked></label>
+        <label>Charger la démo P00 si projet vide <input id="prefLoadDemo" type="checkbox" checked></label>
+      </div>
+      <div data-pref-panel="appearance" class="hidden">
+        <label>Couleur dominante <input id="accentColor" type="color" value="#d7b86a"></label>
+        <label>Couleur secondaire <input id="secondaryColor" type="color" value="#8fa79d"></label>
+        <label>Dégradé principal <select id="gradientMode"><option value="subtle">Discret</option><option value="off">Désactivé</option><option value="strong">Présent</option></select></label>
+        <label>Intensité <input id="gradientIntensity" type="range" min="0" max="100" value="35"></label>
+        <div class="preferences-actions"><button id="appearanceReset" class="smallbtn" type="button">Thème No-de Vibe Designer</button></div>
+      </div>
+      <div data-pref-panel="canvas" class="hidden">
+        <p class="hint">Zoom molette · pan clic milieu ou Alt+glisser · Undo ⌘Z / Ctrl+Z · Redo ⌘⇧Z · Dupliquer ⌘D · Supprimer ⌫</p>
+        <label>Zoom par défaut <input id="prefDefaultZoom" type="range" min="50" max="150" value="100"></label>
+      </div>
+      <div data-pref-panel="ai" class="hidden">
+        <p class="hint">Sans endpoint, le moteur <b>local</b> (règles) s’applique. Aucune réussite IA n’est simulée.</p>
+        <p class="hint bad">Grok / xAI est exclu et sera refusé.</p>
+        <label>Activer l’appel IA distant <input id="aiEnabled" type="checkbox" checked></label>
+        <label class="stack">Endpoint (OpenAI-compatible)<input id="aiEndpoint" type="url" placeholder="https://api.openai.com/v1/chat/completions"></label>
+        <label class="stack">Clé API<input id="aiKey" type="password" placeholder="sk-… (stockée localement)"></label>
+        <label class="stack">Modèle<input id="aiModel" type="text" value="gpt-4o-mini"></label>
+        <div class="preferences-actions"><button id="aiSave" class="smallbtn" type="button">Enregistrer IA</button></div>
+      </div>
+      <div data-pref-panel="io" class="hidden">
+        <p class="hint">MIDI / Serial / OSC passent par le graphe lorsque les nodes sont connectés.</p>
+        <ul class="pref-list">
+          <li><b>MIDI</b> — console <code>midi connect</code> puis node MIDI Hub → sorties CC/gate. Essai matériel : à vérifier.</li>
+          <li><b>Serial</b> — <code>serial connect</code> / <code>serial send …</code>. Essai matériel : à vérifier.</li>
+          <li><b>OSC</b> — node OSC + <code>bridge connect ws://…</code>. Sans bridge : erreur visible, pas de faux succès.</li>
+          <li><b>Caméra / Shader</b> — exécutables dans le patch.</li>
+          <li><b>Audio / NDI / Syphon</b> — pas encore câblés (nodes Library marqués indisponibles).</li>
+        </ul>
+      </div>
+      <div data-pref-panel="backup" class="hidden">
+        <p class="hint">Autosave navigateur (<code>cvd.autosave</code>) + export fichier <code>.cvd.json</code>.</p>
+        <button type="button" id="clearAutosave" class="smallbtn danger">Effacer l’autosave locale</button>
+      </div>
+      <div data-pref-panel="manual" class="hidden">
+        <iframe id="manualFrame" class="manual-frame" src="../docs/manual/index.html" title="Manuel No-de Vibe Designer"></iframe>
+      </div>
+      <div data-pref-panel="about" class="hidden">
+        <p id="versionInfo">No-de Vibe Designer</p>
+        <p class="hint">Schéma projet <code>cvd.graph</code> (compatibilité). Incrémentation à chaque livraison.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="routeSheet" class="route-sheet hidden">
+  <div class="route-sheet-head"><b id="routeSheetTitle">Routage piste</b><button id="routeSheetClose" type="button">×</button></div>
+  <div class="route-section">
+    <label>Mode</label>
+    <div class="route-modes">
+      <button type="button" data-route-mode="main">Principal</button>
+      <button type="button" data-route-mode="only">Uniquement vers…</button>
+      <button type="button" data-route-mode="copy">Copie vers…</button>
+    </div>
+  </div>
+  <div class="route-section"><label>Destinations</label><div id="routeDestinations" class="route-dests"></div></div>
+  <div class="route-hint">Les adaptateurs natifs (NDI, Syphon, Spout) sont préparés dans le modèle mais ne sont affichés comme actifs que lorsqu'un backend compatible est réellement disponible.</div>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
