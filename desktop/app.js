@@ -10,6 +10,8 @@ import { NODE_GROUPS, spec as sharedSpec } from "../shared/node-specs.js";
 import { createHistory } from "../shared/history.js";
 import { ensureSubGraph } from "../shared/subpatch.js";
 import { sharedAudio } from "../shared/audio-engine.js";
+import { planManualSave, planManualOpen, saveStatusMessage, MANUAL_SAVE_KEY } from "../shared/save-fallback.js";
+import { nestedBoxSelfTest } from "../shared/self-test.js";
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -655,18 +657,74 @@ $("#vibeText").addEventListener("keydown", e => {
   }
 });
 
-$("#saveProject").onclick = () => {
-  const blob = new Blob([exportProject(project)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = (project.name || "projet") + ".cvd.json";
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 500);
+function runtimeFacts() {
+  return {
+    electronRuntime: window.nvdDesktop?.runtime === "electron",
+    hasNativeSave: typeof window.nvdDesktop?.saveProject === "function",
+    hasNativeOpen: typeof window.nvdDesktop?.openProject === "function",
+    userAgent: navigator.userAgent || ""
+  };
+}
+
+async function loadProjectText(data, label) {
+  project = validateProject(JSON.parse(data));
+  graphPath = [];
+  redraw();
+  await runtime.syncCameraFromProject();
+  runtime.play();
+  syncPlayButton();
+  log("Projet chargé · " + (label || project.name));
+}
+
+$("#saveProject").onclick = async () => {
+  const data = exportProject(project);
+  const fileName = (project.name || "projet") + ".cvd.json";
+  const facts = runtimeFacts();
+  const plan = planManualSave({
+    hasNativeSave: facts.hasNativeSave,
+    userAgent: facts.userAgent,
+    electronRuntime: facts.electronRuntime
+  });
+  if (plan.persistLocal) {
+    try { localStorage.setItem(MANUAL_SAVE_KEY, data); }
+    catch (e) { log(`Sauvegarde locale impossible · ${e.message || e}`); }
+  }
+  if (plan.mode === "native") {
+    const r = await window.nvdDesktop.saveProject({ suggestedName: fileName, data });
+    if (r && !r.canceled) log(saveStatusMessage(plan, r.path || fileName));
+    autosave();
+    return;
+  }
+  if (plan.download) {
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.style.display = "none";
+    document.body.append(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1200);
+  }
+  log(saveStatusMessage(plan, fileName));
   autosave();
-  log("Projet enregistré");
 };
-$("#loadProject").onclick = () => $("#projectFile").click();
+$("#loadProject").onclick = async () => {
+  const facts = runtimeFacts();
+  const saved = localStorage.getItem(MANUAL_SAVE_KEY);
+  const plan = planManualOpen({ hasNativeOpen: facts.hasNativeOpen, hasLocalSave: !!saved });
+  if (plan === "native") {
+    const r = await window.nvdDesktop.openProject();
+    if (r?.error) log(`Ouverture · ${r.error}`);
+    if (r && !r.canceled && r.data) loadProjectText(r.data, r.path);
+    return;
+  }
+  if (plan === "local-then-file" && saved && confirm("Rouvrir le dernier projet enregistré localement ?")) {
+    loadProjectText(saved, "sauvegarde locale");
+    return;
+  }
+  $("#projectFile").click();
+};
 $("#projectFile").onchange = async e => {
   const f = e.target.files[0];
   if (!f) return;
@@ -989,3 +1047,12 @@ runtime.syncCameraFromProject().then(ok => {
   syncPlayButton();
 });
 log(`${BUILD_LABEL} · moteur graphe actif`);
+window.__nvdSelfTest = () => nestedBoxSelfTest();
+try {
+  const self = window.__nvdSelfTest();
+  log(self.ok
+    ? `Auto-test boîtes imbriquées · PASS (${self.value})`
+    : `Auto-test boîtes imbriquées · ÉCHEC · ${self.error || self.value}`);
+} catch (e) {
+  log(`Auto-test boîtes imbriquées · ÉCHEC · ${e.message || e}`);
+}

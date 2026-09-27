@@ -107,18 +107,54 @@ export function createNodeProcessors() {
       : typeof valIn === "number" ? valIn
       : Number(node.params?.value ?? 0);
 
-    // Emit at most ~15 Hz to avoid flooding
-    const now = performance.now();
+    // Pas de réussite simulée : sans passerelle, l'envoi n'a pas lieu.
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const flag = key => {
+      const flags = ctx.honestFlags;
+      if (!flags) return false;
+      const id = `osc:${node.id}:${key}`;
+      if (flags.has(id)) return true;
+      flags.add(id);
+      return false;
+    };
+    if (!ctx.bridgeSend) {
+      if (!flag("missing")) {
+        ctx.warnings?.push("OSC indisponible dans ce runtime : aucune passerelle n'est chargée");
+      }
+      return out;
+    }
     if (!ctx._oscLast) ctx._oscLast = 0;
-    if (ctx.bridgeSend && now - ctx._oscLast > 66) {
+    if (now - ctx._oscLast > 66) {
       ctx._oscLast = now;
       try {
         ctx.bridgeSend({ type: "osc", target: host, address, args: [value] });
         ctx.oscSent = { host, address, value, at: now };
       } catch (e) {
         ctx.oscError = e.message || String(e);
+        if (!flag("send")) {
+          ctx.warnings?.push(`OSC indisponible : ${ctx.oscError}`);
+        }
       }
     }
+    return out;
+  });
+
+  fns.set("number", node => {
+    const out = new Map();
+    const n = Number(node.params?.value);
+    out.set(0, { kind: "number", value: Number.isFinite(n) ? n : 0 });
+    return out;
+  });
+
+  fns.set("multiply", (_node, inputs) => {
+    const read = v => {
+      if (typeof v === "number") return v;
+      if (v && typeof v.value === "number") return v.value;
+      const n = Number(v?.value ?? v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const out = new Map();
+    out.set(2, { kind: "number", value: read(inputs.get(0)?.value) * read(inputs.get(1)?.value) });
     return out;
   });
 
@@ -179,7 +215,7 @@ export function createNodeProcessors() {
   });
 
   fns.set("soundmemo", (node, inputs, ctx) => {
-    // Niveau micro mémorisé (pas d'enregistrement fichier dans 0.9.3 — signalé)
+    // Niveau micro mémorisé (pas d'enregistrement fichier — signalé)
     node.params = { ...node.params, mode: "mic" };
     const out = fns.get("audio")(node, inputs, ctx);
     if (ctx.warnings && !(node.params._memoWarned)) {

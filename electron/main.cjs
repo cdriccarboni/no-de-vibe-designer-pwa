@@ -114,6 +114,34 @@ async function createWindow() {
     else callback(false);
   });
 
+  if (process.argv.includes("--smoke-test")) {
+    const timeout = setTimeout(() => {
+      console.error("PACKAGED_SELF_TEST_TIMEOUT");
+      app.exit(3);
+    }, 20000);
+    const run = async () => {
+      try {
+        let result = null;
+        for (let i = 0; i < 50; i++) {
+          result = await win.webContents.executeJavaScript(
+            "window.__nvdSelfTest ? window.__nvdSelfTest() : null"
+          );
+          if (result) break;
+          await new Promise(r => setTimeout(r, 100));
+        }
+        clearTimeout(timeout);
+        if (!result) result = { ok: false, error: "self-test hook missing" };
+        console.log("PACKAGED_SELF_TEST", JSON.stringify(result));
+        app.exit(result.ok ? 0 : 2);
+      } catch (e) {
+        clearTimeout(timeout);
+        console.error("PACKAGED_SELF_TEST_ERROR", e);
+        app.exit(2);
+      }
+    };
+    win.webContents.once("did-finish-load", () => { run(); });
+  }
+
   await win.loadURL(`http://127.0.0.1:${port}/desktop/`);
 
   win.webContents.setWindowOpenHandler(({ url }) => {

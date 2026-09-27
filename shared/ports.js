@@ -75,6 +75,14 @@ export const EXECUTABLE_PORTS = {
     { name: "params", dir: "in", data: "number" },
     { name: "out", dir: "out", data: "any" }
   ],
+  number: [
+    { name: "value", dir: "out", data: "number" }
+  ],
+  multiply: [
+    { name: "a", dir: "in", data: "number" },
+    { name: "b", dir: "in", data: "number" },
+    { name: "value", dir: "out", data: "number" }
+  ],
   audio: [
     { name: "in", dir: "in", data: "number" },
     { name: "process", dir: "in", data: "number" },

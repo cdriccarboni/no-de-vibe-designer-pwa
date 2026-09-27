@@ -1,39 +1,23 @@
-# No-de Vibe Designer 0.9.3
+# No-de Vibe Designer
 
-Environnement de patch nodal pour la création et l’exploitation scène (macOS Apple Silicon).
+**This is the canonical source** (0.9.4).
 
-## Lancer
+The previous `main` line (0.8.0, `110a59f`) is kept intact as tag `archive/main-0.8.0-110a59f` and branch `archive/main-0.8.0`. Those refs are history only. This tree is the one to build and to fast-forward onto `main`.
 
-### Application autonome (recommandé)
+## Run
+
 ```bash
-./packaging/mac/BUILD-Electron-No-de-Vibe-Designer.command
-open "dist/electron/mac-arm64/No-de Vibe Designer.app"
+npm install
+npm start
 ```
-Chromium est embarqué via Electron — **pas besoin** de Chrome installé.
 
-### Développement web
-```bash
-./LANCER-No-de-Vibe-Designer.command
-```
-→ `http://127.0.0.1:4173/desktop/`
+macOS package: `npm run dist:mac`  
+Linux package: `npm run pack:linux`
 
 ## Tests
+
 ```bash
 npm test
-# ou
-node tests/run.mjs
 ```
 
-## Fonctions 0.9.3
-- Patch exécutable : caméra → shader → Preview/OUTPUT
-- Sous-patches (édition, save/restore)
-- Audio Web Audio (tone / micro niveau)
-- Vibe : Entrée → aperçu → appliquer / annuler (Undo)
-- MIDI/OSC/Serial via bus patch (matériel à vérifier)
-- Exclusion Grok/xAI
-
-## Signature
-Les builds sont **non notarisés** (`identity: null`, signature ad hoc). Sur macOS : clic droit → Ouvrir si Gatekeeper bloque.
-
-## Historique Git
-Voir `docs/GIT_DIVERGENCE.md` — ne pas fusionner avec `origin/main` (histoire sans ancêtre commun).
+Critical cases: `docs/TEST_MATRIX.md`.

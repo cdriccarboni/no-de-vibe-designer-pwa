@@ -29,6 +29,7 @@ export class Runtime {
     this.lastGraph = { errors: [], warnings: [] };
     this.cameraWanted = false;
     this.audioEngine = sharedAudio;
+    this.honestFlags = new Set();
   }
 
   setDeviceBus(bus) { this.deviceBus = bus || this.deviceBus; }
@@ -36,6 +37,7 @@ export class Runtime {
 
   setProject(project) {
     this.project = project;
+    this.honestFlags = new Set();
     this.resize();
     // Release audio for removed nodes
     const ids = new Set((project?.nodes || []).map(n => n.id));
@@ -149,6 +151,7 @@ export class Runtime {
       bridgeSend: this.bridgeSend,
       controls: this.project.controls || [],
       audioEngine: this.audioEngine,
+      honestFlags: this.honestFlags,
       _graphApi: { evaluateGraph, findVideoOutput },
       _subpatchApi: { evaluateSubGraph },
       _subPrev: this._subPrev || new Map(),

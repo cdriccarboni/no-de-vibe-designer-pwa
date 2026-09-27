@@ -1,0 +1,48 @@
+name: macOS Apple Silicon
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm ci
+      - name: Core tests
+        run: npm test
+      - name: Syntax checks
+        run: npm run check
+
+  build-macos-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm ci
+      - name: Core tests
+        run: npm test
+      - name: Package arm64 application
+        run: npx electron-builder --mac zip --arm64
+      - name: Packaged nested-box smoke test
+        run: |
+          APP=$(find dist/electron -type d -name "No-de Vibe Designer.app" | head -1)
+          test -n "$APP"
+          test -d "$APP/Contents/MacOS"
+          "$APP/Contents/MacOS/No-de Vibe Designer" --smoke-test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: No-de-Vibe-Designer-macos-arm64
+          path: dist/electron/*.zip
+          if-no-files-found: error

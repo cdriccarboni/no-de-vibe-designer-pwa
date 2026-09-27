@@ -1,4 +1,4 @@
-# Matrice de preuves — No-de Vibe Designer 0.9.3
+# Matrice de preuves — No-de Vibe Designer 0.9.4
 
 | Fonction | Statut | Preuve |
 |---|---|---|
@@ -11,6 +11,9 @@
 | Audio tone / stop propre | **vérifié réellement** (logiciel Web Audio) | processeur + release |
 | Audio micro | **partiellement vérifié** | code prêt ; permission **à vérifier** |
 | Sous-patch sérialisation / nav | **vérifié réellement** (logiciel) | tests + UI fil d’Ariane |
+| Boîtes imbriquées A→B→×2 | **vérifié réellement** (logiciel) | `nestedBoxSelfTest` = 6 |
+| Sauvegarde WebKit | **vérifié réellement** (logiciel) | plan localStorage, message honnête |
+| Export Max / TouchDesigner | **vérifié réellement** (logiciel) | JSON + `py_compile` |
 | Vibe aperçu / appliquer / undo | **vérifié réellement** (logiciel local) | UI preview + history |
 | IA distante | **bloqué par configuration** | endpoint utilisateur ; Grok/xAI refusé |
 | Autosave / export `.cvd.json` | **vérifié réellement** (logiciel) | round-trip tests |

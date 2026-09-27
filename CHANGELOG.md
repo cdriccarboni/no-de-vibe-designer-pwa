@@ -2,6 +2,15 @@
 
 Chaque livraison fonctionnelle a un numéro incrémenté et un commit source.
 
+## 0.9.4
+
+- Source canonique : boîtes imbriquées qui transportent une valeur (A → B → ×2), garde de profondeur, auto-test.
+- Sauvegarde WebKit : copie locale réelle, sans téléchargement qui réussit en apparence.
+- OSC / Art-Net : pas d’envoi annoncé quand la passerelle est absente.
+- Exports Max/MSP et TouchDesigner pour les nodes nombre, multiplication, MIDI et OSC.
+- CI Apple Silicon via electron-builder (`macos-arm64.yml`).
+- Histoire `main` 0.8.0 archivée (`archive/main-0.8.0-110a59f`) et joignable sans remplacer cet arbre.
+
 ## 0.9.3
 
 - Sous-patches exécutables : édition imbriquée, sérialisation, restauration, propagation d’erreurs.
