@@ -1,0 +1,17 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Code Vibe Designer — OUTPUT</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}canvas{width:100%;height:100%;display:block;object-fit:contain;background:#000}.hud{position:fixed;top:10px;right:10px;display:flex;gap:6px}.hud button,.hud select{background:#111d;color:#fff;border:1px solid #555;border-radius:6px;padding:6px 8px;font:12px system-ui}</style></head>
+<body><canvas id="out" width="1280" height="720"></canvas><div class="hud"><select id="screens"><option>Écran courant</option></select><button id="screenBtn">Choisir écran</button><button id="fs">Plein écran</button></div>
+<script type="module">
+import {Runtime} from "../shared/runtime.js";
+const canvas=document.getElementById("out"); const params=new URLSearchParams(location.search),destination=params.get("route")||"main-output"; const rt=new Runtime(canvas,{destination}); let project=null; document.title=`Code Vibe Designer — OUTPUT · ${destination}`;
+window.addEventListener("message",e=>{if(e.data?.type==="cvd-project"){project=e.data.project;rt.setProject(project);rt.play()}});
+document.getElementById("fs").onclick=()=>document.documentElement.requestFullscreen?.();
+document.getElementById("screenBtn").onclick=async()=>{
+  if(!window.getScreenDetails){alert("Le choix d’écran avancé n’est pas disponible dans ce navigateur. Déplace OUTPUT sur l’écran voulu puis passe en plein écran.");return}
+  try{
+    const details=await window.getScreenDetails(), sel=document.getElementById("screens");sel.innerHTML="";
+    details.screens.forEach((s,i)=>{const o=document.createElement("option");o.value=i;o.textContent=s.label||`Écran ${i+1}`;sel.appendChild(o)});
+    const s=details.screens[+sel.value||0];window.moveTo(s.left,s.top);window.resizeTo(s.width,s.height)
+  }catch(e){alert("Autorisation écran refusée ou indisponible.")}
+};
+</script></body></html>

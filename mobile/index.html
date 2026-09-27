@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Code Vibe Designer Mobile</title><link rel="stylesheet" href="./mobile.css"></head>
+<body>
+<div class="mobile-app">
+  <header><button id="backBtn" class="ghost">‹</button><div><b>Code Vibe Designer</b><small id="screenTitle">Plateau</small></div><div class="spacer"></div><div class="mobile-mode"><button id="mobileBureau">Bureau</button><button id="mobilePlateau" class="active">Plateau</button></div><button id="mobilePrefs" class="ghost">⚙</button><button id="saveBtn" class="ghost">●</button></header>
+  <main>
+    <section class="screen active" data-screen="stage">
+      <div class="hero">
+        <canvas id="stageCanvas" width="720" height="1280"></canvas>
+        <div class="stage-actions"><button id="playBtn">▶</button><button id="stopBtn">■</button><button id="outputBtn">OUTPUT</button></div>
+      </div>
+      <div class="quick-cues">
+        <button data-cue="1">TOP 1</button><button data-cue="2">TOP 2</button><button data-cue="3">TOP 3</button>
+      </div>
+      <div class="status-row"><span id="runtimeStatus">READY</span><span id="sensorStatus">Capteurs OFF</span></div>
+    </section>
+
+    <section class="screen" data-screen="patch">
+      <div class="toolbar"><button id="addNodeBtn">＋ Node</button><button id="fitBtn">Adapter</button></div>
+      <div id="mobilePatch" class="mobile-patch">
+        <div id="patchWorld" class="patch-world"></div>
+      </div>
+      <div id="nodeSheet" class="sheet hidden">
+        <div class="sheet-grip"></div><div class="sheet-head"><b>Ajouter un node</b><button id="closeNodeSheet">×</button></div>
+        <div id="nodeList" class="node-list"></div>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="vibe">
+      <div class="vibe-mobile">
+        <textarea id="vibeInput" placeholder="Dis ce que tu veux créer…">Ajoute une caméra arrière, utilise le gyroscope pour déplacer légèrement l’image et crée un top de 5 secondes.</textarea>
+        <button id="applyVibeBtn">Mettre à jour le graphe</button>
+      </div>
+      <div class="explain"><b>Vibe mobile</b><p>Une seule zone d’intention, pas de terminal permanent. Les détails apparaissent seulement si nécessaire.</p></div>
+    </section>
+
+    <section class="screen" data-screen="tools">
+      <div class="tool-cards">
+        <button data-tool="camera">Caméras</button><button data-tool="sensors">Capteurs</button><button data-tool="osc">OSC</button><button data-tool="network">Réseau</button>
+        <button data-tool="shader">Shaders</button><button data-tool="mapping">Mapping</button><button data-tool="arduino">Arduino</button><button data-tool="output">OUTPUT</button><button data-tool="routing">Routage pistes</button>
+      </div>
+      <div id="toolView" class="tool-view"><p>Choisis un outil.</p></div>
+    </section>
+
+    <section class="screen" data-screen="device">
+      <div class="device-grid">
+        <button id="frontCam">Caméra avant</button><button id="backCam">Caméra arrière</button><button id="motionBtn">Mouvement</button><button id="gpsBtn">GPS</button><button id="vibrateBtn">Vibration</button>
+      </div>
+      <pre id="sensorReadout">Aucune donnée capteur.</pre>
+    </section>
+  </main>
+
+  <nav>
+    <button data-nav="stage" class="active"><span>◉</span><small>Plateau</small></button>
+    <button data-nav="patch"><span>◇</span><small>Patch</small></button>
+    <button data-nav="vibe"><span>✦</span><small>Vibe</small></button>
+    <button data-nav="tools"><span>☰</span><small>Outils</small></button>
+    <button data-nav="device"><span>⌁</span><small>Device</small></button>
+  </nav>
+</div>
+<div id="mobilePreferences" class="sheet hidden"><div class="sheet-grip"></div><div class="sheet-head"><b>Préférences · Apparence</b><button id="closeMobilePrefs">×</button></div><div class="mobile-prefs-body"><label>Dominante <input id="mobileAccent" type="color" value="#d7b86a"></label><label>Secondaire <input id="mobileSecondary" type="color" value="#8fa79d"></label><button id="mobileResetAppearance">Réinitialiser</button></div></div>
+<script type="module" src="./mobile.js"></script>
+</body></html>

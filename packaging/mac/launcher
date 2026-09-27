@@ -1,0 +1,33 @@
+#!/bin/zsh
+set -e
+HERE="${0:A:h}"
+APP_ROOT="${HERE:h}"
+RES="$APP_ROOT/Resources/app"
+URL="file://$RES/desktop/index.html"
+PROFILE="$HOME/Library/Application Support/Code Vibe Designer/ChromiumProfile"
+mkdir -p "$PROFILE"
+CANDIDATES=(
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
+  "$HOME/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
+  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
+)
+BROWSER=""
+for c in "${CANDIDATES[@]}"; do
+  if [[ -x "$c" ]]; then BROWSER="$c"; break; fi
+done
+if [[ -z "$BROWSER" ]]; then
+  /usr/bin/osascript -e 'display dialog "Code Vibe Designer nécessite Google Chrome, Brave ou Edge pour ce build Mac. Installe ou ouvre l’un d’eux puis relance l’application." buttons {"OK"} default button 1 with icon caution'
+  exit 1
+fi
+exec "$BROWSER" \
+  --app="$URL" \
+  --user-data-dir="$PROFILE" \
+  --allow-file-access-from-files \
+  --no-first-run \
+  --no-default-browser-check \
+  --disable-translate \
+  --disable-features=TranslateUI \
+  --enable-features=WebBluetoothNewPermissionsBackend \
+  --window-size=1440,930
