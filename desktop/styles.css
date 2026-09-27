@@ -101,3 +101,11 @@ body.gradient-strong{--gradient-alpha:.78}
 .patch-world{position:absolute;left:0;top:0;width:2400px;height:1600px;transform-origin:0 0;will-change:transform}
 .patch-world .node{position:absolute}
 .panel-head .iconbtn{font-size:11px;min-width:28px}
+
+.graph-path{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid var(--line);background:var(--panel2);font-size:11px}
+.graph-path .crumb{border:0;background:transparent;color:var(--accent);cursor:pointer;padding:2px 4px}
+.graph-path .crumb-sep{color:var(--muted)}
+.vibe-preview{margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel2)}
+.vibe-preview.hidden{display:none}
+.vibe-preview-ops{max-height:120px;overflow:auto;font:11px ui-monospace,Menlo,monospace;color:var(--muted);white-space:pre-wrap}
+.vibe-preview-actions{display:flex;gap:8px;margin-top:8px}

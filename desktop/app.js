@@ -8,6 +8,8 @@ import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllo
 import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
 import { NODE_GROUPS, spec as sharedSpec } from "../shared/node-specs.js";
 import { createHistory } from "../shared/history.js";
+import { ensureSubGraph } from "../shared/subpatch.js";
+import { sharedAudio } from "../shared/audio-engine.js";
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -20,6 +22,9 @@ const history = createHistory(40);
 let historySuspended = false;
 const view = { x: 0, y: 0, scale: 1 };
 let panDrag = null;
+/** Pile de navigation sous-patch : [{ id, title }] */
+let graphPath = [];
+let pendingVibe = null;
 
 const runtime = new Runtime($("#previewCanvas"), {
   onGraphEvent: ev => {
@@ -104,8 +109,58 @@ function buildLibrary() {
   $$("[data-add]").forEach(x => x.onclick = () => addNode(x.dataset.add));
 }
 
-function nodeById(id) { return project.nodes.find(n => n.id === id); }
-function ensureEdges() { project.edges ||= []; return project.edges; }
+function activeGraph() {
+  if (!graphPath.length) return project;
+  let g = project;
+  let node = null;
+  for (const step of graphPath) {
+    node = (g.nodes || project.nodes).find(n => n.id === step.id);
+    if (!node) break;
+    g = ensureSubGraph(node);
+  }
+  return g;
+}
+
+function isRootGraph() {
+  return graphPath.length === 0;
+}
+
+function updateGraphBreadcrumb() {
+  const el = $("#graphPath");
+  if (!el) return;
+  const parts = ["Racine", ...graphPath.map(p => p.title || p.id)];
+  el.innerHTML = parts.map((p, i) =>
+    `<button type="button" class="crumb" data-crumb="${i}">${p}</button>`
+  ).join("<span class='crumb-sep'>/</span>");
+  el.querySelectorAll("[data-crumb]").forEach(b => {
+    b.onclick = () => {
+      const idx = +b.dataset.crumb;
+      graphPath = graphPath.slice(0, Math.max(0, idx));
+      selectedNode = null;
+      redraw();
+      updateGraphBreadcrumb();
+      log(graphPath.length ? `Sous-patch · ${graphPath.map(x => x.title).join(" / ")}` : "Racine du patch");
+    };
+  });
+}
+
+function enterSubpatch(node) {
+  if (node.type !== "subpatch") return;
+  ensureSubGraph(node);
+  graphPath.push({ id: node.id, title: node.title || "Sous-patch" });
+  selectedNode = null;
+  redraw();
+  updateGraphBreadcrumb();
+  log(`Ouverture sous-patch · ${node.title}`);
+}
+
+function nodeById(id) { return activeGraph().nodes.find(n => n.id === id); }
+function ensureEdges() {
+  const g = activeGraph();
+  g.edges ||= [];
+  if (isRootGraph()) project.edges = g.edges;
+  return g.edges;
+}
 let wireDraft = null, wireSeq = 0;
 
 function ensureWireLayer() {
@@ -148,19 +203,21 @@ function renderWires() {
   svg.setAttribute("width", Math.max(world.scrollWidth || 2400, 2400));
   svg.setAttribute("height", Math.max(world.scrollHeight || 1600, 1600));
   group.innerHTML = "";
-  for (const edge of project.edges) {
+  const g = activeGraph();
+  for (const edge of g.edges || []) {
     const from = findPort(edge.from.node, edge.from.port, "out");
     const to = findPort(edge.to.node, edge.to.port, "in");
     if (!from || !to) continue;
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.classList.add("wire");
     path.dataset.edgeId = edge.id;
-    const v = validateEdge(project, edge.from, edge.to);
+    const v = validateEdge({ nodes: g.nodes, edges: g.edges }, edge.from, edge.to);
     if (!v.ok) path.classList.add("invalid");
     path.setAttribute("d", edgePath(portCenter(from), portCenter(to)));
     path.addEventListener("dblclick", e => {
       e.stopPropagation();
-      project.edges = project.edges.filter(x => x.id !== edge.id);
+      g.edges = g.edges.filter(x => x.id !== edge.id);
+      if (isRootGraph()) project.edges = g.edges;
       renderWires();
       autosave();
       commitHistory();
@@ -215,22 +272,24 @@ function finishWire(e) {
     log("ERREUR · Impossible de connecter un node à lui-même");
     return;
   }
-  const v = validateEdge(project, from, to);
+  const v = validateEdge({ nodes: activeGraph().nodes, edges: activeGraph().edges }, from, to);
   if (!v.ok) {
     log(`ERREUR · ${v.errors.join(" · ")}`);
     return;
   }
   ensureEdges();
-  project.edges = project.edges.filter(x => !(x.to.node === to.node && x.to.port === to.port));
-  if (!project.edges.some(x => x.from.node === from.node && x.from.port === from.port && x.to.node === to.node && x.to.port === to.port)) {
+  const edges = activeGraph().edges;
+  activeGraph().edges = edges.filter(x => !(x.to.node === to.node && x.to.port === to.port));
+  if (!activeGraph().edges.some(x => x.from.node === from.node && x.from.port === from.port && x.to.node === to.node && x.to.port === to.port)) {
     wireSeq++;
-    project.edges.push({ id: `e${Date.now()}-${wireSeq}`, from, to });
+    activeGraph().edges.push({ id: `e${Date.now()}-${wireSeq}`, from, to });
     log(`Connexion · ${nodeById(from.node)?.title || from.node} → ${nodeById(to.node)?.title || to.node}`);
   }
+  if (isRootGraph()) project.edges = activeGraph().edges;
   renderWires();
   autosave();
   commitHistory();
-  runtime.render();
+  if (isRootGraph()) runtime.render();
 }
 
 function attachPortInteractions(el) {
@@ -241,16 +300,20 @@ window.addEventListener("pointerup", finishWire);
 window.addEventListener("resize", () => requestAnimationFrame(renderWires));
 
 function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq / 4) * 110) {
-  nodeSeq++;
-  const [title, ports] = spec(type);
+  const g = activeGraph();
+  const seq = (g.nodes.reduce((m, n) => Math.max(m, parseInt(String(n.id).replace(/\D/g, "")) || 0), 0) + 1);
+  nodeSeq = Math.max(nodeSeq, seq);
+  const [title] = spec(type);
   const n = {
-    id: `n${nodeSeq}`,
+    id: `n${seq}`,
     type,
     title,
     x, y,
-    params: { enabled: true, duration: 5, opacity: 1, intensity: 1, host: "bridge", address: "/nvd/value", value: 0, fallback: 0 }
+    params: { enabled: true, duration: 5, opacity: 1, intensity: 1, host: "bridge", address: "/nvd/value", value: 0, fallback: 0, freq: 220, gain: 0.15, mode: "tone" }
   };
-  project.nodes.push(n);
+  if (type === "subpatch") ensureSubGraph(n);
+  g.nodes.push(n);
+  if (isRootGraph()) project.nodes = g.nodes;
   drawNode(n);
   selectNode(n.id);
   if (!isExecutable(type)) {
@@ -258,12 +321,12 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
   } else {
     log(`Node ajouté · ${title}`);
   }
-  if (type === "camera" || type === "phone-camera-front" || type === "phone-camera-back") {
+  if (isRootGraph() && (type === "camera" || type === "phone-camera-front" || type === "phone-camera-back")) {
     runtime.enableCamera(type === "phone-camera-front" ? "user" : "environment")
       .then(() => log("Caméra active"))
       .catch(e => log("Caméra : " + e.message));
   }
-  runtime.setProject(project);
+  if (isRootGraph()) runtime.setProject(project);
   autosave();
   commitHistory();
   return n;
@@ -282,6 +345,7 @@ function drawNode(n) {
   }).join("")}</div>`;
   $("#patchWorld").appendChild(el);
   el.onmousedown = () => selectNode(n.id);
+  el.ondblclick = () => { if (n.type === "subpatch") enterSubpatch(n); };
   attachPortInteractions(el);
   makeDraggable(el, n);
   requestAnimationFrame(renderWires);
@@ -322,24 +386,46 @@ function selectNode(id) {
     extra += `<div class="field"><label>Fallback CC (0–1)</label><input id="nFb" type="range" min="0" max="1" step=".01" value="${n.params.fallback ?? 0}"></div>`;
     extra += `<p class="hint">Matériel MIDI : à vérifier sur périphérique réel. Test logiciel = bus interne.</p>`;
   }
+  if (n.type === "audio" || n.type === "organicaudio") {
+    extra += `<div class="field"><label>Fréquence</label><input id="nFreq" type="number" min="40" max="2000" value="${n.params.freq ?? 220}"></div>`;
+    extra += `<div class="field"><label>Gain</label><input id="nGain" type="range" min="0" max="0.5" step=".01" value="${n.params.gain ?? 0.15}"></div>`;
+    extra += `<p class="hint">Audio logiciel Web Audio. Micro réel : à vérifier (permissions).</p>`;
+  }
+  if (n.type === "soundmemo") {
+    extra += `<p class="hint">Niveau micro opérationnel. Enregistrement fichier : pas encore disponible.</p>`;
+  }
+  if (n.type === "subpatch") {
+    extra += `<p class="hint">Double-clic ou « Ouvrir sous-patch » pour éditer le graphe interne.</p>`;
+  }
   $("#inspectorBody").innerHTML = `
     <div class="field"><label>Durée</label><input id="nDur" type="number" min=".1" step=".1" value="${n.params.duration}"></div>
     <div class="field"><label>Opacité</label><input id="nOpa" type="range" min="0" max="1" step=".01" value="${n.params.opacity}"></div>
     <div class="field"><label>Actif</label><select id="nEnabled"><option value="true">Oui</option><option value="false">Non</option></select></div>
     ${extra}
-    <button id="toolBtn" class="smallbtn">Ouvrir outil ↗</button>
+    <button id="toolBtn" class="smallbtn">${n.type === "subpatch" ? "Ouvrir sous-patch ↗" : "Ouvrir outil ↗"}</button>
     <button id="dupNodeBtn" class="smallbtn">Dupliquer</button>
     <button id="delNodeBtn" class="smallbtn danger">Supprimer</button>`;
   $("#nEnabled").value = String(n.params.enabled);
   $("#nDur").onchange = e => { n.params.duration = +e.target.value; autosave(); commitHistory(); };
   $("#nOpa").oninput = e => { n.params.opacity = +e.target.value; runtime.render(); autosave(); };
-  $("#nEnabled").onchange = e => { n.params.enabled = e.target.value === "true"; runtime.render(); autosave(); commitHistory(); };
+  $("#nEnabled").onchange = e => {
+    n.params.enabled = e.target.value === "true";
+    if (!n.params.enabled && (n.type === "audio" || n.type === "organicaudio" || n.type === "soundmemo")) {
+      sharedAudio.release(n.id);
+    }
+    runtime.render();
+    autosave();
+    commitHistory();
+  };
   if ($("#nInt")) $("#nInt").oninput = e => { n.params.intensity = +e.target.value; runtime.render(); autosave(); };
   if ($("#nHost")) $("#nHost").onchange = e => { n.params.host = e.target.value; autosave(); commitHistory(); };
   if ($("#nAddr")) $("#nAddr").onchange = e => { n.params.address = e.target.value; autosave(); commitHistory(); };
   if ($("#nFb")) $("#nFb").oninput = e => { n.params.fallback = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nFreq")) $("#nFreq").onchange = e => { n.params.freq = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nGain")) $("#nGain").oninput = e => { n.params.gain = +e.target.value; runtime.render(); autosave(); };
   $("#toolBtn").onclick = () => {
-    if (!isExecutable(n.type)) log(`Outil · ${n.title} indisponible (pas de moteur)`);
+    if (n.type === "subpatch") enterSubpatch(n);
+    else if (!isExecutable(n.type)) log(`Outil · ${n.title} indisponible (pas de moteur)`);
     else log(`Outil · ${n.title} — paramètres dans l'inspecteur`);
   };
   $("#dupNodeBtn").onclick = () => duplicateNode(n.id);
@@ -359,8 +445,14 @@ function duplicateNode(id) {
 }
 
 function deleteNode(id) {
-  project.nodes = project.nodes.filter(n => n.id !== id);
-  project.edges = (project.edges || []).filter(e => e.from.node !== id && e.to.node !== id);
+  const g = activeGraph();
+  sharedAudio.release(id);
+  g.nodes = g.nodes.filter(n => n.id !== id);
+  g.edges = (g.edges || []).filter(e => e.from.node !== id && e.to.node !== id);
+  if (isRootGraph()) {
+    project.nodes = g.nodes;
+    project.edges = g.edges;
+  }
   if (selectedNode === id) selectedNode = null;
   redraw();
   autosave();
@@ -431,16 +523,20 @@ function redraw() {
   $("#previewOverlay").innerHTML = "";
   $$(".track").forEach(t => t.innerHTML = "");
   nodeSeq = 0; clipSeq = 0; pointSeq = 0;
-  for (const n of project.nodes) {
-    nodeSeq = Math.max(nodeSeq, +n.id.replace(/\D/g, "") || 0);
+  const g = activeGraph();
+  for (const n of g.nodes || []) {
+    nodeSeq = Math.max(nodeSeq, +String(n.id).replace(/\D/g, "") || 0);
     drawNode(n);
   }
-  project.controls.forEach((p, i) => { pointSeq = i + 1; drawPoint(p, i + 1); });
-  for (const c of project.timeline) {
-    clipSeq = Math.max(clipSeq, +c.id.replace(/\D/g, "") || 0);
-    drawClip(c);
+  if (isRootGraph()) {
+    project.controls.forEach((p, i) => { pointSeq = i + 1; drawPoint(p, i + 1); });
+    for (const c of project.timeline) {
+      clipSeq = Math.max(clipSeq, +c.id.replace(/\D/g, "") || 0);
+      drawClip(c);
+    }
+    runtime.setProject(project);
   }
-  runtime.setProject(project);
+  updateGraphBreadcrumb();
   requestAnimationFrame(renderWires);
 }
 
@@ -492,24 +588,63 @@ async function applyVibeFromUi() {
 
     if (!result.ops?.length) {
       log("Vibe · aucune opération générée (pas de réussite simulée)");
+      pendingVibe = null;
+      $("#vibePreview")?.classList.add("hidden");
       return;
     }
 
-    const { applied, errors } = applyVibeOps(project, result.ops, {
-      addNode, addClip, ensureEdges, nodeById, log
-    });
-    redraw();
-    runtime.play();
-    syncPlayButton();
-    autosave();
-    commitHistory();
-    log(`Vibe · ${applied.length} op(s) · moteur=${result.engine}`);
-    for (const err of errors) log(`Vibe ERREUR · ${err}`);
+    pendingVibe = result;
+    const box = $("#vibePreview");
+    if (box) {
+      box.classList.remove("hidden");
+      box.innerHTML = `<div class="vibe-preview-head"><b>Aperçu Vibe</b> · ${result.engine} · ${result.ops.length} op(s)</div>
+        <pre class="vibe-preview-ops">${result.ops.map(o => JSON.stringify(o)).join("\n")}</pre>
+        <div class="vibe-preview-actions">
+          <button type="button" id="vibeConfirm" class="smallbtn">Appliquer</button>
+          <button type="button" id="vibeCancel" class="smallbtn">Annuler</button>
+        </div>`;
+      $("#vibeConfirm").onclick = () => confirmPendingVibe();
+      $("#vibeCancel").onclick = () => {
+        pendingVibe = null;
+        box.classList.add("hidden");
+        log("Vibe · aperçu annulé (aucune modification)");
+      };
+    } else {
+      await confirmPendingVibe();
+    }
   } catch (e) {
     log(`Vibe ÉCHEC · ${e.message || e}`);
   } finally {
     $("#applyVibe").disabled = false;
   }
+}
+
+async function confirmPendingVibe() {
+  if (!pendingVibe?.ops?.length) return;
+  commitHistory();
+  const { applied, errors } = applyVibeOps(project, pendingVibe.ops, {
+    addNode: (type, x, y) => {
+      // force root graph for vibe
+      const prev = graphPath;
+      graphPath = [];
+      const n = addNode(type, x, y);
+      graphPath = prev;
+      return n;
+    },
+    addClip, ensureEdges: () => { project.edges ||= []; return project.edges; },
+    nodeById: id => project.nodes.find(n => n.id === id),
+    log
+  });
+  pendingVibe = null;
+  $("#vibePreview")?.classList.add("hidden");
+  graphPath = [];
+  redraw();
+  runtime.play();
+  syncPlayButton();
+  autosave();
+  commitHistory();
+  log(`Vibe · ${applied.length} op(s) appliquée(s) — annulable via Undo`);
+  for (const err of errors) log(`Vibe ERREUR · ${err}`);
 }
 
 $("#applyVibe").onclick = applyVibeFromUi;

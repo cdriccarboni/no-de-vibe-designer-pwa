@@ -210,7 +210,7 @@ export async function runVibe(text, project, { forceLocal = false } = {}) {
   };
 }
 
-const ALLOWED_TYPES = new Set(["camera", "shader", "midi", "osc", "tracking", "stageio", "phone-camera-front", "phone-camera-back"]);
+const ALLOWED_TYPES = new Set(["camera", "shader", "midi", "osc", "tracking", "stageio", "subpatch", "audio", "organicaudio", "soundmemo", "phone-camera-front", "phone-camera-back"]);
 
 export function applyVibeOps(project, ops, helpers) {
   const { addNode, addClip, ensureEdges, nodeById } = helpers;

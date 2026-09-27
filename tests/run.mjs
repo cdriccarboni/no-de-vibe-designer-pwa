@@ -8,6 +8,7 @@ import { validateEdge, findCycleEdgeIds, topoOrder, evaluateGraph, findVideoOutp
 import { localVibeParse, applyVibeOps, isForbiddenAiProvider, assertAiProviderAllowed } from "../shared/vibe.js";
 import { APP_VERSION } from "../shared/version.js";
 import { createHistory } from "../shared/history.js";
+import { ensureSubGraph } from "../shared/subpatch.js";
 
 let passed = 0, failed = 0;
 function assert(cond, msg) {
@@ -27,7 +28,8 @@ assert(portDirection("shader", 0, 3) === "in", "shader texture in");
 assert(portDirection("shader", 2, 3) === "out", "shader out");
 assert(portDirection("osc", 2, 3) === "in", "osc value in (sink)");
 assert(isExecutable("camera") && isExecutable("shader"), "camera+shader executable");
-assert(!isExecutable("audio"), "audio not executable yet");
+assert(isExecutable("audio") && isExecutable("subpatch"), "audio+subpatch executable");
+assert(!isExecutable("millumin"), "millumin not executable yet");
 
 // --- ir / demo ---
 console.log("ir");
@@ -125,6 +127,15 @@ assert(isForbiddenAiProvider("https://api.x.ai/v1/chat/completions", "grok-2"), 
 assert(isForbiddenAiProvider("", "grok-beta"), "blocks grok model name");
 assert(!isForbiddenAiProvider("https://api.openai.com/v1/chat/completions", "gpt-4o-mini"), "allows OpenAI");
 assert(!assertAiProviderAllowed({ endpoint: "https://api.x.ai/v1", model: "grok" }).ok, "assert rejects xAI");
+
+// --- subpatch serialization ---
+console.log("subpatch");
+const sp = { id: "n10", type: "subpatch", title: "Sous-patch", params: {} };
+const sg = ensureSubGraph(sp);
+assert(Array.isArray(sg.nodes) && Array.isArray(sg.edges), "subpatch graph initialized");
+sg.nodes.push({ id: "n1", type: "stageio", title: "IO", x: 0, y: 0, params: { enabled: true } });
+const roundTrip = JSON.parse(JSON.stringify(sp));
+assert(roundTrip.params.graph.nodes.length === 1, "subpatch survives JSON round-trip");
 
 console.log(`\nRésultat : ${passed} OK · ${failed} FAIL\n`);
 process.exit(failed ? 1 : 0);

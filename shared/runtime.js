@@ -1,6 +1,8 @@
 import { ShaderSurface, DEFAULT_FRAGMENT } from "./adapters/shader-surface.js";
 import { evaluateGraph, findVideoOutput } from "./graph-engine.js";
 import { createNodeProcessors } from "./node-processors.js";
+import { evaluateSubGraph } from "./subpatch.js";
+import { sharedAudio } from "./audio-engine.js";
 
 export class Runtime {
   constructor(canvas, { destination = "main-output", onGraphEvent = null } = {}) {
@@ -26,6 +28,7 @@ export class Runtime {
     this.bridgeSend = null;
     this.lastGraph = { errors: [], warnings: [] };
     this.cameraWanted = false;
+    this.audioEngine = sharedAudio;
   }
 
   setDeviceBus(bus) { this.deviceBus = bus || this.deviceBus; }
@@ -34,6 +37,11 @@ export class Runtime {
   setProject(project) {
     this.project = project;
     this.resize();
+    // Release audio for removed nodes
+    const ids = new Set((project?.nodes || []).map(n => n.id));
+    for (const id of [...this.audioEngine.nodes.keys()]) {
+      if (!ids.has(id)) this.audioEngine.release(id);
+    }
     this.syncCameraFromProject();
     this.render();
   }
@@ -96,7 +104,16 @@ export class Runtime {
     this.playing = false;
     cancelAnimationFrame(this.raf);
     this.time = 0;
+    // Arrêt audio : aucun traitement résiduel
+    this.audioEngine?.releaseAll();
     this.render();
+  }
+
+  async dispose() {
+    this.stop();
+    if (this.mediaStream) this.mediaStream.getTracks().forEach(t => t.stop());
+    this.mediaStream = null;
+    await this.audioEngine?.shutdown();
   }
 
   loop(now) {
@@ -131,12 +148,17 @@ export class Runtime {
       deviceBus: this.deviceBus,
       bridgeSend: this.bridgeSend,
       controls: this.project.controls || [],
+      audioEngine: this.audioEngine,
+      _graphApi: { evaluateGraph, findVideoOutput },
+      _subpatchApi: { evaluateSubGraph },
+      _subPrev: this._subPrev || new Map(),
       errors: [],
       warnings: []
     };
 
     const result = evaluateGraph(this.project, this.nodeFns, ctx, this.previousOutputs);
     this.previousOutputs = result.outputs;
+    this._subPrev = ctx._subPrev;
     this.lastGraph = result;
 
     if (result.errors.length || result.warnings.length) {

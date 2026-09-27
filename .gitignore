@@ -3,3 +3,7 @@ _compare/
 .DS_Store
 dist/
 *.log
+node_modules/
+dist/electron/
+*.dmg
+npm-debug.log*

@@ -132,10 +132,80 @@ export function createNodeProcessors() {
     return out;
   });
 
-  fns.set("stageio", (node, inputs) => {
+  fns.set("stageio", (node, inputs, ctx) => {
     const out = new Map();
-    const v = inputs.get(0)?.value;
+    const v = inputs.get(0)?.value ?? ctx.subpatchIn;
     if (v) out.set(2, v);
+    else if (ctx.subpatchIn) out.set(2, ctx.subpatchIn);
+    return out;
+  });
+
+  fns.set("audio", (node, inputs, ctx) => {
+    const out = new Map();
+    const audio = ctx.audioEngine;
+    if (!audio) throw new Error("Moteur audio indisponible");
+    if (node.params?.enabled === false) {
+      audio.release(node.id);
+      out.set(2, { kind: "number", value: 0 });
+      return out;
+    }
+    const freqIn = inputs.get(0)?.value;
+    const gainIn = inputs.get(1)?.value;
+    const freq = typeof freqIn?.value === "number" ? 80 + freqIn.value * 880
+      : Number(node.params?.freq ?? 220);
+    const gain = typeof gainIn?.value === "number" ? Math.min(0.5, Math.max(0, gainIn.value))
+      : Number(node.params?.gain ?? 0.15);
+    const mode = node.params?.mode || "tone";
+
+    // Sync async start without blocking frame — schedule if missing
+    const existing = audio.nodes.get(node.id);
+    if (!existing) {
+      if (mode === "mic") {
+        audio.ensureMic(node.id).catch(e => { ctx.errors?.push?.(`Audio micro : ${e.message || e}`); });
+      } else {
+        audio.ensureTone(node.id, { freq, gain }).catch(e => { ctx.errors?.push?.(`Audio : ${e.message || e}`); });
+      }
+    } else if (existing.type === "tone") {
+      audio.setToneParams(node.id, { freq, gain });
+    }
+    const level = audio.readLevel(node.id);
+    out.set(2, { kind: "number", value: level });
+    return out;
+  });
+
+  fns.set("organicaudio", (node, inputs, ctx) => {
+    node.params = { ...node.params, mode: "tone", freq: 110 + (inputs.get(1)?.value?.value || 0) * 400 };
+    return fns.get("audio")(node, inputs, ctx);
+  });
+
+  fns.set("soundmemo", (node, inputs, ctx) => {
+    // Niveau micro mémorisé (pas d'enregistrement fichier dans 0.9.3 — signalé)
+    node.params = { ...node.params, mode: "mic" };
+    const out = fns.get("audio")(node, inputs, ctx);
+    if (ctx.warnings && !(node.params._memoWarned)) {
+      ctx.warnings.push("Mémo sonore : niveau micro actif ; enregistrement fichier pas encore disponible");
+      node.params._memoWarned = true;
+    }
+    return out;
+  });
+
+  fns.set("subpatch", (node, inputs, ctx) => {
+    const out = new Map();
+    const graph = node.params?.graph || { nodes: [], edges: [] };
+    if (!graph.nodes?.length) {
+      // Pass-through si vide
+      const v = inputs.get(0)?.value;
+      if (v) out.set(2, v);
+      return out;
+    }
+    const { evaluateSubGraph } = ctx._subpatchApi || {};
+    if (!evaluateSubGraph) throw new Error("API sous-patch manquante");
+    const prev = ctx._subPrev?.get(node.id) || new Map();
+    const result = evaluateSubGraph(graph, fns, ctx, inputs, prev);
+    ctx._subPrev = ctx._subPrev || new Map();
+    ctx._subPrev.set(node.id, result.outputs);
+    if (result.errors?.length) ctx.errors?.push?.(...result.errors.map(e => `Sous-patch « ${node.title} » : ${e}`));
+    if (result.outVal) out.set(2, result.outVal);
     return out;
   });
 

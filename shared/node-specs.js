@@ -7,7 +7,7 @@ export const NODE_GROUPS = [
  ["Contrôle scène",[["MIDI Hub","midi"],["OSC","osc"],["Art-Net / DMX","dmx"],["Control surfaces","surface"],["Input Mapper","inputmapper"],["Stage I/O","stageio"]]],
  ["Arduino / devices",[["AutoCode / Arduino IDE","arduino"],["ESP32 / Wemos","esp"],["Servos","servo"],["RFID / QR","rfid"],["Capteurs","sensors"]]],
  ["Passerelles",[["TWOZERO / TD Vibe","twozero"],["Chataigne Bridge","chataigne"],["Millumin Bridge","millumin"],["TouchDesigner Bridge","touchdesigner"],["Isadora Bridge","isadorabridge"],["Max/MSP Bridge","max"],["Pure Data Bridge","pd"],["SuperCollider Bridge","supercollider"]]],
- ["Projet / automation",[["Show Importer","showimport"],["Automation","automation"],["Dream Engine","dream"],["Data Lab","datalab"],["Universal Wire","universal"],["Connectors","connectors"]]],
+ ["Projet / automation",[["Sous-patch","subpatch"],["Show Importer","showimport"],["Automation","automation"],["Dream Engine","dream"],["Data Lab","datalab"],["Universal Wire","universal"],["Connectors","connectors"]]],
  ["Mobile / device",[["Caméra avant","phone-camera-front"],["Caméra arrière","phone-camera-back"],["Micro","phone-mic"],["Écran tactile","touch"],["Multitouch","multitouch"],["Gyroscope","gyro"],["Accéléromètre","accelerometer"],["Orientation","orientation"],["GPS","gps"],["Haptique","haptics"],["Wi-Fi","wifi"],["Bluetooth","bluetooth"]]]
 ];
 
@@ -23,6 +23,11 @@ export function spec(type){
     midi:["MIDI Hub",["device","CC","gate"]],
     osc:["OSC",["host","address","value"]],
     dmx:["Art-Net / DMX",["universe","address","value"]],
+    stageio:["Stage I/O",["in","route","out"]],
+    subpatch:["Sous-patch",["in","params","out"]],
+    audio:["Audio Lab",["in","process","out"]],
+    organicaudio:["Organic Audio",["in","reactive","out"]],
+    soundmemo:["Mémo sonore",["record","tag","out"]],
     arduino:["AutoCode / Arduino IDE",["board","code","upload"]],
     esp:["ESP32 / Wemos",["device","wifi","io"]],
     servo:["Servo",["channel","angle","speed"]],

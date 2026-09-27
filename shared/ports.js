@@ -69,6 +69,26 @@ export const EXECUTABLE_PORTS = {
     { name: "points", dir: "out", data: "number" },
     { name: "curve", dir: "out", data: "number" },
     { name: "out", dir: "out", data: "number" }
+  ],
+  subpatch: [
+    { name: "in", dir: "in", data: "any" },
+    { name: "params", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "any" }
+  ],
+  audio: [
+    { name: "in", dir: "in", data: "number" },
+    { name: "process", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "number" }
+  ],
+  organicaudio: [
+    { name: "in", dir: "in", data: "number" },
+    { name: "reactive", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "number" }
+  ],
+  soundmemo: [
+    { name: "record", dir: "in", data: "trigger" },
+    { name: "tag", dir: "in", data: "text" },
+    { name: "out", dir: "out", data: "number" }
   ]
 };
 
