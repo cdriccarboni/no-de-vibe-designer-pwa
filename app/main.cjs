@@ -12,8 +12,18 @@ function createWindow(){
     title:`${PRODUCT} ${VERSION}`,backgroundColor:'#101214',
     webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:false}
   });
+  if(process.argv.includes('--smoke-test')){
+    const timeout=setTimeout(()=>{console.error('PACKAGED_SELF_TEST_TIMEOUT');app.exit(3);},20000);
+    win.webContents.once('did-finish-load',async()=>{
+      try{
+        const result=await win.webContents.executeJavaScript("window.__nodeVibeSelfTest ? window.__nodeVibeSelfTest() : Promise.resolve({ok:false,error:'self-test hook missing'})");
+        clearTimeout(timeout);
+        console.log('PACKAGED_SELF_TEST',JSON.stringify(result));
+        if(result?.ok) app.quit(); else app.exit(2);
+      }catch(e){clearTimeout(timeout);console.error('PACKAGED_SELF_TEST_ERROR',e);app.exit(2);}
+    });
+  }
   win.loadFile(path.join(__dirname,'desktop','index.html'));
-  if(process.argv.includes('--smoke-test')) setTimeout(()=>app.quit(),5000);
   return win;
 }
 app.whenReady().then(()=>{app.setName(PRODUCT);createWindow();app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)createWindow();});});
