@@ -3,8 +3,16 @@
 <body><canvas id="out" width="1280" height="720"></canvas><div class="hud"><select id="screens"><option>Écran courant</option></select><button id="screenBtn">Choisir écran</button><button id="fs">Plein écran</button></div>
 <script type="module">
 import {Runtime} from "../shared/runtime.js";
-const canvas=document.getElementById("out"); const params=new URLSearchParams(location.search),destination=params.get("route")||"main-output"; const rt=new Runtime(canvas,{destination}); let project=null; document.title=`No-de Vibe Designer — OUTPUT · ${destination}`;
-window.addEventListener("message",e=>{if(e.data?.type==="cvd-project"){project=e.data.project;rt.setProject(project);rt.play()}});
+const canvas=document.getElementById("out");
+const params=new URLSearchParams(location.search),destination=params.get("route")||"main-output";
+const rt=new Runtime(canvas,{destination});
+document.title=`No-de Vibe Designer — OUTPUT · ${destination}`;
+window.addEventListener("message",async e=>{
+  if(e.data?.type!=="cvd-project")return;
+  rt.setProject(e.data.project);
+  await rt.syncCameraFromProject();
+  rt.play();
+});
 document.getElementById("fs").onclick=()=>document.documentElement.requestFullscreen?.();
 document.getElementById("screenBtn").onclick=async()=>{
   if(!window.getScreenDetails){alert("Le choix d’écran avancé n’est pas disponible dans ce navigateur. Déplace OUTPUT sur l’écran voulu puis passe en plein écran.");return}

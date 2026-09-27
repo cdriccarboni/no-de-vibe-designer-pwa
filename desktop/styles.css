@@ -75,3 +75,23 @@ body.gradient-strong{--gradient-alpha:.78}
 .patch-wires .wire:hover{stroke:var(--accent);stroke-width:3.4}
 .patch-wires .wire.draft{stroke:var(--accent);stroke-dasharray:5 5;opacity:0}.patch-wires .wire.draft.active{opacity:.9}
 .node{z-index:2}.nb{gap:3px}.port{min-height:22px;position:relative;display:grid;grid-template-columns:15px minmax(0,1fr) 15px;align-items:center;gap:4px}.port-label{grid-column:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.port-dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--line2);background:var(--panel);cursor:crosshair;touch-action:none;transition:transform .1s,border-color .1s,background .1s}.port-dot:hover{transform:scale(1.35);border-color:var(--accent);background:var(--accent)}.port-dot.input{grid-column:1}.port-dot.output{grid-column:3}.port-in .port-label{text-align:left}.port-out .port-label{text-align:right}
+
+/* P00 — exécutable / indisponible */
+.lib-item.unavailable{opacity:.55}
+.lib-item.unavailable:hover{opacity:.8}
+.node.unavailable{border-style:dashed;opacity:.85}
+.node.unavailable .nh{color:var(--muted)}
+.patch-wires .wire.invalid{stroke:#c45c5c;stroke-dasharray:4 3}
+.smallbtn.danger{border-color:#a55;color:#e8b4b4}
+.hint{font-size:11px;color:var(--muted);line-height:1.45;margin:0}
+.pref-list{margin:0;padding-left:18px;font-size:12px;color:var(--muted);line-height:1.5}
+.pref-list code{font-size:10px}
+.preferences-card.wide{width:min(720px,94vw);max-height:86vh;display:grid;grid-template-rows:46px auto 1fr}
+.preferences-tabs{display:flex;flex-wrap:wrap;gap:6px}
+.preferences-tabs button.active{background:var(--accent);color:#111;border-color:var(--accent)}
+.preferences-body{overflow:auto}
+.preferences-body .hidden{display:none!important}
+.preferences-body label.stack{grid-template-columns:1fr;gap:6px}
+.preferences-body label.stack input{width:100%;padding:8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text)}
+.manual-frame{width:100%;height:min(52vh,420px);border:1px solid var(--line);border-radius:8px;background:#0c0e10}
+.inspector-body .hint{margin-top:8px}
