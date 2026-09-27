@@ -58,4 +58,4 @@ window.__nodeVibeSelfTest=async()=>{try{
   return {ok:value===6,value,patches:Object.keys(restored.patches).length};
 }catch(e){return {ok:false,error:String(e?.message||e)}}};
 
-(async()=>{let i=await native.appInfo?.();if(i?.version)$('#versionBadge').textContent=i.version;let a=localStorage.getItem('node-vibe-autosave-v2');if(a)try{restore(a);log('Session restaurée.','success')}catch{}render();log('No-de Vibe Designer 0.8.0 · moteur prêt.','success');requestAnimationFrame(frame)})();
+(async()=>{let i=await native.appInfo?.();if(i?.version)$('#versionBadge').textContent=i.version;let a=localStorage.getItem('node-vibe-autosave-v2');if(a)try{restore(a);log('Session restaurée.','success')}catch{}render();log('No-de Vibe Designer 0.8.0 · moteur prêt.','success');let self=await window.__nodeVibeSelfTest();log(self.ok?'Auto-test boîtes imbriquées · PASS ('+self.value+')':'Auto-test boîtes imbriquées · ÉCHEC · '+(self.error||self.value),self.ok?'success':'error');requestAnimationFrame(frame)})();
