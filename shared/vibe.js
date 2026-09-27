@@ -21,6 +21,26 @@ export function saveAiConfig(cfg) {
   localStorage.setItem("nvd.ai", JSON.stringify(cfg));
 }
 
+/** Grok / xAI explicitement exclus de No-de Vibe Designer. */
+export function isForbiddenAiProvider(endpoint = "", model = "") {
+  const s = `${endpoint} ${model}`.toLowerCase();
+  return /(?:^|\/\/|\.)x\.ai\b/.test(s)
+    || s.includes("api.x.ai")
+    || s.includes("grok")
+    || s.includes("xai.com")
+    || /\bxai\b/.test(s);
+}
+
+export function assertAiProviderAllowed(cfg = {}) {
+  if (isForbiddenAiProvider(cfg.endpoint, cfg.model)) {
+    return {
+      ok: false,
+      error: "Grok / xAI est exclu de No-de Vibe Designer. Utilisez un endpoint OpenAI-compatible autorisé, ou le moteur local."
+    };
+  }
+  return { ok: true };
+}
+
 function norm(text) {
   return String(text || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 }
@@ -87,6 +107,10 @@ async function callRemoteAi(text, project, cfg) {
   if (!endpoint) {
     return { ok: false, unavailable: true, error: "Aucun endpoint IA configuré dans Préférences → IA / Vibe coding." };
   }
+  const allowed = assertAiProviderAllowed({ endpoint, model });
+  if (!allowed.ok) {
+    return { ok: false, unavailable: true, error: allowed.error };
+  }
 
   const schemaHint = `Tu es le moteur Vibe de ${APP_NAME} ${APP_VERSION}.
 Réponds UNIQUEMENT en JSON: {"ops":[{"op":"addNode","type":"camera|shader|midi|osc|tracking","x":n,"y":n},{"op":"connect","fromType":"...","fromPort":0,"toType":"...","toPort":0},{"op":"setParam","type":"...","key":"...","value":...},{"op":"addClip","track":0,"start":0,"duration":1,"label":"...","kind":"effect|points|cue|shader"}],"summary":"..."}
@@ -144,6 +168,18 @@ Instruction: ${text}`;
 
 export async function runVibe(text, project, { forceLocal = false } = {}) {
   const cfg = readAiConfig();
+  const blocked = assertAiProviderAllowed(cfg);
+  if (!blocked.ok && cfg.endpoint && !forceLocal) {
+    const local = localVibeParse(text, project);
+    return {
+      ok: local.ops.length > 0,
+      engine: "local-fallback",
+      ops: local.ops,
+      aiError: blocked.error,
+      note: `IA refusée — ${blocked.error} · moteur local uniquement`,
+      aiUnavailable: true
+    };
+  }
   const preferAi = cfg.enabled !== false && cfg.endpoint && !forceLocal;
 
   if (preferAi) {

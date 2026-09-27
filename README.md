@@ -1,4 +1,4 @@
-# No-de Vibe Designer 0.9.0
+# No-de Vibe Designer 0.9.1
 
 Environnement de patch nodal pour la création et l’exploitation scène (macOS).
 
@@ -32,6 +32,14 @@ Caméra → Shader → Preview / OUTPUT, avec sauvegarde `.cvd.json` et restaura
 
 Console : `demo` charge le patch de démonstration.
 
+## Édition Patch (P01)
+
+- Undo / Redo : ⌘Z / ⌘⇧Z (Ctrl sur Windows/Linux)
+- Dupliquer : ⌘D
+- Supprimer : ⌫
+- Zoom : molette ou boutons − / 1:1 / +
+- Pan : clic milieu ou Alt+glisser
+
 ## Nodes exécutables vs indisponibles
 
 **Exécutables :** camera, shader, midi, osc, tracking, stageio (+ caméras téléphone).
@@ -40,7 +48,7 @@ Les autres entrées Library sont visibles mais **indisponibles** (pas encore câ
 
 ## Vibe coding
 
-Entrée envoie la commande. Endpoint IA optionnel dans Préférences → IA / Vibe. Sans endpoint : moteur local (règles), sans simulation de succès IA.
+Entrée envoie la commande. Endpoint IA optionnel dans Préférences → IA / Vibe (OpenAI-compatible). **Grok / xAI est exclu.** Sans endpoint : moteur local (règles), sans simulation de succès IA.
 
 ## Schéma projet
 

@@ -4,9 +4,10 @@ import { DESTINATIONS, ROUTE_MODES, ensureRouting, effectiveRoute } from "../sha
 import { DeviceManager } from "../shared/device-manager.js";
 import { portDirection, isExecutable } from "../shared/ports.js";
 import { validateEdge } from "../shared/graph-engine.js";
-import { runVibe, applyVibeOps, readAiConfig, saveAiConfig } from "../shared/vibe.js";
+import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed } from "../shared/vibe.js";
 import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
 import { NODE_GROUPS, spec as sharedSpec } from "../shared/node-specs.js";
+import { createHistory } from "../shared/history.js";
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -15,6 +16,10 @@ let project = newProject();
 let nodeSeq = 0, clipSeq = 0, pointSeq = 0, selectedNode = null;
 const deviceBus = { lastMidi: null, lastSerial: null };
 let graphLogThrottle = 0;
+const history = createHistory(40);
+let historySuspended = false;
+const view = { x: 0, y: 0, scale: 1 };
+let panDrag = null;
 
 const runtime = new Runtime($("#previewCanvas"), {
   onGraphEvent: ev => {
@@ -66,6 +71,29 @@ function log(msg) {
   el.scrollTop = el.scrollHeight;
 }
 
+function commitHistory() {
+  if (historySuspended) return;
+  history.push(project);
+}
+
+function applyViewTransform() {
+  const world = $("#patchWorld");
+  if (!world) return;
+  world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+}
+
+function ensurePatchWorld() {
+  let world = $("#patchWorld");
+  if (!world) {
+    world = document.createElement("div");
+    world.id = "patchWorld";
+    world.className = "patch-world";
+    $("#patchSpace").appendChild(world);
+  }
+  applyViewTransform();
+  return world;
+}
+
 function buildLibrary() {
   $("#libraryList").innerHTML = LIB.map(([title, items]) =>
     `<div class="lib-section"><div class="lib-title">${title}</div>${items.map(([n, t]) => {
@@ -81,21 +109,25 @@ function ensureEdges() { project.edges ||= []; return project.edges; }
 let wireDraft = null, wireSeq = 0;
 
 function ensureWireLayer() {
+  ensurePatchWorld();
   let svg = $("#wireLayer");
   if (svg) return svg;
   svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.id = "wireLayer";
   svg.classList.add("patch-wires");
   svg.innerHTML = '<g id="wirePaths"></g><path id="wireDraftPath" class="wire draft" d=""/>';
-  $("#patchSpace").prepend(svg);
+  $("#patchWorld").prepend(svg);
   return svg;
 }
 
 function portCenter(dot) {
-  const pr = $("#patchSpace").getBoundingClientRect(), r = dot.getBoundingClientRect();
+  const world = $("#patchWorld") || $("#patchSpace");
+  const wr = world.getBoundingClientRect();
+  const r = dot.getBoundingClientRect();
+  const s = view.scale || 1;
   return {
-    x: r.left - pr.left + r.width / 2 + $("#patchSpace").scrollLeft,
-    y: r.top - pr.top + r.height / 2 + $("#patchSpace").scrollTop
+    x: (r.left - wr.left + r.width / 2) / s,
+    y: (r.top - wr.top + r.height / 2) / s
   };
 }
 
@@ -112,9 +144,9 @@ function findPort(nodeId, index, dir) {
 function renderWires() {
   ensureEdges();
   const svg = ensureWireLayer(), group = $("#wirePaths");
-  const space = $("#patchSpace");
-  svg.setAttribute("width", Math.max(space.scrollWidth, space.clientWidth));
-  svg.setAttribute("height", Math.max(space.scrollHeight, space.clientHeight));
+  const world = $("#patchWorld") || $("#patchSpace");
+  svg.setAttribute("width", Math.max(world.scrollWidth || 2400, 2400));
+  svg.setAttribute("height", Math.max(world.scrollHeight || 1600, 1600));
   group.innerHTML = "";
   for (const edge of project.edges) {
     const from = findPort(edge.from.node, edge.from.port, "out");
@@ -131,6 +163,7 @@ function renderWires() {
       project.edges = project.edges.filter(x => x.id !== edge.id);
       renderWires();
       autosave();
+      commitHistory();
       log("Connexion supprimée");
     });
     group.appendChild(path);
@@ -151,9 +184,14 @@ function beginWire(e, dot) {
 
 function moveWire(e) {
   if (!wireDraft) return;
-  const space = $("#patchSpace"), r = space.getBoundingClientRect();
+  const world = $("#patchWorld") || $("#patchSpace");
+  const wr = world.getBoundingClientRect();
+  const s = view.scale || 1;
   const a = portCenter(wireDraft.dot);
-  const b = { x: e.clientX - r.left + space.scrollLeft, y: e.clientY - r.top + space.scrollTop };
+  const b = {
+    x: (e.clientX - wr.left) / s,
+    y: (e.clientY - wr.top) / s
+  };
   $("#wireDraftPath").setAttribute("d", edgePath(a, b));
 }
 
@@ -191,6 +229,7 @@ function finishWire(e) {
   }
   renderWires();
   autosave();
+  commitHistory();
   runtime.render();
 }
 
@@ -226,6 +265,7 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
   }
   runtime.setProject(project);
   autosave();
+  commitHistory();
   return n;
 }
 
@@ -240,7 +280,7 @@ function drawNode(n) {
     const dir = portDirection(n.type, i, ports.length);
     return `<div class="port port-${dir}">${dir === "in" ? `<span class="port-dot input" data-node="${n.id}" data-port-index="${i}" data-dir="in" title="Entrée ${p}"></span>` : ""}<span class="port-label">${p}</span>${dir === "out" ? `<span class="port-dot output" data-node="${n.id}" data-port-index="${i}" data-dir="out" title="Sortie ${p}"></span>` : ""}</div>`;
   }).join("")}</div>`;
-  $("#patchSpace").appendChild(el);
+  $("#patchWorld").appendChild(el);
   el.onmousedown = () => selectNode(n.id);
   attachPortInteractions(el);
   makeDraggable(el, n);
@@ -260,7 +300,7 @@ function makeDraggable(el, n) {
     renderWires();
   });
   window.addEventListener("mouseup", () => {
-    if (d) { d = false; renderWires(); autosave(); }
+    if (d) { d = false; renderWires(); autosave(); commitHistory(); }
   });
 }
 
@@ -288,20 +328,34 @@ function selectNode(id) {
     <div class="field"><label>Actif</label><select id="nEnabled"><option value="true">Oui</option><option value="false">Non</option></select></div>
     ${extra}
     <button id="toolBtn" class="smallbtn">Ouvrir outil ↗</button>
+    <button id="dupNodeBtn" class="smallbtn">Dupliquer</button>
     <button id="delNodeBtn" class="smallbtn danger">Supprimer</button>`;
   $("#nEnabled").value = String(n.params.enabled);
-  $("#nDur").onchange = e => { n.params.duration = +e.target.value; autosave(); };
+  $("#nDur").onchange = e => { n.params.duration = +e.target.value; autosave(); commitHistory(); };
   $("#nOpa").oninput = e => { n.params.opacity = +e.target.value; runtime.render(); autosave(); };
-  $("#nEnabled").onchange = e => { n.params.enabled = e.target.value === "true"; runtime.render(); autosave(); };
+  $("#nEnabled").onchange = e => { n.params.enabled = e.target.value === "true"; runtime.render(); autosave(); commitHistory(); };
   if ($("#nInt")) $("#nInt").oninput = e => { n.params.intensity = +e.target.value; runtime.render(); autosave(); };
-  if ($("#nHost")) $("#nHost").onchange = e => { n.params.host = e.target.value; autosave(); };
-  if ($("#nAddr")) $("#nAddr").onchange = e => { n.params.address = e.target.value; autosave(); };
+  if ($("#nHost")) $("#nHost").onchange = e => { n.params.host = e.target.value; autosave(); commitHistory(); };
+  if ($("#nAddr")) $("#nAddr").onchange = e => { n.params.address = e.target.value; autosave(); commitHistory(); };
   if ($("#nFb")) $("#nFb").oninput = e => { n.params.fallback = +e.target.value; runtime.render(); autosave(); };
   $("#toolBtn").onclick = () => {
     if (!isExecutable(n.type)) log(`Outil · ${n.title} indisponible (pas de moteur)`);
     else log(`Outil · ${n.title} — paramètres dans l'inspecteur`);
   };
+  $("#dupNodeBtn").onclick = () => duplicateNode(n.id);
   $("#delNodeBtn").onclick = () => deleteNode(n.id);
+}
+
+function duplicateNode(id) {
+  const src = nodeById(id);
+  if (!src) return;
+  const n = addNode(src.type, src.x + 36, src.y + 36);
+  n.params = { ...src.params };
+  n.title = src.title;
+  const el = document.querySelector(`.node[data-id="${n.id}"] .nh`);
+  if (el) el.textContent = n.title + (isExecutable(n.type) ? "" : " · ○");
+  selectNode(n.id);
+  log(`Node dupliqué · ${n.title}`);
 }
 
 function deleteNode(id) {
@@ -310,6 +364,7 @@ function deleteNode(id) {
   if (selectedNode === id) selectedNode = null;
   redraw();
   autosave();
+  commitHistory();
   log("Node supprimé");
 }
 
@@ -371,6 +426,7 @@ function redraw() {
   ensureRouting(project);
   updateRouteButtons();
   $("#patchSpace").innerHTML = "";
+  ensurePatchWorld();
   ensureWireLayer();
   $("#previewOverlay").innerHTML = "";
   $$(".track").forEach(t => t.innerHTML = "");
@@ -446,6 +502,7 @@ async function applyVibeFromUi() {
     runtime.play();
     syncPlayButton();
     autosave();
+    commitHistory();
     log(`Vibe · ${applied.length} op(s) · moteur=${result.engine}`);
     for (const err of errors) log(`Vibe ERREUR · ${err}`);
   } catch (e) {
@@ -524,7 +581,7 @@ function readAppearance() {
   try { return JSON.parse(localStorage.getItem("cvd.appearance")) || {}; } catch { return {}; }
 }
 
-function openPreferences(tab = "appearance") {
+function openPreferences(tab = "general") {
   $("#preferencesModal").classList.remove("hidden");
   $$("[data-pref-tab]").forEach(b => b.classList.toggle("active", b.dataset.prefTab === tab));
   $$("[data-pref-panel]").forEach(p => p.classList.toggle("hidden", p.dataset.prefPanel !== tab));
@@ -534,8 +591,14 @@ function openPreferences(tab = "appearance") {
   if ($("#aiKey")) $("#aiKey").value = ai.apiKey || "";
   if ($("#aiModel")) $("#aiModel").value = ai.model || "gpt-4o-mini";
   if ($("#versionInfo")) $("#versionInfo").textContent = BUILD_LABEL;
+  try {
+    const g = JSON.parse(localStorage.getItem("nvd.general") || "{}");
+    if ($("#prefRestoreAutosave")) $("#prefRestoreAutosave").checked = g.restoreAutosave !== false;
+    if ($("#prefLoadDemo")) $("#prefLoadDemo").checked = g.loadDemo !== false;
+  } catch { /* */ }
+  if ($("#prefDefaultZoom")) $("#prefDefaultZoom").value = String(Math.round(view.scale * 100));
 }
-$("#preferencesBtn").onclick = () => openPreferences("appearance");
+$("#preferencesBtn").onclick = () => openPreferences("general");
 $("#preferencesClose").onclick = () => $("#preferencesModal").classList.add("hidden");
 $$("[data-pref-tab]").forEach(b => b.onclick = () => openPreferences(b.dataset.prefTab));
 
@@ -557,15 +620,39 @@ $("#appearanceReset").onclick = () => {
 };
 
 $("#aiSave")?.addEventListener("click", () => {
-  saveAiConfig({
+  const cfg = {
     enabled: $("#aiEnabled").checked,
     endpoint: $("#aiEndpoint").value.trim(),
     apiKey: $("#aiKey").value.trim(),
     model: $("#aiModel").value.trim() || "gpt-4o-mini"
-  });
+  };
+  const check = assertAiProviderAllowed(cfg);
+  if (!check.ok) {
+    log(`ERREUR · ${check.error}`);
+    alert(check.error);
+    return;
+  }
+  saveAiConfig(cfg);
   log("Préférences IA enregistrées");
 });
 
+$("#clearAutosave")?.addEventListener("click", () => {
+  localStorage.removeItem("cvd.autosave");
+  log("Autosave effacée");
+});
+$("#prefRestoreAutosave")?.addEventListener("change", () => {
+  const g = { restoreAutosave: $("#prefRestoreAutosave").checked, loadDemo: $("#prefLoadDemo")?.checked !== false };
+  localStorage.setItem("nvd.general", JSON.stringify(g));
+});
+$("#prefLoadDemo")?.addEventListener("change", () => {
+  const g = { restoreAutosave: $("#prefRestoreAutosave")?.checked !== false, loadDemo: $("#prefLoadDemo").checked };
+  localStorage.setItem("nvd.general", JSON.stringify(g));
+});
+$("#prefDefaultZoom")?.addEventListener("input", e => {
+  view.scale = Math.max(0.4, Math.min(2.2, (+e.target.value || 100) / 100));
+  applyViewTransform();
+  renderWires();
+});
 const savedAppearance = readAppearance();
 if (savedAppearance.accent) {
   $("#accentColor").value = savedAppearance.accent;
@@ -584,12 +671,72 @@ document.addEventListener("keydown", e => {
   togglePlay();
 });
 document.addEventListener("keydown", e => {
-  if ((e.key === "Backspace" || e.key === "Delete") && selectedNode) {
-    const tag = e.target?.tagName?.toLowerCase?.();
-    if (tag === "input" || tag === "textarea" || tag === "select") return;
+  const tag = e.target?.tagName?.toLowerCase?.();
+  const typing = tag === "input" || tag === "textarea" || tag === "select" || e.target?.isContentEditable;
+  if ((e.key === "Backspace" || e.key === "Delete") && selectedNode && !typing) {
     e.preventDefault();
     deleteNode(selectedNode);
+    return;
   }
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod || typing) return;
+  if (e.key === "z" && !e.shiftKey) {
+    e.preventDefault();
+    const snap = history.undo();
+    if (!snap) { log("Undo · rien à annuler"); return; }
+    historySuspended = true;
+    project = validateProject(snap);
+    redraw();
+    historySuspended = false;
+    autosave();
+    log("Undo");
+  } else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+    e.preventDefault();
+    const snap = history.redo();
+    if (!snap) { log("Redo · rien à rétablir"); return; }
+    historySuspended = true;
+    project = validateProject(snap);
+    redraw();
+    historySuspended = false;
+    autosave();
+    log("Redo");
+  } else if (e.key === "d" && selectedNode) {
+    e.preventDefault();
+    duplicateNode(selectedNode);
+  }
+});
+
+// Zoom / pan Patch Canvas
+function setZoom(next) {
+  view.scale = Math.max(0.4, Math.min(2.2, next));
+  applyViewTransform();
+  renderWires();
+  if ($("#prefDefaultZoom")) $("#prefDefaultZoom").value = String(Math.round(view.scale * 100));
+}
+$("#zoomIn").onclick = () => setZoom(view.scale + 0.1);
+$("#zoomOut").onclick = () => setZoom(view.scale - 0.1);
+$("#zoomReset").onclick = () => { view.x = 0; view.y = 0; setZoom(1); };
+$("#patchSpace").addEventListener("wheel", e => {
+  e.preventDefault();
+  const delta = e.deltaY < 0 ? 0.08 : -0.08;
+  setZoom(view.scale + delta);
+}, { passive: false });
+$("#patchSpace").addEventListener("pointerdown", e => {
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    panDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+    $("#patchSpace").setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+});
+$("#patchSpace").addEventListener("pointermove", e => {
+  if (!panDrag || e.pointerId !== panDrag.id) return;
+  view.x = panDrag.vx + (e.clientX - panDrag.x);
+  view.y = panDrag.vy + (e.clientY - panDrag.y);
+  applyViewTransform();
+  renderWires();
+});
+$("#patchSpace").addEventListener("pointerup", e => {
+  if (panDrag && e.pointerId === panDrag.id) panDrag = null;
 });
 
 $$(".collapse").forEach(b => b.onclick = () => b.closest(".panel").classList.toggle("collapsed"));
@@ -684,18 +831,23 @@ ensureEdges();
 updateRouteButtons();
 buildLibrary();
 
+let generalPrefs = { restoreAutosave: true, loadDemo: true };
+try { generalPrefs = { ...generalPrefs, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") }; } catch { /* */ }
+
 const autosaved = localStorage.getItem("cvd.autosave");
-if (autosaved) {
+if (generalPrefs.restoreAutosave !== false && autosaved) {
   try {
     project = validateProject(JSON.parse(autosaved));
     log("Autosave restaurée");
   } catch { /* */ }
 }
-if (project.nodes.length === 0) {
+if (project.nodes.length === 0 && generalPrefs.loadDemo !== false) {
   project = createDemoProject();
   log("Demo P00 initialisée (caméra → shader)");
 }
 redraw();
+history.clear();
+commitHistory();
 runtime.syncCameraFromProject().then(ok => {
   if (ok) log("Caméra synchronisée");
   runtime.play();

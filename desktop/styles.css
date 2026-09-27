@@ -95,3 +95,9 @@ body.gradient-strong{--gradient-alpha:.78}
 .preferences-body label.stack input{width:100%;padding:8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text)}
 .manual-frame{width:100%;height:min(52vh,420px);border:1px solid var(--line);border-radius:8px;background:#0c0e10}
 .inspector-body .hint{margin-top:8px}
+
+.hint.bad{color:#e07a7a}
+.patch-space{overflow:hidden;cursor:default}
+.patch-world{position:absolute;left:0;top:0;width:2400px;height:1600px;transform-origin:0 0;will-change:transform}
+.patch-world .node{position:absolute}
+.panel-head .iconbtn{font-size:11px;min-width:28px}

@@ -5,8 +5,9 @@
 import { validateProject, exportProject, createDemoProject, newProject } from "../shared/ir.js";
 import { typesCompatible, portDataType, portDirection, isExecutable } from "../shared/ports.js";
 import { validateEdge, findCycleEdgeIds, topoOrder, evaluateGraph, findVideoOutput } from "../shared/graph-engine.js";
-import { localVibeParse, applyVibeOps } from "../shared/vibe.js";
+import { localVibeParse, applyVibeOps, isForbiddenAiProvider, assertAiProviderAllowed } from "../shared/vibe.js";
 import { APP_VERSION } from "../shared/version.js";
+import { createHistory } from "../shared/history.js";
 
 let passed = 0, failed = 0;
 function assert(cond, msg) {
@@ -14,7 +15,7 @@ function assert(cond, msg) {
   else { failed++; console.error(" FAIL ", msg); }
 }
 
-console.log(`\nNo-de Vibe Designer ${APP_VERSION} — System Test P00\n`);
+console.log(`\nNo-de Vibe Designer ${APP_VERSION} — System Test P00/P01\n`);
 
 // --- ports ---
 console.log("ports");
@@ -102,6 +103,28 @@ const applied = applyVibeOps(p2, parsed.ops, {
 });
 assert(applied.applied.filter(a => a.op === "addNode" && !a.skipped).length >= 2, "vibe applied addNode");
 assert(p2.edges.length >= 1, "vibe created edge");
+
+// --- history ---
+console.log("history");
+const h = createHistory(10);
+const pA = createDemoProject();
+h.push(pA);
+const pB = JSON.parse(JSON.stringify(pA));
+pB.nodes.push({ id: "n99", type: "tracking", title: "T", x: 0, y: 0, params: {} });
+h.push(pB);
+assert(h.canUndo(), "history can undo");
+const back = h.undo();
+assert(back.nodes.length === 4, "undo restores previous node count");
+assert(h.canRedo(), "history can redo");
+const fwd = h.redo();
+assert(fwd.nodes.some(n => n.id === "n99"), "redo restores added node");
+
+// --- xAI / Grok exclusion ---
+console.log("ai-policy");
+assert(isForbiddenAiProvider("https://api.x.ai/v1/chat/completions", "grok-2"), "blocks api.x.ai + grok");
+assert(isForbiddenAiProvider("", "grok-beta"), "blocks grok model name");
+assert(!isForbiddenAiProvider("https://api.openai.com/v1/chat/completions", "gpt-4o-mini"), "allows OpenAI");
+assert(!assertAiProviderAllowed({ endpoint: "https://api.x.ai/v1", model: "grok" }).ok, "assert rejects xAI");
 
 console.log(`\nRésultat : ${passed} OK · ${failed} FAIL\n`);
 process.exit(failed ? 1 : 0);

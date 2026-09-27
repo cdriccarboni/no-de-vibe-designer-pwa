@@ -30,7 +30,14 @@
     <main class="center">
       <div class="upper">
         <section class="panel patch resizable-both" id="patchPanel">
-          <div class="panel-head">Patch Canvas <span class="sub">source de vérité</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
+          <div class="panel-head">Patch Canvas <span class="sub">source de vérité · molette = zoom · clic milieu = pan</span>
+            <div class="tools">
+              <button type="button" id="zoomOut" class="iconbtn" title="Zoom −">−</button>
+              <button type="button" id="zoomReset" class="iconbtn" title="Reset zoom">1:1</button>
+              <button type="button" id="zoomIn" class="iconbtn" title="Zoom +">+</button>
+              <button type="button" class="iconbtn collapse">−</button>
+            </div>
+          </div>
           <div id="patchSpace" class="panel-body patch-space"></div>
         </section>
 
@@ -110,22 +117,35 @@
   <div class="preferences-card wide">
     <div class="preferences-head"><b>Préférences</b><button id="preferencesClose" type="button">×</button></div>
     <div class="preferences-tabs">
-      <button type="button" data-pref-tab="appearance" class="active">Apparence</button>
+      <button type="button" data-pref-tab="general" class="active">Général</button>
+      <button type="button" data-pref-tab="appearance">Interface</button>
+      <button type="button" data-pref-tab="canvas">Patch Canvas</button>
       <button type="button" data-pref-tab="ai">IA / Vibe</button>
       <button type="button" data-pref-tab="io">Moteurs / I/O</button>
+      <button type="button" data-pref-tab="backup">Sauvegardes</button>
       <button type="button" data-pref-tab="manual">Manuel</button>
       <button type="button" data-pref-tab="about">Version</button>
     </div>
     <div class="preferences-body">
-      <div data-pref-panel="appearance">
+      <div data-pref-panel="general">
+        <p class="hint">Langue d’interface : français. Démarrage : restaurer l’autosave si disponible.</p>
+        <label>Restaurer l’autosave au lancement <input id="prefRestoreAutosave" type="checkbox" checked></label>
+        <label>Charger la démo P00 si projet vide <input id="prefLoadDemo" type="checkbox" checked></label>
+      </div>
+      <div data-pref-panel="appearance" class="hidden">
         <label>Couleur dominante <input id="accentColor" type="color" value="#d7b86a"></label>
         <label>Couleur secondaire <input id="secondaryColor" type="color" value="#8fa79d"></label>
         <label>Dégradé principal <select id="gradientMode"><option value="subtle">Discret</option><option value="off">Désactivé</option><option value="strong">Présent</option></select></label>
         <label>Intensité <input id="gradientIntensity" type="range" min="0" max="100" value="35"></label>
         <div class="preferences-actions"><button id="appearanceReset" class="smallbtn" type="button">Thème No-de Vibe Designer</button></div>
       </div>
+      <div data-pref-panel="canvas" class="hidden">
+        <p class="hint">Zoom molette · pan clic milieu ou Alt+glisser · Undo ⌘Z / Ctrl+Z · Redo ⌘⇧Z · Dupliquer ⌘D · Supprimer ⌫</p>
+        <label>Zoom par défaut <input id="prefDefaultZoom" type="range" min="50" max="150" value="100"></label>
+      </div>
       <div data-pref-panel="ai" class="hidden">
         <p class="hint">Sans endpoint, le moteur <b>local</b> (règles) s’applique. Aucune réussite IA n’est simulée.</p>
+        <p class="hint bad">Grok / xAI est exclu et sera refusé.</p>
         <label>Activer l’appel IA distant <input id="aiEnabled" type="checkbox" checked></label>
         <label class="stack">Endpoint (OpenAI-compatible)<input id="aiEndpoint" type="url" placeholder="https://api.openai.com/v1/chat/completions"></label>
         <label class="stack">Clé API<input id="aiKey" type="password" placeholder="sk-… (stockée localement)"></label>
@@ -139,7 +159,12 @@
           <li><b>Serial</b> — <code>serial connect</code> / <code>serial send …</code>. Essai matériel : à vérifier.</li>
           <li><b>OSC</b> — node OSC + <code>bridge connect ws://…</code>. Sans bridge : erreur visible, pas de faux succès.</li>
           <li><b>Caméra / Shader</b> — exécutables dans le patch.</li>
+          <li><b>Audio / NDI / Syphon</b> — pas encore câblés (nodes Library marqués indisponibles).</li>
         </ul>
+      </div>
+      <div data-pref-panel="backup" class="hidden">
+        <p class="hint">Autosave navigateur (<code>cvd.autosave</code>) + export fichier <code>.cvd.json</code>.</p>
+        <button type="button" id="clearAutosave" class="smallbtn danger">Effacer l’autosave locale</button>
       </div>
       <div data-pref-panel="manual" class="hidden">
         <iframe id="manualFrame" class="manual-frame" src="../docs/manual/index.html" title="Manuel No-de Vibe Designer"></iframe>
