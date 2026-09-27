@@ -1,0 +1,13 @@
+{
+  "name": "no-de-vibe-designer",
+  "productName": "No-de Vibe Designer",
+  "version": "0.8.0",
+  "private": true,
+  "description": "No-code + node visual patch environment for live performance",
+  "main": "app/main.cjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check app/main.cjs && node --check app/preload.cjs && node --check app/desktop/app.js && node --check app/shared/graph.js && node --check app/shared/runtime-core.js && node --check app/shared/vibe.js && node --check app/shared/exporters.js"
+  },
+  "type": "module"
+}
