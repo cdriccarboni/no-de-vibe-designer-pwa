@@ -1,0 +1,55 @@
+name: macOS Apple Silicon
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+jobs:
+  build:
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install packaging dependencies
+        run: npm install --no-save electron@44.4.5 @electron/packager@19.0.1
+      - name: Core tests
+        run: npm test
+      - name: Syntax checks
+        run: npm run check
+      - name: Package arm64 application
+        run: |
+          npx electron-packager . "No-de Vibe Designer" \
+            --platform=darwin --arch=arm64 \
+            --electron-version=44.4.5 \
+            --app-version=0.8.0 --build-version=80 \
+            --bundle-id=fr.acousmatic.nodevibedesigner \
+            --overwrite --out=dist
+          APP="dist/No-de Vibe Designer-darwin-arm64/No-de Vibe Designer.app"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName No-de Vibe Designer" "$APP/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName No-de Vibe Designer" "$APP/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string No-de Vibe Designer utilise la caméra uniquement lorsque vous activez un node caméra." "$APP/Contents/Info.plist" || true
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string No-de Vibe Designer peut utiliser le micro pour les nodes audio lorsqu'ils seront activés." "$APP/Contents/Info.plist" || true
+          codesign --force --deep --sign - "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "dist/No-de-Vibe-Designer-0.8.0-macOS-arm64.zip"
+      - name: Packaged application smoke launch
+        run: |
+          APP="$PWD/dist/No-de Vibe Designer-darwin-arm64/No-de Vibe Designer.app"
+          open "$APP" --args --smoke-test &
+          sleep 8
+          pgrep -f "No-de Vibe Designer" >/dev/null || true
+          pkill -f "No-de Vibe Designer" || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: No-de-Vibe-Designer-0.8.0-macOS-arm64
+          path: dist/No-de-Vibe-Designer-0.8.0-macOS-arm64.zip
+          if-no-files-found: error
+      - name: Create GitHub release for tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/No-de-Vibe-Designer-0.8.0-macOS-arm64.zip --title "No-de Vibe Designer 0.8.0" --notes "Apple Silicon test build."
