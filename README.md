@@ -1,24 +1,47 @@
-# No-de Vibe Designer V0.5
+# No-de Vibe Designer 0.9.0
 
-Structure prête pour développement desktop + mobile sur la même branche.
+Environnement de patch nodal pour la création et l’exploitation scène (macOS).
 
-## Lancer
+## Lancer (développement)
+
 ```bash
 ./LANCER-No-de-Vibe-Designer.command
 ```
 
-Desktop :
-`http://127.0.0.1:4173/desktop/`
+- Desktop : `http://127.0.0.1:4173/desktop/`
+- Mobile : `http://127.0.0.1:4173/mobile/`
 
-Mobile :
-`http://127.0.0.1:4173/mobile/`
+## Build application macOS
 
-Pour tester le mobile sur le Mac, ouvre la seconde URL et active l'émulation téléphone dans les DevTools.
-Pour les capteurs réels, ouvrir l'interface mobile sur un téléphone via un serveur HTTPS/réseau de développement adapté.
+```bash
+./packaging/mac/BUILD-No-de-Vibe-Designer-app.command
+open "dist/No-de Vibe Designer.app"
+```
 
+L’`.app` démarre un serveur HTTP local et ouvre Chrome/Brave/Edge en mode application (étape transitoire avant runtime embarqué).
 
-## V0.6 — routage par piste
-Chaque piste/layer peut maintenant rester sur OUTPUT principal, sortir uniquement vers une destination, ou être copiée vers plusieurs sorties. Voir `docs/ROUTING.md`.
+## Tests
 
-## V0.7 — intégrations réelles
-Le cœur partagé intègre maintenant Web MIDI, Web Serial, WebSocket bridge, paquets OSC/Art-Net via bridge, shader WebGL et filtrage OUTPUT par destination. Voir `docs/PATCHER_AUDIT.md`.
+```bash
+node tests/run.mjs
+```
+
+## Chaîne P00 fonctionnelle
+
+Caméra → Shader → Preview / OUTPUT, avec sauvegarde `.cvd.json` et restauration.
+
+Console : `demo` charge le patch de démonstration.
+
+## Nodes exécutables vs indisponibles
+
+**Exécutables :** camera, shader, midi, osc, tracking, stageio (+ caméras téléphone).
+
+Les autres entrées Library sont visibles mais **indisponibles** (pas encore câblées au moteur).
+
+## Vibe coding
+
+Entrée envoie la commande. Endpoint IA optionnel dans Préférences → IA / Vibe. Sans endpoint : moteur local (règles), sans simulation de succès IA.
+
+## Schéma projet
+
+`cvd.graph` / fichiers `.cvd.json` (compatibilité historique du préfixe CVD).

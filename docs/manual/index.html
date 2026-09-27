@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Manuel — No-de Vibe Designer</title>
+  <style>
+    :root{--bg:#101214;--panel:#171a1e;--text:#e8eaed;--muted:#8b949e;--accent:#d7b86a;--line:#2d333b}
+    *{box-sizing:border-box}body{margin:0;font:14px/1.55 system-ui,sans-serif;background:var(--bg);color:var(--text);padding:20px 22px 40px}
+    h1{font-size:22px;margin:0 0 6px}h2{font-size:16px;margin:28px 0 8px;color:var(--accent)}
+    p,li{color:var(--muted)}.lead{color:var(--text);font-size:15px}
+    figure{margin:14px 0;padding:0}img{max-width:100%;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
+    figcaption{font-size:12px;margin-top:6px;color:var(--muted)}
+    code{background:var(--panel);padding:1px 5px;border-radius:4px;font-size:12px}
+    .ok{color:#7dcea0}.warn{color:#e6b35a}.bad{color:#e07a7a}
+    ul{padding-left:18px}
+  </style>
+</head>
+<body>
+  <h1>Manuel — No-de Vibe Designer</h1>
+  <p class="lead">Guide simple pour démarrer. Vocabulaire de base, sans jargon inutile.</p>
+
+  <h2>1. Qu’est-ce que c’est ?</h2>
+  <p><b>No-de Vibe Designer</b> est un environnement pour créer un <b>patch</b> : des briques (nodes) reliées entre elles, qui traitent la vidéo, le son et les commandes de scène.</p>
+
+  <h2>2. Lancer l’application</h2>
+  <ol>
+    <li>Double-cliquez <code>LANCER-No-de-Vibe-Designer.command</code> <em>ou</em> ouvrez l’app macOS.</li>
+    <li>L’interface Bureau s’ouvre : Library à gauche, Patch au centre, Preview à droite.</li>
+  </ol>
+  <figure>
+    <img src="./captures/ui-overview.svg" alt="Vue d’ensemble de l’interface">
+    <figcaption>Figure 1 — Zones principales : Library, Patch, Preview, Vibe, Timeline, Console.</figcaption>
+  </figure>
+
+  <h2>3. Chaîne de base (caméra → shader)</h2>
+  <ol>
+    <li>Ajoutez <b>Caméra live</b> (marquée exécutable).</li>
+    <li>Ajoutez <b>Shader Lab</b>.</li>
+    <li>Tirez un câble de la sortie <code>video</code> vers l’entrée <code>texture</code>.</li>
+    <li>Autorisez la caméra si demandé. La Preview doit afficher l’image + le voile shader.</li>
+    <li>Cliquez <b>OUTPUT ↗</b> pour une fenêtre de diffusion.</li>
+  </ol>
+  <figure>
+    <img src="./captures/patch-camera-shader.svg" alt="Patch caméra vers shader">
+    <figcaption>Figure 2 — Patch de démonstration : Caméra → Shader (+ MIDI optionnel).</figcaption>
+  </figure>
+  <p>Astuce console : tapez <code>demo</code> puis Entrée pour charger ce patch.</p>
+
+  <h2>4. Vibe coding</h2>
+  <p>Dans la zone <b>Vibe</b>, décrivez ce que vous voulez. <b>Entrée</b> envoie la commande (Shift+Entrée = nouvelle ligne).</p>
+  <ul>
+    <li>Si un endpoint IA est configuré (Préférences → IA / Vibe) : appel réel.</li>
+    <li>Sinon : moteur local (règles) — clairement indiqué dans la console.</li>
+    <li class="bad">Jamais de faux « succès IA » si le moteur est indisponible.</li>
+  </ul>
+
+  <h2>5. Sauvegarder et rouvrir</h2>
+  <p><b>Enregistrer</b> crée un fichier <code>.cvd.json</code>. À la réouverture (ou via autosave), le patch — nodes et connexions — est restauré, puis la caméra / lecture reprennent.</p>
+
+  <h2>6. MIDI, OSC, Serial</h2>
+  <ul>
+    <li><span class="ok">Logiciel</span> : les nodes MIDI / OSC reliés au graphe font circuler des valeurs (ex. CC → intensité shader).</li>
+    <li><span class="warn">Matériel</span> : branchez l’appareil, puis <code>midi connect</code> / <code>serial connect</code> / <code>bridge connect ws://…</code>. Tant que non testé sur machine réelle : <b>à vérifier</b>.</li>
+  </ul>
+
+  <h2>7. Nodes disponibles vs indisponibles</h2>
+  <p>Seuls certains nodes sont <span class="ok">exécutables</span> (caméra, shader, midi, osc, tracking, stage I/O). Les autres restent visibles dans la Library mais sont marqués <span class="bad">indisponibles</span> — ils ne font pas encore de vrai travail.</p>
+
+  <h2>8. Mode Plateau</h2>
+  <p>Masque Library, Inspector et Vibe pour se concentrer sur Preview + Timeline pendant une répétition.</p>
+
+  <p style="margin-top:32px;font-size:12px">Manuel aligné sur la version logicielle courante — mis à jour avec le logiciel.</p>
+</body>
+</html>

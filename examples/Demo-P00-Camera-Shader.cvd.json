@@ -1,0 +1,69 @@
+{
+  "schema": "cvd.graph",
+  "version": 1,
+  "appVersion": "0.9.0",
+  "name": "Demo P00 — Caméra → Shader",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "camera",
+      "title": "Caméra live",
+      "x": 40,
+      "y": 70,
+      "params": { "enabled": true, "duration": 5, "opacity": 1 }
+    },
+    {
+      "id": "n2",
+      "type": "shader",
+      "title": "Shader Lab",
+      "x": 300,
+      "y": 140,
+      "params": { "enabled": true, "duration": 5, "opacity": 0.9, "intensity": 1 }
+    },
+    {
+      "id": "n3",
+      "type": "midi",
+      "title": "MIDI Hub",
+      "x": 40,
+      "y": 260,
+      "params": { "enabled": true, "duration": 5, "opacity": 1, "fallback": 0.4 }
+    },
+    {
+      "id": "n4",
+      "type": "osc",
+      "title": "OSC",
+      "x": 300,
+      "y": 280,
+      "params": { "enabled": true, "host": "bridge", "address": "/nvd/cc", "value": 0 }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "node": "n1", "port": 0 }, "to": { "node": "n2", "port": 0 } },
+    { "id": "e2", "from": { "node": "n3", "port": 1 }, "to": { "node": "n2", "port": 1 } },
+    { "id": "e3", "from": { "node": "n3", "port": 1 }, "to": { "node": "n4", "port": 2 } }
+  ],
+  "timeline": [
+    { "id": "c1", "track": 1, "start": 10, "duration": 5, "label": "Anim points", "kind": "points" },
+    { "id": "c2", "track": 4, "start": 9, "duration": 1.5, "label": "Top demo", "kind": "cue" }
+  ],
+  "controls": [
+    { "id": "p1", "type": "point2d", "x": 0.35, "y": 0.45 },
+    { "id": "p2", "type": "point2d", "x": 0.62, "y": 0.4 }
+  ],
+  "resources": [],
+  "output": {
+    "width": 1280,
+    "height": 720,
+    "fps": 60,
+    "background": "#090b0d",
+    "name": "OUTPUT principal"
+  },
+  "routing": { "tracks": {} },
+  "devices": [],
+  "meta": {
+    "created": "2026-09-27T00:00:00.000Z",
+    "updated": "2026-09-27T00:00:00.000Z",
+    "appVersion": "0.9.0",
+    "description": "Patch de démonstration P00 — chaîne caméra→shader exécutable"
+  }
+}

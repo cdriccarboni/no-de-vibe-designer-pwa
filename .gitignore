@@ -1,3 +1,5 @@
 _incoming/
 _compare/
 .DS_Store
+dist/
+*.log
