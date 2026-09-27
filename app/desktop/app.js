@@ -44,4 +44,17 @@ async function save(){let r=await native.saveProject?.({suggestedName:(project.n
 async function openProject(){let r=await native.openProject?.();if(r&&!r.canceled){history=[];future=[];restore(r.data);log('Projet ouvert · '+r.path,'success')}}
 async function exportTo(kind){let o=kind==='max'?exportMax(project):exportTouchDesigner(project);if(o.unsupported.length)log('Non exportés · '+o.unsupported.join(', '),'warn');let r=await native.exportFile?.({suggestedName:kind==='max'?'No-de-export.maxpat':'No-de-import-touchdesigner.py',data:o.content});if(r&&!r.canceled)log('Export créé · '+r.path,'success')}
 $('#librarySearch').oninput=library;$('#parentBtn').onclick=()=>{let p=parentPatchId(project,patchId);if(p)enter(p)};$('#rootBtn').onclick=()=>enter(project.rootPatchId);$('#deleteBtn').onclick=del;$('#duplicateBtn').onclick=duplicate;$('#undoBtn').onclick=undo;$('#redoBtn').onclick=redo;$('#zoomInBtn').onclick=()=>{zoom=Math.min(2,zoom+.1);canvas()};$('#zoomOutBtn').onclick=()=>{zoom=Math.max(.35,zoom-.1);canvas()};$('#newBtn').onclick=()=>{if(confirm('Créer un nouveau projet ?')){project=createProject('Nouveau projet');patchId=project.rootPatchId;runtime=makeRuntime();sel.clear();render()}};$('#saveBtn').onclick=save;$('#openBtn').onclick=openProject;$('#exportMaxBtn').onclick=()=>exportTo('max');$('#exportTdBtn').onclick=()=>exportTo('td');$('#addCueBtn').onclick=addCue;$('#goBtn').onclick=go;$('#clearLogBtn').onclick=()=>$('#log').innerHTML='';$('#terminalToggle').onclick=()=>{$('#terminalPanel').classList.toggle('collapsed')};$('#vibeText').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();vibe()}};window.onkeydown=e=>{let m=e.metaKey||e.ctrlKey;if(m&&e.key==='s'){e.preventDefault();save()}else if(m&&e.key==='z'&&!e.shiftKey){e.preventDefault();undo()}else if(m&&e.key==='z'&&e.shiftKey){e.preventDefault();redo()}else if((e.key==='Delete'||e.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName))del()};
+
+window.__nodeVibeSelfTest=async()=>{try{
+  let p=createProject('packaged-self-test'),root=p.patches[p.rootPatchId],src=addNode(p,root.id,'number',{params:{value:3}}),
+      A=addNode(p,root.id,'subpatch',{name:'A'}),ai=addBoxPort(p,A,'input','in','number'),ao=addBoxPort(p,A,'output','out','number');
+  connect(p,root.id,src.id,'value',A.id,ai.portId);
+  let ap=p.patches[A.subpatchId],B=addNode(p,ap.id,'subpatch',{name:'B'}),bi=addBoxPort(p,B,'input','in','number'),bo=addBoxPort(p,B,'output','out','number');
+  connect(p,ap.id,ai.node.id,'out',B.id,bi.portId);connect(p,ap.id,B.id,bo.portId,ao.node.id,'in');
+  let bp=p.patches[B.subpatchId],mul=addNode(p,bp.id,'multiply'),two=addNode(p,bp.id,'number',{params:{value:2}});
+  connect(p,bp.id,bi.node.id,'out',mul.id,'a');connect(p,bp.id,two.id,'value',mul.id,'b');connect(p,bp.id,mul.id,'value',bo.node.id,'in');
+  let restored=deserializeProject(serializeProject(p)),r=await new RuntimeEngine(restored).evaluate(),value=r.values[restored.rootPatchId+':'+A.id+':'+ao.portId];
+  return {ok:value===6,value,patches:Object.keys(restored.patches).length};
+}catch(e){return {ok:false,error:String(e?.message||e)}}};
+
 (async()=>{let i=await native.appInfo?.();if(i?.version)$('#versionBadge').textContent=i.version;let a=localStorage.getItem('node-vibe-autosave-v2');if(a)try{restore(a);log('Session restaurée.','success')}catch{}render();log('No-de Vibe Designer 0.8.0 · moteur prêt.','success');requestAnimationFrame(frame)})();
