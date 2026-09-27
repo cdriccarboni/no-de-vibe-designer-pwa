@@ -14,7 +14,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - name: Install packaging dependencies
         run: npm install --no-save electron@44.4.5 @electron/packager@19.0.1
       - name: Core tests
@@ -36,13 +35,10 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string No-de Vibe Designer peut utiliser le micro pour les nodes audio lorsqu'ils seront activés." "$APP/Contents/Info.plist" || true
           codesign --force --deep --sign - "$APP"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "dist/No-de-Vibe-Designer-0.8.0-macOS-arm64.zip"
-      - name: Packaged application smoke launch
+      - name: Packaged application recursive smoke test
         run: |
           APP="$PWD/dist/No-de Vibe Designer-darwin-arm64/No-de Vibe Designer.app"
-          open "$APP" --args --smoke-test &
-          sleep 8
-          pgrep -f "No-de Vibe Designer" >/dev/null || true
-          pkill -f "No-de Vibe Designer" || true
+          "$APP/Contents/MacOS/No-de Vibe Designer" --smoke-test
       - uses: actions/upload-artifact@v4
         with:
           name: No-de-Vibe-Designer-0.8.0-macOS-arm64
