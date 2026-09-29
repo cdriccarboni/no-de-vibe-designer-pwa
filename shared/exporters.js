@@ -120,3 +120,56 @@ export function exportTouchDesigner(project) {
   lines.push("print('No-de Vibe Designer: import terminé,', len(created), 'operators créés')");
   return { content: `${lines.join("\n")}\n`, unsupported };
 }
+
+/**
+ * Export Pure Data — patch texte .pd minimal.
+ * Les types non mappés restent dans unsupported.
+ */
+export function exportPureData(project) {
+  const flat = flatten(project);
+  const ids = new Map();
+  const lines = ["#N canvas 0 0 900 600 12;"];
+  const unsupported = [];
+  let i = 0;
+  const obj = (n, text) => {
+    const idx = i++;
+    ids.set(n.id, idx);
+    lines.push(`#X obj ${Math.round(n.x || 40)} ${Math.round(n.y || 40)} ${text};`);
+  };
+  for (const n of flat.nodes) {
+    if (n.type === "number") obj(n, `floatatom`);
+    else if (n.type === "multiply") obj(n, "*");
+    else if (n.type === "add") obj(n, "+");
+    else if (n.type === "osc") obj(n, `udpsend ${n.params?.host || "127.0.0.1"} ${n.params?.port || 9000}`);
+    else if (n.type === "midi") obj(n, "ctlin");
+    else unsupported.push(n.path);
+  }
+  for (const e of flat.edges) {
+    if (!ids.has(e.from?.node) || !ids.has(e.to?.node)) continue;
+    lines.push(`#X connect ${ids.get(e.from.node)} 0 ${ids.get(e.to.node)} 0;`);
+  }
+  return { content: `${lines.join("\n")}\n`, unsupported, extension: "pd" };
+}
+
+/** Documentation OSC Millumin — adresses proposées, pas un envoi simulé. */
+export function exportMilluminOscMap(project) {
+  const flat = flatten(project);
+  const addresses = [];
+  for (const n of flat.nodes) {
+    if (n.type === "osc") {
+      addresses.push({
+        address: n.params?.address || "/millumin/layer/0/opacity",
+        host: n.params?.host || "127.0.0.1",
+        port: Number(n.params?.port) || 5000,
+        node: n.path
+      });
+    }
+  }
+  const content = [
+    "# No-de Vibe Designer — carte OSC Millumin",
+    "# Ces adresses sont déclaratives. Aucun paquet n'est envoyé par cet export.",
+    ...addresses.map(a => `${a.address}  # ${a.node} → ${a.host}:${a.port}`),
+    addresses.length ? "" : "# (aucun node OSC dans le projet)"
+  ].join("\n");
+  return { content: `${content}\n`, addresses, unsupported: [] };
+}

@@ -4,7 +4,7 @@ Date : 2026-09-27
 
 ## Source canonique
 
-Cet arbre (`desktop/` + `shared/` + Electron, **0.9.4**) est la source canonique.
+La version courante de cet arbre est **0.10.1**. Le récit ci-dessous décrit comment **0.9.4** est devenu la source canonique à la place du `main` 0.8.0.
 
 | Ref | Commit | Rôle |
 |---|---|---|

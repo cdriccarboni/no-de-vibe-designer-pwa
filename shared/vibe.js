@@ -53,10 +53,49 @@ export function localVibeParse(text, project) {
   const ops = [];
   const has = (type) => project.nodes.some(n => n.type === type);
 
-  if ((t.includes("camera") || t.includes("webcam") || /\bvideo\b/.test(t)) && !has("camera")) {
+  const backCam = t.includes("camera arriere") || t.includes("camera back");
+  const frontCam = t.includes("camera avant") || t.includes("camera front");
+  if (backCam && !has("phone-camera-back")) {
+    ops.push({ op: "addNode", type: "phone-camera-back", x: 40, y: 60 });
+  } else if (frontCam && !has("phone-camera-front")) {
+    ops.push({ op: "addNode", type: "phone-camera-front", x: 40, y: 60 });
+  } else if ((t.includes("camera") || t.includes("webcam") || /\bvideo\b/.test(t)) && !has("camera")) {
     ops.push({ op: "addNode", type: "camera", x: 40, y: 60 });
   }
-  if ((t.includes("shader") || t.includes("effet") || t.includes("glsl")) && !has("shader")) {
+  if ((t.includes("gyro") || t.includes("gyroscope")) && !has("gyro")) {
+    ops.push({ op: "addNode", type: "gyro", x: 40, y: 320 });
+  }
+  if ((/\bnombre\b/.test(t) || t.includes("number")) && !has("number")) {
+    ops.push({ op: "addNode", type: "number", x: 40, y: 40 });
+  }
+  if ((t.includes("multipl") || t.includes("fois")) && !has("multiply")) {
+    ops.push({ op: "addNode", type: "multiply", x: 260, y: 40 });
+  }
+  if ((t.includes("addition") || t.includes("additionne")) && !has("add")) {
+    ops.push({ op: "addNode", type: "add", x: 260, y: 160 });
+  }
+  if (t.includes("lissage") && !has("smooth")) {
+    ops.push({ op: "addNode", type: "smooth", x: 480, y: 40 });
+  }
+  if ((t.includes("compar") || t.includes("compare")) && !has("compare")) {
+    ops.push({ op: "addNode", type: "compare", x: 480, y: 160 });
+  }
+  if ((t.includes("trou noir") || t.includes("blackhole")) && !has("blackhole")) {
+    ops.push({ op: "addNode", type: "blackhole", x: 40, y: 200 });
+  }
+  if ((t.includes("addition") || t.includes("additionne")) && !has("add")) {
+    ops.push({ op: "addNode", type: "add", x: 260, y: 160 });
+  }
+  if (t.includes("lissage") && !has("smooth")) {
+    ops.push({ op: "addNode", type: "smooth", x: 480, y: 40 });
+  }
+  if ((t.includes("compar") || t.includes("plus grand")) && !has("compare")) {
+    ops.push({ op: "addNode", type: "compare", x: 480, y: 160 });
+  }
+  if ((t.includes("trou noir") || t.includes("blackhole")) && !has("blackhole")) {
+    ops.push({ op: "addNode", type: "blackhole", x: 40, y: 200 });
+  }
+  if ((t.includes("shader") || t.includes("glsl")) && !has("shader")) {
     ops.push({ op: "addNode", type: "shader", x: 280, y: 120 });
   }
   if (t.includes("midi") && !has("midi")) {
@@ -67,6 +106,74 @@ export function localVibeParse(text, project) {
   }
   if ((t.includes("tracking") || t.includes("point")) && !has("tracking")) {
     ops.push({ op: "addNode", type: "tracking", x: 500, y: 60 });
+  }
+
+  // Intentions créatives locales : résultat rapide, nodes standards, aucun code opaque.
+  const wantsWhale = t.includes("baleine") || t.includes("whale");
+  const wantsBlob = /\bblob\b/.test(t) || t.includes("metaball") || t.includes("forme organique");
+  const wantsGhost = t.includes("fantom") || /\bghost\b/.test(t) || t.includes("trainee") || t.includes("traînee") || t.includes("trail");
+  const wantsThreshold = t.includes("threshold") || t.includes("seuil") || t.includes("silhouette") || t.includes("supprime le fond") || t.includes("enleve le fond");
+  const wantsMirror = t.includes("miroir") || /\bmirror\b/.test(t);
+  const wantsClone = t.includes("dedouble") || t.includes("dédouble") || t.includes("double-moi") || t.includes("clone") || t.includes("body clone");
+
+  if (wantsWhale && !has("whale")) {
+    if (!has("pointer")) ops.push({ op: "addNode", type: "pointer", x: 40, y: 60 });
+    ops.push({ op: "addNode", type: "whale", x: 310, y: 80 });
+  }
+  if (wantsBlob && !has("blob")) {
+    ops.push({ op: "addNode", type: "blob", x: 330, y: 220 });
+  }
+
+  const sourcePreference = () => {
+    for (const type of ["transform", "whale", "blob", "videofile", "camera", "phone-camera-back", "phone-camera-front"]) {
+      if (has(type) || ops.some(o => o.op === "addNode" && o.type === type)) return type;
+    }
+    return null;
+  };
+
+  if (wantsGhost && !has("ghost")) {
+    const src = sourcePreference();
+    ops.push({ op: "addNode", type: "ghost", x: 620, y: 110 });
+    if (src) ops.push({ op: "connect", fromType: src, fromPort: src === "transform" ? 3 : (src === "whale" || src === "blob" ? 3 : 0), toType: "ghost", toPort: 0 });
+  }
+  if (wantsThreshold && !has("threshold")) {
+    let src = sourcePreference();
+    if (!src && (t.includes("moi") || t.includes("personne") || t.includes("corps"))) {
+      ops.push({ op: "addNode", type: "camera", x: 40, y: 80 });
+      src = "camera";
+    }
+    ops.push({ op: "addNode", type: "threshold", x: 590, y: 180 });
+    if (src) ops.push({ op: "connect", fromType: src, fromPort: src === "transform" ? 3 : (src === "whale" || src === "blob" ? 3 : 0), toType: "threshold", toPort: 0 });
+  }
+  if (wantsMirror && !has("mirror")) {
+    const src = sourcePreference();
+    ops.push({ op: "addNode", type: "mirror", x: 620, y: 260 });
+    if (src) ops.push({ op: "connect", fromType: src, fromPort: src === "transform" ? 3 : (src === "whale" || src === "blob" ? 3 : 0), toType: "mirror", toPort: 0 });
+  }
+  if (wantsClone && !has("bodyclone")) {
+    let src = sourcePreference();
+    if (!src || (!["camera","phone-camera-back","phone-camera-front","videofile"].includes(src) && (t.includes("moi") || t.includes("corps") || t.includes("personne")))) {
+      if (!has("camera")) ops.push({ op: "addNode", type: "camera", x: 40, y: 80 });
+      src = "camera";
+    }
+    ops.push({ op: "addNode", type: "bodyclone", x: 600, y: 330 });
+    if (src) ops.push({ op: "connect", fromType: src, fromPort: 0, toType: "bodyclone", toPort: 0 });
+  }
+
+  if ((t.includes("plus lent") || t.includes("ralenti")) && has("whale")) {
+    ops.push({ op: "setParam", type: "whale", key: "motionSpeed", value: 0.55 });
+  }
+  if ((t.includes("plus vite") || t.includes("accelere") || t.includes("accélère")) && has("whale")) {
+    ops.push({ op: "setParam", type: "whale", key: "motionSpeed", value: 1.55 });
+  }
+  if ((t.includes("gross") || t.includes("plus grande")) && has("whale")) {
+    ops.push({ op: "setParam", type: "whale", key: "scale", value: 1.35 });
+  }
+  if ((t.includes("respir") || t.includes("vivant")) && has("whale")) {
+    ops.push({ op: "setParam", type: "whale", key: "breathe", value: 0.065 });
+  }
+  if ((t.includes("trainee") || t.includes("traînee") || t.includes("trail")) && has("whale")) {
+    ops.push({ op: "setParam", type: "whale", key: "trail", value: 0.42 });
   }
 
   const willHaveCam = has("camera") || ops.some(o => o.type === "camera");
@@ -82,6 +189,11 @@ export function localVibeParse(text, project) {
   }
   if (willHaveMidi && willHaveOsc) {
     ops.push({ op: "connect", fromType: "midi", fromPort: 1, toType: "osc", toPort: 2 });
+  }
+  const willHaveNumber = has("number") || ops.some(o => o.type === "number");
+  const willHaveMul = has("multiply") || ops.some(o => o.type === "multiply");
+  if (willHaveNumber && willHaveMul) {
+    ops.push({ op: "connect", fromType: "number", fromPort: 0, toType: "multiply", toPort: 0 });
   }
 
   if (t.includes("5 seconde") || t.includes("5s") || t.includes("5 sec")) {
@@ -113,8 +225,8 @@ async function callRemoteAi(text, project, cfg) {
   }
 
   const schemaHint = `Tu es le moteur Vibe de ${APP_NAME} ${APP_VERSION}.
-Réponds UNIQUEMENT en JSON: {"ops":[{"op":"addNode","type":"camera|shader|midi|osc|tracking","x":n,"y":n},{"op":"connect","fromType":"...","fromPort":0,"toType":"...","toPort":0},{"op":"setParam","type":"...","key":"...","value":...},{"op":"addClip","track":0,"start":0,"duration":1,"label":"...","kind":"effect|points|cue|shader"}],"summary":"..."}
-Nodes exécutables uniquement: camera, shader, midi, osc, tracking, stageio.
+Réponds UNIQUEMENT en JSON: {"ops":[{"op":"addNode","type":"camera|pointer|whale|blob|threshold|ghost|mirror|bodyclone|transform|shader|midi|osc|tracking","x":n,"y":n},{"op":"connect","fromType":"...","fromPort":0,"toType":"...","toPort":0},{"op":"setParam","type":"...","key":"...","value":...},{"op":"addClip","track":0,"start":0,"duration":1,"label":"...","kind":"effect|points|cue|shader"}],"summary":"..."}
+Nodes exécutables prioritaires: camera, pointer, whale, blob, threshold, ghost, mirror, bodyclone, shadow, transform, composite, shader, midi, osc, tracking, stageio. La caméra n'est jamais activée par l'IA : seul l'utilisateur peut demander la permission.
 Projet actuel nodes: ${JSON.stringify(project.nodes.map(n => ({ id: n.id, type: n.type })))}
 edges: ${JSON.stringify(project.edges || [])}
 Instruction: ${text}`;
@@ -210,7 +322,7 @@ export async function runVibe(text, project, { forceLocal = false } = {}) {
   };
 }
 
-const ALLOWED_TYPES = new Set(["camera", "shader", "midi", "osc", "tracking", "stageio", "subpatch", "audio", "organicaudio", "soundmemo", "phone-camera-front", "phone-camera-back"]);
+const ALLOWED_TYPES = new Set(["camera", "pointer", "whale", "blob", "threshold", "ghost", "mirror", "bodyclone", "shadow", "transform", "composite", "blackhole", "shader", "midi", "osc", "tracking", "stageio", "subpatch", "audio", "organicaudio", "soundmemo", "phone-camera-front", "phone-camera-back"]);
 
 export function applyVibeOps(project, ops, helpers) {
   const { addNode, addClip, ensureEdges, nodeById } = helpers;

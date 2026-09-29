@@ -2,22 +2,35 @@ import { newProject, validateProject, exportProject, createDemoProject } from ".
 import { Runtime } from "../shared/runtime.js";
 import { DESTINATIONS, ROUTE_MODES, ensureRouting, effectiveRoute } from "../shared/routing.js";
 import { DeviceManager } from "../shared/device-manager.js";
-import { portDirection, isExecutable } from "../shared/ports.js";
+import { portDirection, portLabels, portDataType, isExecutable } from "../shared/ports.js";
 import { validateEdge } from "../shared/graph-engine.js";
 import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed } from "../shared/vibe.js";
 import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
 import { NODE_GROUPS, spec as sharedSpec } from "../shared/node-specs.js";
 import { createHistory } from "../shared/history.js";
-import { ensureSubGraph } from "../shared/subpatch.js";
+import { addBoxPort, ensureSubGraph, wrapNodesInSubpatch } from "../shared/subpatch.js";
 import { sharedAudio } from "../shared/audio-engine.js";
 import { planManualSave, planManualOpen, saveStatusMessage, MANUAL_SAVE_KEY } from "../shared/save-fallback.js";
 import { nestedBoxSelfTest } from "../shared/self-test.js";
+import { connectRemote } from "../shared/remote-client.js";
+import { REMOTE_PORT } from "../shared/remote-protocol.js";
+import { applyCue, listCues, nextCue, previousCue } from "../shared/stage/cues.js";
+import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
+import { createHostCard, hostCardToQrPayload } from "../shared/discovery/host-card.js";
+import { discoveryCapabilities } from "../shared/discovery/lan-beacon.js";
 
 const $ = s => document.querySelector(s);
-const $$ = s => [...document.querySelectorAll(s)];
+const qall = s => [...document.querySelectorAll(s)];
+
+if ("serviceWorker" in navigator && window.nvdDesktop?.runtime !== "electron") {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(err => console.warn("PWA_SW", err?.message || err));
+  });
+}
 
 let project = newProject();
 let nodeSeq = 0, clipSeq = 0, pointSeq = 0, selectedNode = null;
+const selection = new Set();
 const deviceBus = { lastMidi: null, lastSerial: null };
 let graphLogThrottle = 0;
 const history = createHistory(40);
@@ -31,6 +44,7 @@ let pendingVibe = null;
 const runtime = new Runtime($("#previewCanvas"), {
   onGraphEvent: ev => {
     if (ev.type === "camera-error") log(`ERREUR · ${ev.error}`);
+    if (ev.type === "camera-state") log(`Caméra · ${ev.state === "on" ? "ACTIVE" : "COUPÉE"}`);
     if (ev.type === "graph") {
       const now = performance.now();
       if (now - graphLogThrottle < 2000) return;
@@ -60,6 +74,12 @@ runtime.setBridgeSend(packet => {
   try { devices.bridge.send(packet); }
   catch (err) { throw err; }
 });
+if (typeof window.nvdDesktop?.sendOscUdp === "function") {
+  runtime.setOscUdpSend(msg => window.nvdDesktop.sendOscUdp(msg));
+}
+if (typeof window.nvdDesktop?.sendArtNetUdp === "function") {
+  runtime.setArtNetUdpSend(msg => window.nvdDesktop.sendArtNetUdp(msg));
+}
 
 ensureRouting(project);
 
@@ -108,7 +128,7 @@ function buildLibrary() {
       return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${ok ? "Exécutable" : "Indisponible — représentation seule"}"><span>${n}${ok ? "" : " · indisponible"}</span><span>${ok ? "＋" : "○"}</span></div>`;
     }).join("")}</div>`
   ).join("");
-  $$("[data-add]").forEach(x => x.onclick = () => addNode(x.dataset.add));
+  qall("[data-add]").forEach(x => x.onclick = () => addNode(x.dataset.add));
 }
 
 function activeGraph() {
@@ -323,11 +343,6 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
   } else {
     log(`Node ajouté · ${title}`);
   }
-  if (isRootGraph() && (type === "camera" || type === "phone-camera-front" || type === "phone-camera-back")) {
-    runtime.enableCamera(type === "phone-camera-front" ? "user" : "environment")
-      .then(() => log("Caméra active"))
-      .catch(e => log("Caméra : " + e.message));
-  }
   if (isRootGraph()) runtime.setProject(project);
   autosave();
   commitHistory();
@@ -340,13 +355,14 @@ function drawNode(n) {
   el.dataset.id = n.id;
   el.style.left = n.x + "px";
   el.style.top = n.y + "px";
-  const ports = spec(n.type)[1];
+  const ports = portLabels(n.type, n) || spec(n.type)[1];
+  el.className += selection.has(n.id) ? " sel" : "";
   el.innerHTML = `<div class="nh">${n.title}${isExecutable(n.type) ? "" : " · ○"}</div><div class="nb">${ports.map((p, i) => {
-    const dir = portDirection(n.type, i, ports.length);
+    const dir = portDirection(n.type, i, ports.length, n);
     return `<div class="port port-${dir}">${dir === "in" ? `<span class="port-dot input" data-node="${n.id}" data-port-index="${i}" data-dir="in" title="Entrée ${p}"></span>` : ""}<span class="port-label">${p}</span>${dir === "out" ? `<span class="port-dot output" data-node="${n.id}" data-port-index="${i}" data-dir="out" title="Sortie ${p}"></span>` : ""}</div>`;
   }).join("")}</div>`;
   $("#patchWorld").appendChild(el);
-  el.onmousedown = () => selectNode(n.id);
+  el.onmousedown = (e) => selectNode(n.id, { additive: e.shiftKey });
   el.ondblclick = () => { if (n.type === "subpatch") enterSubpatch(n); };
   attachPortInteractions(el);
   makeDraggable(el, n);
@@ -370,15 +386,87 @@ function makeDraggable(el, n) {
   });
 }
 
-function selectNode(id) {
-  selectedNode = id;
-  $$(".node").forEach(n => n.classList.toggle("sel", n.dataset.id === id));
+function channelCandidatesForNode(n) {
+  const common = [
+    ["opacity", "Opacité", 0, 1, 0.01],
+    ["scale", "Échelle", 0.2, 3, 0.01],
+    ["rotation", "Rotation", -3.14, 3.14, 0.01],
+    ["threshold", "Seuil", 0, 1, 0.01],
+    ["trail", "Traînée", 0, 0.8, 0.01],
+    ["decay", "Persistance", 0, 0.98, 0.01],
+    ["speed", "Vitesse", 0, 3, 0.01],
+    ["size", "Taille", 0.03, 1, 0.01],
+    ["softness", "Souplesse", 0, 1, 0.01],
+    ["noise", "Mouvement organique", 0, 0.65, 0.01],
+    ["dx", "Décalage X", -600, 600, 1],
+    ["dy", "Décalage Y", -600, 600, 1]
+  ];
+  const allowed = new Set(Object.keys(n.params || {}));
+  if (n.type === "whale") ["scale","trail","breathe"].forEach(k => allowed.add(k));
+  if (n.type === "blob") ["size","softness","noise","speed"].forEach(k => allowed.add(k));
+  if (["shadow","threshold","bodyclone"].includes(n.type)) ["threshold","dx","dy","decay"].forEach(k => allowed.add(k));
+  if (n.type === "ghost") ["decay","dx","dy"].forEach(k => allowed.add(k));
+  if (n.type === "transform") ["scale","rotation","dx","dy"].forEach(k => allowed.add(k));
+  const defs = common.filter(([key]) => allowed.has(key));
+  if (n.type === "whale") defs.push(["breathe", "Respiration", 0, 0.12, 0.001]);
+  return defs;
+}
+
+function exposeChannel(node, def) {
+  if (!node || !def) return;
+  project.channels ||= [];
+  const [key, label, min, max, step] = def;
+  const existing = project.channels.find(ch => ch.nodeId === node.id && ch.param === key);
+  if (existing) {
+    log(`Channel déjà exposé · ${existing.name}`);
+    renderControlSurface();
+    return;
+  }
+  project.channels.push({
+    id: `ch-${node.id}-${key}-${Date.now().toString(36)}`,
+    name: `${node.title} · ${label}`,
+    nodeId: node.id,
+    param: key,
+    min, max, step
+  });
+  autosave();
+  commitHistory();
+  renderControlSurface();
+  log(`Channel exposé · ${node.title} · ${label}`);
+}
+
+function selectNode(id, { additive = false } = {}) {
+  if (!additive) {
+    selection.clear();
+    if (id) selection.add(id);
+  } else if (id) {
+    if (selection.has(id) && selection.size > 1) selection.delete(id);
+    else selection.add(id);
+  }
+  selectedNode = id && selection.has(id) ? id : ([...selection][0] || null);
+  qall(".node").forEach(n => n.classList.toggle("sel", selection.has(n.dataset.id)));
   const n = nodeById(id);
   if (!n) return;
   $("#inspectorType").textContent = n.title + (isExecutable(n.type) ? "" : " · indisponible");
   let extra = "";
   if (n.type === "shader") {
     extra += `<div class="field"><label>Intensité</label><input id="nInt" type="range" min="0" max="2" step=".01" value="${n.params.intensity ?? 1}"></div>`;
+  }
+  if (["camera", "phone-camera-front", "phone-camera-back"].includes(n.type)) {
+    extra += `<div class="camera-actions"><button id="cameraStart" type="button">Activer la caméra</button><button id="cameraStop" class="stop" type="button">Couper caméra</button></div><p class="hint">La caméra ne démarre jamais automatiquement. L'action ci-dessus demande explicitement l'accès.</p>`;
+  }
+  if (n.type === "whale") {
+    extra += `<div class="field"><label>Échelle</label><input id="nScale" type="range" min=".35" max="2.2" step=".01" value="${n.params.scale ?? 1}"></div>`;
+    extra += `<div class="field"><label>Traînée</label><input id="nTrailAmount" type="range" min="0" max=".7" step=".01" value="${n.params.trail ?? .18}"></div>`;
+    extra += `<div class="field"><label>Respiration</label><input id="nBreathe" type="range" min="0" max=".12" step=".001" value="${n.params.breathe ?? .035}"></div>`;
+  }
+  if (n.type === "blob") {
+    extra += `<div class="field"><label>Points</label><input id="nPoints" type="range" min="3" max="18" step="1" value="${n.params.points ?? 7}"></div>`;
+    extra += `<div class="field"><label>Taille</label><input id="nSize" type="range" min=".03" max=".8" step=".01" value="${n.params.size ?? .22}"></div>`;
+    extra += `<div class="field"><label>Souplesse</label><input id="nSoftness" type="range" min="0" max="1" step=".01" value="${n.params.softness ?? .65}"></div>`;
+    extra += `<div class="field"><label>Mouvement organique</label><input id="nNoise" type="range" min="0" max=".65" step=".01" value="${n.params.noise ?? .18}"></div>`;
+    extra += `<div class="field"><label>Vitesse</label><input id="nSpeed" type="range" min="0" max="3" step=".01" value="${n.params.speed ?? .6}"></div>`;
+    extra += `<div class="field"><label>Afficher les points</label><select id="nShowPoints"><option value="false">Non</option><option value="true">Oui</option></select></div>`;
   }
   if (n.type === "osc") {
     extra += `<div class="field"><label>Host / cible</label><input id="nHost" value="${n.params.host || "bridge"}"></div>`;
@@ -396,8 +484,66 @@ function selectNode(id) {
   if (n.type === "soundmemo") {
     extra += `<p class="hint">Niveau micro opérationnel. Enregistrement fichier : pas encore disponible.</p>`;
   }
+  if (n.type === "smooth") {
+    extra += `<div class="field"><label>Lissage</label><input id="nSmooth" type="range" min="0" max="1" step=".01" value="${n.params.amount ?? 0.18}"></div>`;
+  }
+  if (n.type === "compare") {
+    extra += `<div class="field"><label>Opérateur</label><select id="nOp"><option>&gt;</option><option>&lt;</option><option>==</option><option>&gt;=</option><option>&lt;=</option><option>!=</option></select></div>`;
+  }
+  if (n.type === "boolean") {
+    extra += `<div class="field"><label>Valeur</label><select id="nBool"><option value="false">Faux</option><option value="true">Vrai</option></select></div>`;
+  }
+  if (n.type === "text") {
+    extra += `<div class="field"><label>Texte</label><input id="nText" value="${n.params.text || ""}"></div>`;
+  }
+  if (n.type === "blackhole") {
+    extra += `<div class="field"><label>Vitesse</label><input id="nSpeed" type="range" min="0" max="3" step=".01" value="${n.params.speed ?? 0.65}"></div>`;
+    extra += `<div class="field"><label>Taille</label><input id="nSize" type="range" min="0.05" max="1" step=".01" value="${n.params.size ?? 0.58}"></div>`;
+  }
+  if (n.type === "transform") {
+    extra += `<div class="field"><label>Échelle</label><input id="nScale" type="number" step=".01" value="${n.params.scale ?? 1}"></div>`;
+    extra += `<div class="field"><label>Rotation (rad)</label><input id="nRot" type="number" step=".01" value="${n.params.rotation ?? 0}"></div>`;
+    extra += `<div class="field"><label>Décalage X</label><input id="nDx" type="number" value="${n.params.dx ?? 0}"></div>`;
+    extra += `<div class="field"><label>Décalage Y</label><input id="nDy" type="number" value="${n.params.dy ?? 0}"></div>`;
+  }
+  if (n.type === "composite") {
+    extra += `<div class="field"><label>Blend</label><select id="nBlend"><option>normal</option><option>add</option><option>multiply</option><option>screen</option></select></div>`;
+  }
+  if (["shadow", "threshold", "bodyclone"].includes(n.type)) {
+    extra += `<div class="field"><label>Seuil</label><input id="nThreshold" type="range" min="0" max="1" step=".01" value="${n.params.threshold ?? 0.45}"></div>`;
+    extra += `<div class="field"><label>Inverser</label><select id="nInvert"><option value="false">Non</option><option value="true">Oui</option></select></div>`;
+    if (n.type !== "threshold") {
+      extra += `<div class="field"><label>Décalage X</label><input id="nDx" type="number" value="${n.params.dx ?? (n.type === "bodyclone" ? 64 : 12)}"></div>`;
+      extra += `<div class="field"><label>Décalage Y</label><input id="nDy" type="number" value="${n.params.dy ?? 0}"></div>`;
+    }
+    if (n.type === "shadow") {
+      extra += `<div class="field"><label>Trail</label><select id="nTrail"><option value="false">Non</option><option value="true">Oui</option></select></div>`;
+      extra += `<div class="field"><label>Persistance</label><input id="nDecay" type="range" min="0" max=".98" step=".01" value="${n.params.decay ?? .85}"></div>`;
+    }
+  }
+  if (n.type === "ghost") {
+    extra += `<div class="field"><label>Persistance</label><input id="nDecay" type="range" min="0" max=".98" step=".01" value="${n.params.decay ?? .82}"></div>`;
+    extra += `<div class="field"><label>Décalage X</label><input id="nDx" type="number" value="${n.params.dx ?? 8}"></div>`;
+    extra += `<div class="field"><label>Décalage Y</label><input id="nDy" type="number" value="${n.params.dy ?? 0}"></div>`;
+  }
+  if (n.type === "mirror") {
+    extra += `<div class="field"><label>Axe</label><select id="nAxis"><option value="x">Horizontal</option><option value="y">Vertical</option></select></div>`;
+  }
+  if (n.type === "videofile") {
+    extra += `<div class="field"><label>Fichier</label><input id="nVideoFile" type="file" accept="video/*"></div>`;
+    extra += `<div class="field"><label>Boucle</label><select id="nLoop"><option value="true">Oui</option><option value="false">Non</option></select></div>`;
+    extra += `<div class="field"><label>Seek (s)</label><input id="nSeek" type="number" min="0" step="0.1" value="${n.params.seekTo ?? 0}"></div>`;
+    extra += `<div class="field"><label>Marqueurs (s, virgules)</label><input id="nMarkers" value="${(n.params.markers || []).join(",")}"></div>`;
+    extra += `<div class="field"><label>Sync group</label><input id="nSyncGroup" value="${n.params.syncGroup || ""}" placeholder="ex. A"></div>`;
+    extra += `<p class="hint">${n.params?.srcName ? "Chargé : " + n.params.srcName : "Aucun fichier — le node restera en erreur jusqu'au chargement."}</p>`;
+  }
   if (n.type === "subpatch") {
-    extra += `<p class="hint">Double-clic ou « Ouvrir sous-patch » pour éditer le graphe interne.</p>`;
+    extra += `<p class="hint">Double-clic pour éditer. Maj+clic pour sélectionner plusieurs nodes, puis « Boîte ».</p>`;
+    extra += `<button id="addInPort" class="smallbtn">＋ entrée</button><button id="addOutPort" class="smallbtn">＋ sortie</button>`;
+  }
+  const channelDefs = channelCandidatesForNode(n);
+  if (channelDefs.length) {
+    extra += `<div class="channel-expose"><select id="channelParam">${channelDefs.map(([key,label]) => `<option value="${key}">${label}</option>`).join("")}</select><button id="exposeChannelBtn" class="smallbtn" type="button">Exposer</button></div>`;
   }
   $("#inspectorBody").innerHTML = `
     <div class="field"><label>Durée</label><input id="nDur" type="number" min=".1" step=".1" value="${n.params.duration}"></div>
@@ -415,7 +561,8 @@ function selectNode(id) {
     if (!n.params.enabled && (n.type === "audio" || n.type === "organicaudio" || n.type === "soundmemo")) {
       sharedAudio.release(n.id);
     }
-    runtime.render();
+    if (["camera", "phone-camera-front", "phone-camera-back"].includes(n.type)) runtime.setProject(project);
+    else runtime.render();
     autosave();
     commitHistory();
   };
@@ -425,6 +572,83 @@ function selectNode(id) {
   if ($("#nFb")) $("#nFb").oninput = e => { n.params.fallback = +e.target.value; runtime.render(); autosave(); };
   if ($("#nFreq")) $("#nFreq").onchange = e => { n.params.freq = +e.target.value; runtime.render(); autosave(); commitHistory(); };
   if ($("#nGain")) $("#nGain").oninput = e => { n.params.gain = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nSmooth")) $("#nSmooth").oninput = e => { n.params.amount = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nOp")) { $("#nOp").value = n.params.operator || ">"; $("#nOp").onchange = e => { n.params.operator = e.target.value; runtime.render(); autosave(); commitHistory(); }; }
+  if ($("#nBool")) { $("#nBool").value = String(n.params.value === true || n.params.value === "true"); $("#nBool").onchange = e => { n.params.value = e.target.value === "true"; runtime.render(); autosave(); commitHistory(); }; }
+  if ($("#nText")) $("#nText").onchange = e => { n.params.text = e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nSpeed")) $("#nSpeed").oninput = e => { n.params.speed = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nSize")) $("#nSize").oninput = e => { n.params.size = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nScale")) $("#nScale").onchange = e => { n.params.scale = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nRot")) $("#nRot").onchange = e => { n.params.rotation = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nBlend")) {
+    $("#nBlend").value = n.params.blend || "normal";
+    $("#nBlend").onchange = e => { n.params.blend = e.target.value; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#nThreshold")) $("#nThreshold").oninput = e => { n.params.threshold = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nDx")) $("#nDx").onchange = e => { n.params.dx = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nDy")) $("#nDy").onchange = e => { n.params.dy = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nTrailAmount")) $("#nTrailAmount").oninput = e => { n.params.trail = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nBreathe")) $("#nBreathe").oninput = e => { n.params.breathe = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nPoints")) $("#nPoints").oninput = e => { n.params.points = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nSoftness")) $("#nSoftness").oninput = e => { n.params.softness = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nNoise")) $("#nNoise").oninput = e => { n.params.noise = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nDecay")) $("#nDecay").oninput = e => { n.params.decay = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nInvert")) {
+    $("#nInvert").value = String(!!n.params.invert);
+    $("#nInvert").onchange = e => { n.params.invert = e.target.value === "true"; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#nShowPoints")) {
+    $("#nShowPoints").value = String(!!n.params.showPoints);
+    $("#nShowPoints").onchange = e => { n.params.showPoints = e.target.value === "true"; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#nAxis")) {
+    $("#nAxis").value = n.params.axis || "x";
+    $("#nAxis").onchange = e => { n.params.axis = e.target.value; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#cameraStart")) $("#cameraStart").onclick = async () => {
+    const facingMode = n.type === "phone-camera-front" ? "user" : "environment";
+    const ok = await runtime.syncCameraFromProject({ request: true, facingMode });
+    log(ok ? "Caméra active · action utilisateur" : "Caméra non activée");
+  };
+  if ($("#cameraStop")) $("#cameraStop").onclick = () => runtime.stopCamera();
+  if ($("#exposeChannelBtn")) $("#exposeChannelBtn").onclick = () => {
+    const key = $("#channelParam")?.value;
+    const def = channelDefs.find(([k]) => k === key);
+    exposeChannel(n, def);
+  };
+  if ($("#nTrail")) {
+    $("#nTrail").value = String(!!n.params.trail);
+    $("#nTrail").onchange = e => { n.params.trail = e.target.value === "true"; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#nLoop")) {
+    $("#nLoop").value = String(n.params.loop !== false);
+    $("#nLoop").onchange = e => { n.params.loop = e.target.value === "true"; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#nSeek")) $("#nSeek").onchange = e => { n.params.seekTo = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nMarkers")) $("#nMarkers").onchange = e => {
+    n.params.markers = String(e.target.value || "").split(",").map(s => Number(s.trim())).filter(Number.isFinite);
+    autosave();
+    commitHistory();
+  };
+  if ($("#nSyncGroup")) $("#nSyncGroup").onchange = e => { n.params.syncGroup = e.target.value.trim(); autosave(); commitHistory(); };
+  if ($("#nVideoFile")) {
+    $("#nVideoFile").onchange = async e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        await runtime.attachVideoFile(n.id, file, { loop: n.params.loop !== false });
+        n.params.srcName = file.name;
+        log(`Vidéo chargée · ${file.name}`);
+        runtime.render();
+        autosave();
+        commitHistory();
+      } catch (err) {
+        log(`Vidéo : ${err.message || err}`);
+      }
+    };
+  }
+  if ($("#addInPort")) $("#addInPort").onclick = () => addSubpatchPort(n, "in");
+  if ($("#addOutPort")) $("#addOutPort").onclick = () => addSubpatchPort(n, "out");
   $("#toolBtn").onclick = () => {
     if (n.type === "subpatch") enterSubpatch(n);
     else if (!isExecutable(n.type)) log(`Outil · ${n.title} indisponible (pas de moteur)`);
@@ -432,6 +656,34 @@ function selectNode(id) {
   };
   $("#dupNodeBtn").onclick = () => duplicateNode(n.id);
   $("#delNodeBtn").onclick = () => deleteNode(n.id);
+}
+
+function addSubpatchPort(node, direction) {
+  const label = direction === "in" ? "Nom de l'entrée" : "Nom de la sortie";
+  const name = prompt(label, direction === "in" ? "In" : "Out");
+  if (!name) return;
+  addBoxPort(node, direction, name, "any");
+  redraw();
+  selectNode(node.id);
+  log(`Port ${direction === "in" ? "entrée" : "sortie"} · ${name}`);
+  autosave();
+  commitHistory();
+}
+
+function wrapSelection() {
+  const ids = [...selection];
+  if (!ids.length && selectedNode) ids.push(selectedNode);
+  if (!ids.length) { log("Sélection vide"); return; }
+  const g = activeGraph();
+  let box;
+  try { box = wrapNodesInSubpatch(g, ids, "Boîte"); }
+  catch (e) { log(e.message || String(e)); return; }
+  selection.clear();
+  redraw();
+  selectNode(box.id);
+  log(`Sous-patch · ${box.title} · ${ids.length} node(s)`);
+  autosave();
+  commitHistory();
 }
 
 function duplicateNode(id) {
@@ -447,6 +699,7 @@ function duplicateNode(id) {
 }
 
 function deleteNode(id) {
+  selection.delete(id);
   const g = activeGraph();
   sharedAudio.release(id);
   g.nodes = g.nodes.filter(n => n.id !== id);
@@ -457,6 +710,7 @@ function deleteNode(id) {
   }
   if (selectedNode === id) selectedNode = null;
   redraw();
+  if (isRootGraph()) runtime.setProject(project);
   autosave();
   commitHistory();
   log("Node supprimé");
@@ -523,7 +777,7 @@ function redraw() {
   ensurePatchWorld();
   ensureWireLayer();
   $("#previewOverlay").innerHTML = "";
-  $$(".track").forEach(t => t.innerHTML = "");
+  qall(".track").forEach(t => t.innerHTML = "");
   nodeSeq = 0; clipSeq = 0; pointSeq = 0;
   const g = activeGraph();
   for (const n of g.nodes || []) {
@@ -544,8 +798,13 @@ function redraw() {
 
 function autosave() {
   try { localStorage.setItem("cvd.autosave", exportProject(project)); } catch { /* */ }
+  try { publishHostState(); } catch { /* hôte distant optionnel */ }
 }
 
+$("#previewOverlay").addEventListener("pointermove", e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  runtime.setPointer((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+});
 $("#previewOverlay").onclick = e => {
   const r = e.currentTarget.getBoundingClientRect();
   addPoint((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
@@ -560,6 +819,253 @@ $("#clearPoints").onclick = () => {
 };
 $("#addCue").onclick = () => addClip(4, Math.random() * 45, 2, "Cue", "cue");
 $("#addEffect").onclick = () => addClip(1, Math.random() * 40, 6, "Effet", "effect");
+
+function videoOutputPort(node) {
+  if (!node) return null;
+  const labels = portLabels(node.type, node) || [];
+  for (let i = labels.length - 1; i >= 0; i--) {
+    if (portDirection(node.type, i, labels.length, node) === "out" && portDataType(node.type, i, node) === "video") return i;
+  }
+  return null;
+}
+
+function connectNodes(fromNode, fromPort, toNode, toPort = 0) {
+  if (!fromNode || !toNode || fromPort == null) return false;
+  const g = activeGraph();
+  const from = { node: fromNode.id, port: fromPort };
+  const to = { node: toNode.id, port: toPort };
+  const validation = validateEdge({ nodes: g.nodes, edges: g.edges || [] }, from, to);
+  if (!validation.ok) {
+    log(`Magic FX · connexion impossible · ${validation.errors.join(" · ")}`);
+    return false;
+  }
+  g.edges ||= [];
+  g.edges = g.edges.filter(e => !(e.to.node === to.node && e.to.port === to.port));
+  wireSeq += 1;
+  g.edges.push({ id: `e${Date.now()}-${wireSeq}`, from, to });
+  if (isRootGraph()) project.edges = g.edges;
+  return true;
+}
+
+function applyMagicFx(type) {
+  const source = selectedNode ? nodeById(selectedNode) : null;
+  if (type === "blob") {
+    const n = addNode("blob", source ? source.x + 220 : 340, source ? source.y + 40 : 160);
+    n.params = { ...n.params, points: 7, size: .22, softness: .65, noise: .18, speed: .6, showPoints: true };
+    redraw();
+    selectNode(n.id);
+    runtime.setProject(project);
+    log("Magic FX · Blob organique créé · points éditables via l'inspecteur");
+    $("#magicFxModal")?.classList.add("hidden");
+    return;
+  }
+  if (!source) {
+    log("Magic FX · sélectionne d'abord une source vidéo dans PATCH");
+    return;
+  }
+  const outPort = videoOutputPort(source);
+  if (outPort == null) {
+    log(`Magic FX · « ${source.title} » ne fournit pas de vidéo`);
+    return;
+  }
+  const n = addNode(type, source.x + 220, source.y + 20);
+  const presets = {
+    ghost: { decay: .82, dx: 8, dy: 0 },
+    threshold: { threshold: .45, invert: false },
+    mirror: { axis: "x" },
+    shadow: { threshold: .45, mirror: true, dx: 18, dy: 0, trail: true, decay: .84 },
+    bodyclone: { threshold: .45, dx: 72, dy: 0, invert: false },
+    blackhole: { speed: .65, size: .58 }
+  };
+  n.params = { ...n.params, ...(presets[type] || {}) };
+  const connected = type === "blackhole" ? true : connectNodes(source, outPort, n, 0);
+  redraw();
+  selectNode(n.id);
+  runtime.setProject(project);
+  autosave();
+  commitHistory();
+  log(`Magic FX · ${n.title}${connected ? "" : " · à connecter"}`);
+  $("#magicFxModal")?.classList.add("hidden");
+}
+
+function renderControlSurface() {
+  const host = $("#controlSurface");
+  if (!host) return;
+  project.channels ||= [];
+  project.channels = project.channels.filter(ch => project.nodes.some(n => n.id === ch.nodeId));
+  if (!project.channels.length) {
+    host.innerHTML = '<p class="hint">Aucun Channel exposé. Sélectionne un node puis clique « Exposer » dans l’inspecteur.</p>';
+    return;
+  }
+  host.innerHTML = project.channels.map(ch => {
+    const node = project.nodes.find(n => n.id === ch.nodeId);
+    const value = Number(node?.params?.[ch.param] ?? ch.min ?? 0);
+    return `<div class="control-channel" data-channel="${ch.id}">
+      <label title="${ch.name}">${ch.name}</label>
+      <input type="range" min="${ch.min ?? 0}" max="${ch.max ?? 1}" step="${ch.step ?? .01}" value="${value}">
+      <output>${Number.isFinite(value) ? value.toFixed((ch.step ?? .01) < .1 ? 2 : 0) : "—"}</output>
+      <button type="button" title="Retirer du Control Surface">×</button>
+    </div>`;
+  }).join("");
+  host.querySelectorAll(".control-channel").forEach(row => {
+    const ch = project.channels.find(x => x.id === row.dataset.channel);
+    const input = row.querySelector("input");
+    const output = row.querySelector("output");
+    const remove = row.querySelector("button");
+    input.oninput = () => {
+      const node = project.nodes.find(n => n.id === ch.nodeId);
+      if (!node) return;
+      node.params ||= {};
+      node.params[ch.param] = Number(input.value);
+      output.textContent = Number(input.value).toFixed((ch.step ?? .01) < .1 ? 2 : 0);
+      runtime.render();
+      autosave();
+    };
+    input.onchange = () => commitHistory();
+    remove.onclick = () => {
+      project.channels = project.channels.filter(x => x.id !== ch.id);
+      autosave();
+      commitHistory();
+      renderControlSurface();
+    };
+  });
+}
+
+$("#magicFxBtn")?.addEventListener("click", () => $("#magicFxModal")?.classList.remove("hidden"));
+$("#magicFxClose")?.addEventListener("click", () => $("#magicFxModal")?.classList.add("hidden"));
+$("#magicFxModal")?.addEventListener("click", e => { if (e.target.id === "magicFxModal") e.currentTarget.classList.add("hidden"); });
+qall("[data-magic-fx]").forEach(b => b.onclick = () => applyMagicFx(b.dataset.magicFx));
+
+$("#controlsBtn")?.addEventListener("click", () => {
+  renderControlSurface();
+  $("#controlsModal")?.classList.remove("hidden");
+});
+$("#controlsClose")?.addEventListener("click", () => $("#controlsModal")?.classList.add("hidden"));
+$("#controlsRefresh")?.addEventListener("click", renderControlSurface);
+$("#controlsModal")?.addEventListener("click", e => { if (e.target.id === "controlsModal") e.currentTarget.classList.add("hidden"); });
+
+function fireDesktopCue(cue) {
+  if (!cue) {
+    log("ERREUR · aucun cue");
+    return;
+  }
+  const applied = applyCue(project, {
+    id: cue.id,
+    label: cue.label,
+    time: cue.time ?? cue.start,
+    actions: cue.actions || [{ type: "jump-time", value: cue.time ?? cue.start }]
+  });
+  project = applied.project;
+  for (const effect of applied.effects) {
+    if (effect.type === "jump-time" || effect.type === "go") {
+      runtime.time = Number(effect.time ?? cue.time ?? cue.start) || 0;
+      runtime.play();
+      syncPlayButton();
+    }
+    if (effect.type === "error") log(`ERREUR cue · ${effect.error}`);
+    if (effect.type === "osc") log(`Cue OSC déclaré · ${effect.address} (à transmettre)`);
+    if (effect.type === "artnet") log(`Cue Art-Net déclaré · u${effect.universe} ch${effect.channel}=${effect.value}`);
+    if (effect.type === "panic") log("PANIC · audio coupé dans le projet");
+  }
+  project.meta = project.meta || {};
+  project.meta.transport = { action: "go", cueId: cue.id, start: cue.time ?? cue.start, label: cue.label };
+  try { publishHostState(); } catch { /* */ }
+  redraw();
+  autosave();
+  log(`GO · ${cue.label || cue.id}`);
+}
+
+$("#cueGo").onclick = () => {
+  const cues = listCues(project);
+  const current = project.meta?.transport?.cueId;
+  const cue = cues.find(c => c.id === current) || cues[0];
+  fireDesktopCue(cue);
+};
+$("#cueNext").onclick = () => {
+  const cues = listCues(project);
+  const cue = nextCue(cues, project.meta?.transport?.cueId);
+  if (!cue) return log("ERREUR · pas de cue suivant");
+  fireDesktopCue(cue);
+};
+$("#cuePrev").onclick = () => {
+  const cues = listCues(project);
+  const cue = previousCue(cues, project.meta?.transport?.cueId);
+  if (!cue) return log("ERREUR · pas de cue précédent");
+  fireDesktopCue(cue);
+};
+$("#cuePanic").onclick = () => {
+  const applied = applyCue(project, null, { panic: true });
+  project = applied.project;
+  runtime.stop();
+  syncPlayButton();
+  redraw();
+  autosave();
+  log("PANIC");
+};
+
+function downloadText(content, fileName, mime = "text/plain") {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.style.display = "none";
+  document.body.append(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1200);
+}
+
+function runExport(kind) {
+  const map = {
+    max: () => ({ result: exportMax(project), name: `${project.name || "patch"}.maxpat`, mime: "application/json" }),
+    td: () => ({ result: exportTouchDesigner(project), name: `${project.name || "patch"}_td.py`, mime: "text/x-python" }),
+    pd: () => ({ result: exportPureData(project), name: `${project.name || "patch"}.pd`, mime: "text/plain" }),
+    millumin: () => ({ result: exportMilluminOscMap(project), name: `${project.name || "patch"}-millumin-osc.txt`, mime: "text/plain" })
+  };
+  const run = map[kind];
+  if (!run) return;
+  const { result, name, mime } = run();
+  downloadText(result.content, name, mime);
+  const uns = result.unsupported?.length ? ` · sans map : ${result.unsupported.join(", ")}` : "";
+  log(`Export ${kind}${uns}`);
+}
+
+$("#exportMaxBtn")?.addEventListener("click", () => runExport("max"));
+$("#exportTdBtn")?.addEventListener("click", () => runExport("td"));
+$("#exportPdBtn")?.addEventListener("click", () => runExport("pd"));
+$("#exportMilluminBtn")?.addEventListener("click", () => runExport("millumin"));
+
+$("#showHostCard")?.addEventListener("click", async () => {
+  const out = $("#hostCardOut");
+  if (!out) return;
+  let card = null;
+  try {
+    if (window.nvdDesktop?.getHostCard) card = await window.nvdDesktop.getHostCard();
+  } catch (e) {
+    log(`Carte hôte Electron · ${e.message || e}`);
+  }
+  if (!card) {
+    card = createHostCard({
+      host: location.hostname || "127.0.0.1",
+      port: window.nvdDesktop?.remotePort || REMOTE_PORT,
+      httpPort: Number(location.port) || null,
+      version: APP_VERSION
+    });
+  }
+  const caps = discoveryCapabilities();
+  const qr = hostCardToQrPayload(card);
+  out.style.display = "block";
+  out.textContent = [
+    `WS ${card.wsUrl}`,
+    card.httpUrl ? `HTTP ${card.httpUrl}` : "HTTP —",
+    `Pair ${card.pairCode}`,
+    `Discovery · LAN UDP oui · mDNS ${caps.mdnsStatus}`,
+    "",
+    "QR payload :",
+    qr
+  ].join("\n");
+  log("Carte hôte affichée (QR = payload JSON)");
+});
 
 function syncPlayButton() {
   const b = $("#play");
@@ -670,7 +1176,6 @@ async function loadProjectText(data, label) {
   project = validateProject(JSON.parse(data));
   graphPath = [];
   redraw();
-  await runtime.syncCameraFromProject();
   runtime.play();
   syncPlayButton();
   log("Projet chargé · " + (label || project.name));
@@ -730,7 +1235,6 @@ $("#projectFile").onchange = async e => {
   if (!f) return;
   project = validateProject(JSON.parse(await f.text()));
   redraw();
-  await runtime.syncCameraFromProject();
   runtime.play();
   syncPlayButton();
   log("Projet chargé · " + project.name);
@@ -776,8 +1280,8 @@ function readAppearance() {
 
 function openPreferences(tab = "general") {
   $("#preferencesModal").classList.remove("hidden");
-  $$("[data-pref-tab]").forEach(b => b.classList.toggle("active", b.dataset.prefTab === tab));
-  $$("[data-pref-panel]").forEach(p => p.classList.toggle("hidden", p.dataset.prefPanel !== tab));
+  qall("[data-pref-tab]").forEach(b => b.classList.toggle("active", b.dataset.prefTab === tab));
+  qall("[data-pref-panel]").forEach(p => p.classList.toggle("hidden", p.dataset.prefPanel !== tab));
   const ai = readAiConfig();
   if ($("#aiEnabled")) $("#aiEnabled").checked = ai.enabled !== false;
   if ($("#aiEndpoint")) $("#aiEndpoint").value = ai.endpoint || "";
@@ -793,7 +1297,7 @@ function openPreferences(tab = "general") {
 }
 $("#preferencesBtn").onclick = () => openPreferences("general");
 $("#preferencesClose").onclick = () => $("#preferencesModal").classList.add("hidden");
-$$("[data-pref-tab]").forEach(b => b.onclick = () => openPreferences(b.dataset.prefTab));
+qall("[data-pref-tab]").forEach(b => b.onclick = () => openPreferences(b.dataset.prefTab));
 
 for (const id of ["accentColor", "secondaryColor", "gradientMode", "gradientIntensity"]) {
   const el = $("#" + id);
@@ -856,6 +1360,39 @@ if (savedAppearance.accent) {
 }
 setWorkspaceMode(localStorage.getItem("cvd.workspace") || "bureau");
 
+function restoreWorkspaceLayout() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("nvd.workspace.layout") || "{}"); } catch { /* */ }
+  const targets = {
+    library: $(".library"),
+    inspector: $(".inspector"),
+    patch: $("#patchPanel"),
+    timeline: $("#timelinePanel"),
+    vibe: $(".vibe"),
+    terminal: $(".terminal")
+  };
+  for (const [key, el] of Object.entries(targets)) {
+    if (!el || !saved[key]) continue;
+    if (saved[key].width) el.style.width = saved[key].width;
+    if (saved[key].height) el.style.height = saved[key].height;
+  }
+  if (typeof ResizeObserver === "undefined") return;
+  let timer = null;
+  const observer = new ResizeObserver(() => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const layout = {};
+      for (const [key, el] of Object.entries(targets)) {
+        if (!el) continue;
+        layout[key] = { width: el.style.width || "", height: el.style.height || "" };
+      }
+      localStorage.setItem("nvd.workspace.layout", JSON.stringify(layout));
+    }, 180);
+  });
+  Object.values(targets).filter(Boolean).forEach(el => observer.observe(el));
+}
+restoreWorkspaceLayout();
+
 document.addEventListener("keydown", e => {
   if (e.code !== "Space" || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
   const t = e.target, tag = t?.tagName?.toLowerCase?.();
@@ -908,6 +1445,7 @@ function setZoom(next) {
 }
 $("#zoomIn").onclick = () => setZoom(view.scale + 0.1);
 $("#zoomOut").onclick = () => setZoom(view.scale - 0.1);
+if ($("#wrapBtn")) $("#wrapBtn").onclick = () => wrapSelection();
 $("#zoomReset").onclick = () => { view.x = 0; view.y = 0; setZoom(1); };
 $("#patchSpace").addEventListener("wheel", e => {
   e.preventDefault();
@@ -932,8 +1470,8 @@ $("#patchSpace").addEventListener("pointerup", e => {
   if (panDrag && e.pointerId === panDrag.id) panDrag = null;
 });
 
-$$(".collapse").forEach(b => b.onclick = () => b.closest(".panel").classList.toggle("collapsed"));
-$("#search").oninput = e => $$(".lib-item").forEach(x => {
+qall(".collapse").forEach(b => b.onclick = () => b.closest(".panel").classList.toggle("collapsed"));
+$("#search").oninput = e => qall(".lib-item").forEach(x => {
   x.style.display = x.textContent.toLowerCase().includes(e.target.value.toLowerCase()) ? "flex" : "none";
 });
 $("#termSend").onclick = runCmd;
@@ -949,7 +1487,6 @@ async function runCmd() {
     else if (v === "demo" || v === "load demo") {
       project = createDemoProject();
       redraw();
-      await runtime.syncCameraFromProject();
       runtime.play();
       syncPlayButton();
       autosave();
@@ -987,7 +1524,7 @@ function openRouteSheet(track) {
   ensureRouting(project);
   const r = effectiveRoute(project, track);
   $("#routeSheetTitle").textContent = `Routage piste ${track + 1}`;
-  $$("[data-route-mode]").forEach(b => b.classList.toggle("active", b.dataset.routeMode === r.mode));
+  qall("[data-route-mode]").forEach(b => b.classList.toggle("active", b.dataset.routeMode === r.mode));
   $("#routeDestinations").innerHTML = DESTINATIONS.map(d => {
     const checked = r.destinations.includes(d.id) ? "checked" : "";
     const status = d.status === "adapter" ? "<span class='adapter'>adaptateur</span>" : d.status === "planned" ? "<small>passerelle</small>" : "<small>prêt</small>";
@@ -997,15 +1534,15 @@ function openRouteSheet(track) {
 }
 document.querySelectorAll("[data-track-route]").forEach(b => b.onclick = () => openRouteSheet(+b.dataset.trackRoute));
 $("#routeSheetClose").onclick = () => $("#routeSheet").classList.add("hidden");
-$$("[data-route-mode]").forEach(b => b.onclick = () => {
+qall("[data-route-mode]").forEach(b => b.onclick = () => {
   const r = effectiveRoute(project, routingTrack);
   r.mode = b.dataset.routeMode;
   if (r.mode === "main") r.destinations = ["main-output"];
-  $$("[data-route-mode]").forEach(x => x.classList.toggle("active", x === b));
+  qall("[data-route-mode]").forEach(x => x.classList.toggle("active", x === b));
   updateRouteButtons();
 });
 $("#routeDestinations").addEventListener("change", () => {
-  const ids = $$("#routeDestinations [data-route-dest]:checked").map(x => x.dataset.routeDest);
+  const ids = qall("#routeDestinations [data-route-dest]:checked").map(x => x.dataset.routeDest);
   const r = effectiveRoute(project, routingTrack);
   if (r.mode === "main") r.destinations = ["main-output"];
   else r.destinations = ids.length ? ids : ["main-output"];
@@ -1036,18 +1573,61 @@ if (generalPrefs.restoreAutosave !== false && autosaved) {
 }
 if (project.nodes.length === 0 && generalPrefs.loadDemo !== false) {
   project = createDemoProject();
-  log("Demo P00 initialisée (caméra → shader)");
+  log("Démo Baleine interactive initialisée · aucune permission requise");
 }
 redraw();
 history.clear();
 commitHistory();
-runtime.syncCameraFromProject().then(ok => {
-  if (ok) log("Caméra synchronisée");
-  runtime.play();
-  syncPlayButton();
-});
+runtime.play();
+syncPlayButton();
 log(`${BUILD_LABEL} · moteur graphe actif`);
 window.__nvdSelfTest = () => nestedBoxSelfTest();
+let remoteRevision = 0;
+let remoteSession = null;
+let applyingRemote = false;
+
+function publishHostState() {
+  if (!remoteSession?.online || applyingRemote) return;
+  remoteRevision += 1;
+  remoteSession.pushState({ revision: remoteRevision, project });
+}
+
+function startDesktopRemoteHost() {
+  const params = new URLSearchParams(location.search);
+  const query = params.get("remoteHost");
+  const electron = window.nvdDesktop?.runtime === "electron";
+  if (!query && !electron) return;
+  const url = query && query.startsWith("ws") ? query : `ws://127.0.0.1:${window.nvdDesktop?.remotePort || REMOTE_PORT}`;
+  remoteSession = connectRemote({
+    url,
+    role: "host",
+    clientId: "desktop",
+    getState: () => ({ revision: remoteRevision, project }),
+    setState: ({ revision, project: next }) => {
+      applyingRemote = true;
+      remoteRevision = revision ?? remoteRevision;
+      try {
+        historySuspended = true;
+        project = validateProject(next);
+        graphPath = [];
+        redraw();
+        const transport = project.meta?.transport;
+        if (transport?.action === "go" && typeof transport.start === "number") {
+          runtime.time = transport.start;
+          runtime.play();
+          syncPlayButton();
+        }
+      } finally {
+        historySuspended = false;
+        applyingRemote = false;
+      }
+    },
+    onStatus: (s) => log(`Distant · ${s.state}${s.detail ? " · " + s.detail : ""}`),
+    onLog: (m) => log(`Distant · ${m}`)
+  });
+}
+startDesktopRemoteHost();
+
 try {
   const self = window.__nvdSelfTest();
   log(self.ok

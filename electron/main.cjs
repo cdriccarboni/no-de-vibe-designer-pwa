@@ -2,7 +2,7 @@
  * No-de Vibe Designer — process principal Electron (Chromium embarqué).
  * Sert l'UI locale sans dépendre d'une installation Chrome externe.
  */
-const { app, BrowserWindow, shell, dialog, session } = require("electron");
+const { app, BrowserWindow, shell, dialog, session, ipcMain } = require("electron");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -12,6 +12,10 @@ const APP_NAME = "No-de Vibe Designer";
 let mainWindow = null;
 let httpServer = null;
 let httpPort = 0;
+let hostCard = null;
+let sendOscUdp = null;
+let sendArtNetUdp = null;
+let lanAnnouncer = null;
 
 function appRoot() {
   // En développement : racine du dépôt. Empaqueté : resources/app.asar ou resources/app
@@ -53,6 +57,11 @@ function startLocalServer(root) {
       try {
         let rel = req.url || "/";
         if (rel === "/") rel = "/index.html";
+        if (rel === "/nvd-host.json" && hostCard) {
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-cache" });
+          res.end(JSON.stringify(hostCard, null, 2));
+          return;
+        }
         let filePath = safeJoin(root, rel);
         if (!filePath) {
           res.writeHead(403);
@@ -88,9 +97,71 @@ function startLocalServer(root) {
   });
 }
 
+async function startRemoteBridge() {
+  try {
+    const mod = await import(pathToFileURL(path.join(__dirname, "..", "bridge", "remote-server.mjs")).href);
+    const started = await mod.startRemoteServer({ port: 4174, host: "127.0.0.1" });
+    console.log("REMOTE", started.url);
+  } catch (err) {
+    console.error("REMOTE_FAILED", err?.message || err);
+  }
+}
+
+async function loadNativeModules() {
+  try {
+    const osc = await import(pathToFileURL(path.join(__dirname, "..", "bridge", "osc-udp.mjs")).href);
+    sendOscUdp = osc.sendOscUdp;
+  } catch (err) {
+    console.error("OSC_UDP_LOAD_FAILED", err?.message || err);
+  }
+  try {
+    const artnet = await import(pathToFileURL(path.join(__dirname, "..", "bridge", "artnet-udp.mjs")).href);
+    sendArtNetUdp = artnet.sendArtNetUdp;
+  } catch (err) {
+    console.error("ARTNET_UDP_LOAD_FAILED", err?.message || err);
+  }
+  try {
+    const discovery = await import(pathToFileURL(path.join(__dirname, "..", "shared", "discovery", "host-card.js")).href);
+    hostCard = discovery.createHostCard({
+      name: APP_NAME,
+      host: "127.0.0.1",
+      port: 4174,
+      httpPort,
+      version: app.getVersion()
+    });
+  } catch (err) {
+    console.error("HOST_CARD_FAILED", err?.message || err);
+  }
+  try {
+    const lan = await import(pathToFileURL(path.join(__dirname, "..", "bridge", "lan-discovery.mjs")).href);
+    if (lanAnnouncer) lanAnnouncer.stop();
+    lanAnnouncer = lan.startLanAnnouncer(() => hostCard);
+    console.log("LAN_BEACON", "multicast announce started");
+  } catch (err) {
+    console.error("LAN_BEACON_FAILED", err?.message || err);
+  }
+}
+
+ipcMain.handle("nvd:osc-udp", async (_event, message = {}) => {
+  if (!sendOscUdp) throw new Error("OSC UDP indisponible dans cet hôte");
+  return sendOscUdp(message);
+});
+
+ipcMain.handle("nvd:artnet-udp", async (_event, message = {}) => {
+  if (!sendArtNetUdp) throw new Error("Art-Net UDP indisponible dans cet hôte");
+  return sendArtNetUdp(message);
+});
+
+ipcMain.handle("nvd:host-card", async () => {
+  if (!hostCard) throw new Error("Carte hôte indisponible");
+  return hostCard;
+});
+
 async function createWindow() {
+  await startRemoteBridge();
   const root = appRoot();
   const port = await startLocalServer(root);
+  await loadNativeModules();
   const win = new BrowserWindow({
     width: 1440,
     height: 930,
@@ -98,6 +169,10 @@ async function createWindow() {
     minHeight: 700,
     title: APP_NAME,
     backgroundColor: "#101214",
+    ...(process.platform === "darwin" ? {
+      titleBarStyle: "hiddenInset",
+      trafficLightPosition: { x: 14, y: 16 }
+    } : {}),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -143,6 +218,11 @@ async function createWindow() {
   }
 
   await win.loadURL(`http://127.0.0.1:${port}/desktop/`);
+  if (process.platform === "darwin") {
+    await win.webContents.executeJavaScript(
+      'document.documentElement.classList.add("electron-macos")'
+    );
+  }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     // OUTPUT popup relative → laisser Electron ouvrir une fenêtre enfant sur même origine

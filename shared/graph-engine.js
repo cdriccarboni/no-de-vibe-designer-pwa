@@ -14,8 +14,8 @@ export function validateEdge(project, from, to) {
   const dst = project.nodes.find(n => n.id === to.node);
   if (!src || !dst) return { ok: false, errors: ["Node introuvable"] };
 
-  const fromType = portDataType(src.type, from.port);
-  const toType = portDataType(dst.type, to.port);
+  const fromType = portDataType(src.type, from.port, src);
+  const toType = portDataType(dst.type, to.port, dst);
   if (!typesCompatible(fromType, toType)) {
     errors.push(`Types incompatibles : ${fromType} → ${toType} (${src.title || src.type} → ${dst.title || dst.type})`);
   }
@@ -129,8 +129,8 @@ export function evaluateGraph(project, nodeFns, ctx, previousOutputs = new Map()
       errors.push(`Connexion orpheline ${e.id}`);
       continue;
     }
-    const fromType = portDataType(src.type, e.from.port);
-    const toType = portDataType(dst.type, e.to.port);
+    const fromType = portDataType(src.type, e.from.port, src);
+    const toType = portDataType(dst.type, e.to.port, dst);
     if (!typesCompatible(fromType, toType)) {
       errors.push(`Types incompatibles : ${src.title || src.type} (${fromType}) → ${dst.title || dst.type} (${toType})`);
     }
@@ -171,22 +171,23 @@ export function evaluateGraph(project, nodeFns, ctx, previousOutputs = new Map()
 
   ctx.errors = [...(ctx.errors || []), ...errors];
   ctx.warnings = [...(ctx.warnings || []), ...warnings];
-  return { outputs, errors, warnings, cycleEdgeIds, order };
+  return { outputs, errors: ctx.errors, warnings: ctx.warnings, cycleEdgeIds, order };
 }
 
 export function findVideoOutput(project, outputs) {
-  for (const n of project.nodes || []) {
-    if (n.type !== "shader" || n.params?.enabled === false) continue;
-    const bag = outputs.get(n.id);
-    const v = bag?.get(2);
-    if (v && (v.kind === "video" || v.el || v.canvas)) return { node: n, value: v, source: "shader" };
-  }
-  for (const n of project.nodes || []) {
-    if (!(n.type === "camera" || n.type === "phone-camera-front" || n.type === "phone-camera-back")) continue;
-    if (n.params?.enabled === false) continue;
-    const bag = outputs.get(n.id);
-    const v = bag?.get(0) || bag?.get(2);
-    if (v) return { node: n, value: v, source: "camera" };
+  const prefer = ["composite", "ghost", "bodyclone", "shadow", "threshold", "mirror", "transform", "blackhole", "shader", "blob", "whale", "videofile", "camera", "phone-camera-front", "phone-camera-back"];
+  for (const type of prefer) {
+    for (const n of project.nodes || []) {
+      if (n.type !== type || n.params?.enabled === false) continue;
+      const bag = outputs.get(n.id);
+      if (!bag) continue;
+      for (const port of [2, 3, 0]) {
+        const v = bag.get(port);
+        if (v && (v.kind === "video" || v.el || v.canvas || v.pixels)) {
+          return { node: n, value: v, source: type };
+        }
+      }
+    }
   }
   return null;
 }

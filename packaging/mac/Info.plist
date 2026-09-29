@@ -5,8 +5,8 @@
   <key>CFBundleDisplayName</key><string>No-de Vibe Designer</string>
   <key>CFBundleName</key><string>No-de Vibe Designer</string>
   <key>CFBundleIdentifier</key><string>fr.acousmatic.nodevibedesigner</string>
-  <key>CFBundleVersion</key><string>94</string>
-  <key>CFBundleShortVersionString</key><string>0.9.4</string>
+  <key>CFBundleVersion</key><string>130</string>
+  <key>CFBundleShortVersionString</key><string>0.13.0</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>No-de Vibe Designer</string>
   <key>CFBundleIconFile</key><string>VibeDesigner</string>

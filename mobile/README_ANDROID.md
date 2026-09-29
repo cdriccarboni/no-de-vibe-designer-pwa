@@ -1,35 +1,28 @@
-# Android / Mobile
+# Android / PWA
 
-Ce dossier prépare l'application Android sans transformer l'interface desktop en responsive.
+La cible actuelle est la PWA, pas une copie responsive du desktop.
 
-## Principe
-Même `shared/` :
-- IR de projet `.cvd.json`
-- runtime
-- catalogue de nodes
-- moteurs communs
+## Construire
 
-Interface mobile indépendante :
-- écrans successifs
-- navigation basse
-- node editor tactile avec pan/zoom
-- vues outils plein écran / bottom sheets
-- Stage rapide à une main
-- Vibe simplifié
-- accès aux capteurs du téléphone
+```bash
+npm run build:pwa
+```
 
-## Capacités téléphone prévues comme nodes
-- caméra avant/arrière
-- micro
-- tactile / multitouch
-- gyroscope
-- accéléromètre
-- orientation
-- GPS
-- vibration/haptique
-- Wi-Fi
-- Bluetooth
+Sortie : `dist/pwa/`. C’est ce dossier qu’un futur projet Capacitor doit utiliser comme `webDir`. Ne pas dupliquer `shared/` dans l’application Android.
 
-## Packaging Android
-Le prochain jalon sera d'envelopper `mobile/` avec Capacitor/Android ou une enveloppe native équivalente après stabilisation du socle partagé.
-Ne pas dupliquer le moteur dans le projet Android.
+Servir en local (pas d’hébergement public) :
+
+```bash
+npm run serve:pwa
+```
+
+## Interface
+
+- **Bureau** : projet, nodes, câbles, paramètres, Vibe, timeline, enregistrement.
+- **Plateau** : GO, cues, Preview, retour vers l’édition.
+
+Les capteurs (caméra avant/arrière, micro, tactile, gyroscope, accéléromètre, orientation, GPS, vibration, réseau, Bluetooth) sont des nodes du moteur partagé. Si l’API n’existe pas, le node affiche l’indisponibilité. Il n’invente pas de mesure.
+
+## Capacitor
+
+Pas encore branché. Quand il le sera : envelopper `dist/pwa`, garder le pont WebSocket pour le bureau distant, et retester les permissions Android (caméra, micro, mouvement) sur un appareil réel.

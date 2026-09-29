@@ -30,10 +30,61 @@ export class Runtime {
     this.cameraWanted = false;
     this.audioEngine = sharedAudio;
     this.honestFlags = new Set();
+    this.sensorBus = null;
+    this.mediaElements = new Map();
+    this._pixelScratch = null;
+    this.frameScratch = new Map();
+    this.pointer = { x: 0.5, y: 0.52, speed: 0, active: false, t: 0 };
   }
 
   setDeviceBus(bus) { this.deviceBus = bus || this.deviceBus; }
   setBridgeSend(fn) { this.bridgeSend = fn; }
+  setSensorBus(bus) { this.sensorBus = bus || null; }
+  setOscUdpSend(fn) { this.oscUdpSend = fn || null; }
+  setArtNetUdpSend(fn) { this.artnetUdpSend = fn || null; }
+  setPointer(x, y) {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const nx = Math.max(0, Math.min(1, Number(x) || 0));
+    const ny = Math.max(0, Math.min(1, Number(y) || 0));
+    const dt = Math.max(16, now - (this.pointer?.t || now));
+    const dx = nx - (this.pointer?.x ?? nx);
+    const dy = ny - (this.pointer?.y ?? ny);
+    const speed = Math.min(2, Math.hypot(dx, dy) / (dt / 1000));
+    this.pointer = { x: nx, y: ny, speed, active: true, t: now };
+  }
+
+  setMediaElement(nodeId, el) {
+    if (!nodeId) return;
+    if (!el) {
+      const prev = this.mediaElements.get(nodeId);
+      if (prev?.src && prev.src.startsWith("blob:")) URL.revokeObjectURL(prev.src);
+      this.mediaElements.delete(nodeId);
+      return;
+    }
+    this.mediaElements.set(nodeId, el);
+  }
+
+  async attachVideoFile(nodeId, fileOrUrl, { loop = true } = {}) {
+    if (!nodeId) throw new Error("Node vidéo manquant");
+    const video = document.createElement("video");
+    video.playsInline = true;
+    video.muted = true;
+    video.loop = loop;
+    video.preload = "auto";
+    if (typeof fileOrUrl === "string") {
+      video.src = fileOrUrl;
+    } else if (fileOrUrl) {
+      video.src = URL.createObjectURL(fileOrUrl);
+    } else {
+      throw new Error("Fichier vidéo manquant");
+    }
+    await new Promise((resolve, reject) => {
+      video.onloadeddata = () => resolve();
+      video.onerror = () => reject(new Error("Impossible de décoder le fichier vidéo"));
+    });
+    this.setMediaElement(nodeId, video);
+    return video;
+  }
 
   setProject(project) {
     this.project = project;
@@ -44,7 +95,7 @@ export class Runtime {
     for (const id of [...this.audioEngine.nodes.keys()]) {
       if (!ids.has(id)) this.audioEngine.release(id);
     }
-    this.syncCameraFromProject();
+    if (!this.needsCamera() && this.mediaStream) this.stopCamera();
     this.render();
   }
 
@@ -62,11 +113,15 @@ export class Runtime {
     );
   }
 
-  async syncCameraFromProject() {
-    if (!this.needsCamera()) return false;
+  async syncCameraFromProject({ request = false, facingMode = "environment" } = {}) {
+    if (!this.needsCamera()) {
+      if (this.mediaStream) this.stopCamera();
+      return false;
+    }
     if (this.mediaStream && this.video.readyState >= 2) return true;
+    if (!request) return false;
     try {
-      await this.enableCamera();
+      await this.enableCamera(facingMode);
       return true;
     } catch (e) {
       this.lastGraph.errors = [`Caméra : ${e.message || e}`];
@@ -82,14 +137,24 @@ export class Runtime {
     this.video.srcObject = this.mediaStream;
     await this.video.play();
     this.cameraWanted = true;
+    this.onGraphEvent?.({ type: "camera-state", state: "on" });
     return true;
+  }
+
+  stopCamera() {
+    if (this.mediaStream) this.mediaStream.getTracks().forEach(t => t.stop());
+    this.mediaStream = null;
+    try { this.video.pause(); } catch { /* */ }
+    this.video.srcObject = null;
+    this.cameraWanted = false;
+    this.onGraphEvent?.({ type: "camera-state", state: "off" });
+    this.render();
   }
 
   play() {
     if (this.playing) return;
     this.playing = true;
     this.last = performance.now();
-    this.syncCameraFromProject();
     this.loop(this.last);
   }
   pause() {
@@ -113,8 +178,8 @@ export class Runtime {
 
   async dispose() {
     this.stop();
-    if (this.mediaStream) this.mediaStream.getTracks().forEach(t => t.stop());
-    this.mediaStream = null;
+    this.stopCamera();
+    this.frameScratch.clear();
     await this.audioEngine?.shutdown();
   }
 
@@ -149,8 +214,16 @@ export class Runtime {
       resultCanvas: this.resultCanvas,
       deviceBus: this.deviceBus,
       bridgeSend: this.bridgeSend,
+      oscUdpSend: this.oscUdpSend,
+      artnetUdpSend: this.artnetUdpSend,
       controls: this.project.controls || [],
       audioEngine: this.audioEngine,
+      sensorBus: this.sensorBus,
+      mediaElements: this.mediaElements,
+      frameScratch: this.frameScratch,
+      pointer: this.pointer,
+      project: this.project,
+      playing: this.playing,
       honestFlags: this.honestFlags,
       _graphApi: { evaluateGraph, findVideoOutput },
       _subpatchApi: { evaluateSubGraph },
@@ -164,22 +237,20 @@ export class Runtime {
     this._subPrev = ctx._subPrev;
     this.lastGraph = result;
 
-    if (result.errors.length || result.warnings.length) {
-      this.onGraphEvent?.({ type: "graph", errors: result.errors, warnings: result.warnings });
+    const graphSig = `${result.errors.join("\n")}\n${result.warnings.join("\n")}`;
+    if (graphSig !== this._graphSig) {
+      this._graphSig = graphSig;
+      if (result.errors.length || result.warnings.length) {
+        this.onGraphEvent?.({ type: "graph", errors: result.errors, warnings: result.warnings });
+      }
     }
 
     c.fillStyle = bg;
     c.fillRect(0, 0, w, h);
 
     const videoOut = findVideoOutput(this.project, result.outputs);
-    if (videoOut?.value?.el) {
-      try {
-        c.globalAlpha = videoOut.value.opacity ?? 1;
-        c.drawImage(videoOut.value.el, 0, 0, w, h);
-        c.globalAlpha = 1;
-      } catch {
-        this.drawPlaceholder(c, w, h);
-      }
+    if (videoOut?.value) {
+      this.drawVideoValue(c, w, h, videoOut.value);
     } else if (this.needsCamera() && this.video.readyState >= 2) {
       // Camera present but not yet producing via graph (no evaluate output)
       c.drawImage(this.video, 0, 0, w, h);
@@ -214,6 +285,37 @@ export class Runtime {
       c.fillStyle = "#fff";
       c.font = "14px system-ui";
       c.fillText(result.errors[0].slice(0, 120), 12, 24);
+    }
+  }
+
+  drawVideoValue(c, w, h, value) {
+    try {
+      c.globalAlpha = value.opacity ?? 1;
+      if (typeof value.draw === "function") {
+        value.draw(c, w, h);
+      } else if (value.el) {
+        c.drawImage(value.el, 0, 0, w, h);
+      } else if (value.canvas) {
+        c.drawImage(value.canvas, 0, 0, w, h);
+      } else if (value.pixels && value.width && value.height) {
+        if (!this._pixelScratch || this._pixelScratch.width !== value.width || this._pixelScratch.height !== value.height) {
+          this._pixelScratch = (typeof OffscreenCanvas !== "undefined")
+            ? new OffscreenCanvas(value.width, value.height)
+            : Object.assign(document.createElement("canvas"), { width: value.width, height: value.height });
+        }
+        const scratch = this._pixelScratch;
+        const sctx = scratch.getContext("2d");
+        const img = sctx.createImageData(value.width, value.height);
+        img.data.set(value.pixels);
+        sctx.putImageData(img, 0, 0);
+        c.drawImage(scratch, 0, 0, w, h);
+      } else {
+        this.drawPlaceholder(c, w, h);
+      }
+      c.globalAlpha = 1;
+    } catch {
+      c.globalAlpha = 1;
+      this.drawPlaceholder(c, w, h);
     }
   }
 

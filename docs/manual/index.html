@@ -89,12 +89,23 @@
     <li>Fermez complètement l’app, rouvrez : le patch (nodes, câbles, sous-patches, paramètres) doit revenir.</li>
   </ol>
 
-  <h2>9. Dépannage</h2>
+  <h2>9. Téléphone et PWA</h2>
+  <ol>
+    <li>Construire : <code>npm run build:pwa</code>. Servir en local : <code>npm run serve:pwa</code> puis ouvrir <code>http://127.0.0.1:4175/</code>.</li>
+    <li><b>Bureau</b> édite le graphe (nodes, câbles, Vibe, timeline). <b>Plateau</b> déclenche les cues (GO) et le retour scène.</li>
+    <li>L’enregistrement manuel écrit le projet dans le navigateur (IndexedDB) et propose aussi un fichier <code>.cvd.json</code> quand le navigateur le permet.</li>
+    <li>Une mise à jour du service worker affiche « Nouvelle version disponible ». Le patch n’est pas rechargé tant que vous n’appuyez pas sur Mettre à jour.</li>
+    <li>Outils → Bureau distant : URL <code>ws://</code> du pont (défaut <code>ws://127.0.0.1:4174</code>). Sans hôte desktop, le pont applique les opérations. Un projet différent s’affiche comme conflit.</li>
+  </ol>
+  <p>Caméra, micro, mouvement, GPS, Bluetooth et MIDI dépendent de l’appareil. S’ils manquent, le node le dit. Rien n’est simulé.</p>
+
+  <h2>10. Dépannage</h2>
   <ul>
     <li>Caméra noire → permissions Système → Confidentialité.</li>
     <li>Câble rouge → types incompatibles ou node indisponible.</li>
     <li>OSC silencieux → bridge WebSocket requis.</li>
     <li>App non signée → Gatekeeper peut demander un clic droit → Ouvrir.</li>
+    <li>PWA qui ne s’installe pas → servir le dossier <code>dist/pwa</code> (pas les sources <code>mobile/</code>, qui importent <code>../shared/</code>).</li>
   </ul>
 
   <p style="margin-top:32px;font-size:12px">Manuel aligné sur la version livrée — mis à jour avec le logiciel.</p>

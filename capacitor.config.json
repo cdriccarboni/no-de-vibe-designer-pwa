@@ -1,0 +1,17 @@
+{
+  "appId": "fr.acousmatic.nodevibedesigner",
+  "appName": "No-de Vibe Designer",
+  "webDir": "dist/pwa",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true
+    }
+  }
+}

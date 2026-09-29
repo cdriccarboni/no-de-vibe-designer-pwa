@@ -12,3 +12,7 @@ npm-debug.log*
 !.env.example
 *.pem
 *.key
+test-results/
+playwright-report/
+
+tests/.screenshots/

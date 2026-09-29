@@ -1,7 +1,7 @@
 {
   "name": "no-de-vibe-designer",
   "productName": "No-de Vibe Designer",
-  "version": "0.9.4",
+  "version": "1.1.0",
   "description": "No-de Vibe Designer — environnement de patch nodal pour le spectacle vivant",
   "author": "Acousmatic / No-de Vibe Designer",
   "license": "UNLICENSED",
@@ -10,10 +10,20 @@
   "scripts": {
     "start": "electron .",
     "test": "node tests/run.mjs",
-    "check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check desktop/app.js",
+    "test:pwa": "playwright test -c playwright.config.mjs",
+    "build:pwa": "node scripts/build-pwa.mjs",
+    "serve:pwa": "node scripts/serve-pwa.mjs",
+    "android:sync": "node scripts/sync-android.mjs",
+    "android:apk": "node scripts/build-android.mjs",
+    "android:apk:release": "node scripts/build-android.mjs --release",
+    "icons": "node scripts/make-icons.mjs",
+    "remote:bridge": "node bridge/remote-server.mjs",
+    "check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check desktop/app.js && node --check mobile/mobile.js && node --check bridge/remote-server.mjs && node --check bridge/osc-udp.mjs && node --check bridge/artnet-udp.mjs && node --check bridge/lan-discovery.mjs && node --check shared/remote-protocol.js && node --check shared/sensor-bus.js && node --check shared/graphics/blackhole.js && node --check shared/graphics/transform.js && node --check shared/graphics/pass-graph.js && node --check shared/graphics/webgl2.js && node --check shared/graphics/composite.js && node --check shared/graphics/shadow.js && node --check shared/graphics/frame-utils.js && node --check shared/graphics/whale.js && node --check shared/graphics/blob.js && node --check shared/protocols/osc.js && node --check shared/protocols/artnet.js && node --check shared/stage/cues.js && node --check shared/discovery/host-card.js && node --check shared/discovery/lan-beacon.js && node --check shared/discovery/registry.js && node --check shared/adapters/midi-learn.js && node --check shared/adapters/serial.js && node --check scripts/sync-android.mjs && node --check scripts/build-android.mjs && node --check scripts/serve-web.mjs",
     "pack:mac": "electron-builder --mac dir --arm64",
     "dist:mac": "electron-builder --mac zip --arm64",
-    "pack:linux": "electron-builder --linux zip --x64"
+    "pack:linux": "electron-builder --linux zip --x64",
+    "serve:web": "node scripts/serve-web.mjs",
+    "release:check": "npm test && npm run check"
   },
   "build": {
     "appId": "fr.acousmatic.nodevibedesigner",
@@ -30,6 +40,7 @@
       "docs/**/*",
       "examples/**/*",
       "mobile/**/*",
+      "bridge/**/*",
       "index.html",
       "package.json"
     ],
@@ -68,7 +79,9 @@
       "target": [
         {
           "target": "zip",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "category": "Graphics",
@@ -77,6 +90,10 @@
     "asar": true
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@playwright/test": "^1.63.0",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8"
   },

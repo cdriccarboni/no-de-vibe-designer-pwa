@@ -4,15 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>No-de Vibe Designer</title>
+  <meta name="theme-color" content="#101214">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="../mobile/icons/icon-192.png">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body data-theme="stage" data-workspace="bureau">
 <div id="app">
   <header class="topbar">
-    <div class="brand"><div class="brandmark">◒</div><div><b>No-de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v0.9.4</span>
+    <div class="brand"><div class="brandmark" title="No-de Vibe Designer">◒</div><div><b>No-de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
+    <span class="badge">v1.0.0</span>
     <div class="spacer"></div>
     <div class="themes workspace-modes"><button id="modeBureau" class="active">Bureau</button><button id="modePlateau">Plateau</button></div>
+    <button id="controlsBtn" class="btn">Controls</button>
     <button id="preferencesBtn" class="btn">Préférences</button>
     <button id="saveProject" class="btn">Enregistrer</button>
     <button id="loadProject" class="btn">Ouvrir</button>
@@ -35,6 +40,7 @@
               <button type="button" id="zoomOut" class="iconbtn" title="Zoom −">−</button>
               <button type="button" id="zoomReset" class="iconbtn" title="Reset zoom">1:1</button>
               <button type="button" id="zoomIn" class="iconbtn" title="Zoom +">+</button>
+              <button type="button" id="wrapBtn" class="iconbtn" title="Mettre la sélection dans une boîte">Boîte</button>
               <button type="button" class="iconbtn collapse">−</button>
             </div>
           </div>
@@ -47,7 +53,7 @@
           <div class="panel-body preview-body">
             <canvas id="previewCanvas" width="1280" height="720"></canvas>
             <div id="previewOverlay" class="preview-overlay"></div>
-            <div class="preview-foot"><span id="previewInfo">1280×720 · 60 fps</span><span class="spacer"></span><button id="clearPoints" class="smallbtn">Effacer points</button></div>
+            <div class="preview-foot"><span id="previewInfo">1280×720 · 60 fps</span><span class="spacer"></span><button id="magicFxBtn" class="smallbtn">✦ Magic FX</button><button id="clearPoints" class="smallbtn">Effacer points</button></div>
           </div>
         </section>
       </div>
@@ -55,7 +61,7 @@
       <section class="panel vibe resizable-y">
         <div class="panel-head">Vibe <span class="sub">Entrée = envoyer · Shift+Entrée = nouvelle ligne</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
         <div class="panel-body vibe-body">
-          <textarea id="vibeText" placeholder="Ex. : Crée une caméra reliée à un shader">Crée une caméra reliée à un shader, ajoute MIDI vers l’intensité du shader.</textarea>
+          <textarea id="vibeText" placeholder="Ex. : Rends la baleine fantomatique">Rends la baleine fantomatique et ajoute une traînée douce.</textarea>
           <button id="applyVibe" class="generate">Envoyer ↵</button>
           <div id="vibePreview" class="vibe-preview hidden"></div>
         </div>
@@ -71,6 +77,10 @@
             <div class="spacer"></div>
             <button id="addCue" class="smallbtn">+ Cue</button>
             <button id="addEffect" class="smallbtn">+ Effet</button>
+            <button id="cueGo" class="smallbtn">GO</button>
+            <button id="cuePrev" class="smallbtn">◀ Cue</button>
+            <button id="cueNext" class="smallbtn">Cue ▶</button>
+            <button id="cuePanic" class="smallbtn danger">PANIC</button>
           </div>
           <div class="timeline-routing-wrap">
             <div id="timelineBody" class="timeline-body">
@@ -132,7 +142,7 @@
       <div data-pref-panel="general">
         <p class="hint">Langue d’interface : français. Démarrage : restaurer l’autosave si disponible.</p>
         <label>Restaurer l’autosave au lancement <input id="prefRestoreAutosave" type="checkbox" checked></label>
-        <label>Charger la démo P00 si projet vide <input id="prefLoadDemo" type="checkbox" checked></label>
+        <label>Charger la baleine interactive si projet vide <input id="prefLoadDemo" type="checkbox" checked></label>
       </div>
       <div data-pref-panel="appearance" class="hidden">
         <label>Couleur dominante <input id="accentColor" type="color" value="#d7b86a"></label>
@@ -158,11 +168,20 @@
         <p class="hint">MIDI / Serial / OSC passent par le graphe lorsque les nodes sont connectés.</p>
         <ul class="pref-list">
           <li><b>MIDI</b> — console <code>midi connect</code> puis node MIDI Hub → sorties CC/gate. Essai matériel : à vérifier.</li>
-          <li><b>Serial</b> — <code>serial connect</code> / <code>serial send …</code>. Essai matériel : à vérifier.</li>
+          <li><b>Serial</b> — <code>serial connect</code> / <code>serial reconnect</code> / <code>serial send …</code>. Reconnexion auto sur ports déjà autorisés.</li>
           <li><b>OSC</b> — node OSC + <code>bridge connect ws://…</code>. Sans bridge : erreur visible, pas de faux succès.</li>
-          <li><b>Caméra / Shader</b> — exécutables dans le patch.</li>
+          <li><b>Caméra</b> — permission uniquement après action « Activer la caméra » dans l’inspecteur.</li>
+          <li><b>Whale / Blob / Threshold / Ghost / Mirror / Shadow</b> — moteurs locaux exécutables dans le patch.</li>
           <li><b>Audio / NDI / Syphon</b> — pas encore câblés (nodes Library marqués indisponibles).</li>
         </ul>
+        <div class="preferences-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+          <button type="button" id="showHostCard" class="smallbtn">Carte hôte / QR</button>
+          <button type="button" id="exportMaxBtn" class="smallbtn">Export Max</button>
+          <button type="button" id="exportTdBtn" class="smallbtn">Export TD</button>
+          <button type="button" id="exportPdBtn" class="smallbtn">Export Pure Data</button>
+          <button type="button" id="exportMilluminBtn" class="smallbtn">Carte Millumin OSC</button>
+        </div>
+        <pre id="hostCardOut" class="term-log" style="max-height:160px;margin-top:10px;display:none"></pre>
       </div>
       <div data-pref-panel="backup" class="hidden">
         <p class="hint">Autosave navigateur (<code>cvd.autosave</code>) + export fichier <code>.cvd.json</code>.</p>
@@ -173,9 +192,36 @@
       </div>
       <div data-pref-panel="about" class="hidden">
         <p id="versionInfo">No-de Vibe Designer</p>
-        <p class="hint">Schéma projet <code>cvd.graph</code> (compatibilité). Incrémentation à chaque livraison.</p>
+        <p class="hint"><b>PWA</b> — application web utilisable directement dans votre navigateur, sans installation obligatoire.</p>
+        <p class="hint"><b>Mac</b> — application native Apple Silicon distribuée directement depuis le site lorsqu’un build est publié.</p>
+        <p class="hint"><b>Companion</b> — sur téléphone, No-de peut devenir télécommande, caméra et capteur. Les fonctions Remote Camera restent marquées expérimentales tant que la recette terrain n’est pas validée.</p>
+        <p class="hint">Schéma projet <code>cvd.graph</code> · même moteur de patch entre les variantes compatibles.</p>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="magicFxModal" class="preferences-modal hidden">
+  <div class="preferences-card magic-card">
+    <div class="preferences-head"><b>Magic FX</b><button id="magicFxClose" type="button">×</button></div>
+    <div class="magic-grid">
+      <button type="button" data-magic-fx="ghost"><b>Ghost</b><small>traînée temporelle</small></button>
+      <button type="button" data-magic-fx="threshold"><b>Threshold</b><small>silhouette instantanée</small></button>
+      <button type="button" data-magic-fx="mirror"><b>Mirror</b><small>miroir</small></button>
+      <button type="button" data-magic-fx="shadow"><b>Shadow</b><small>ombre miroir</small></button>
+      <button type="button" data-magic-fx="bodyclone"><b>Body Clone</b><small>dédoublement simple</small></button>
+      <button type="button" data-magic-fx="blob"><b>Blob</b><small>forme organique</small></button>
+      <button type="button" data-magic-fx="blackhole"><b>Black Hole</b><small>visuel génératif</small></button>
+    </div>
+    <p class="hint magic-hint">Sélectionne une source vidéo puis choisis un effet. Le résultat reste un vrai node dans PATCH.</p>
+  </div>
+</div>
+
+<div id="controlsModal" class="preferences-modal hidden">
+  <div class="preferences-card wide">
+    <div class="preferences-head"><b>Control Surface · No-de Channels</b><button id="controlsClose" type="button">×</button></div>
+    <div class="controls-toolbar"><span class="hint">Expose seulement les paramètres utiles à la régie. Les valeurs restent celles des nodes du patch.</span><button id="controlsRefresh" class="smallbtn" type="button">Actualiser</button></div>
+    <div id="controlSurface" class="control-surface"></div>
   </div>
 </div>
 

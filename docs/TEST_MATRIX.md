@@ -1,23 +1,25 @@
-# No-de Vibe Designer 0.9.4 — critical test matrix
+# No-de Vibe Designer 0.10.1 — matrice de tests
 
-Canonical tree. The 0.8.0 acceptance cases that this line did not already cover are ported here; camera → shader, vibe preview, and audio stay on the 0.9.x engine.
-
-| Test | Automated state |
+| Test | État automatisé |
 |---|---|
-| Root → A → B → ×2 → B → A → root returns 6 | PASS (`nestedBoxSelfTest`) |
-| Nested hierarchy survives JSON round-trip | PASS |
-| Nested box restores parent input after a child box | PASS |
-| Subpatch depth stops at 32 | PASS |
-| Empty box passes a parent number through | PASS |
-| Typed incompatible connection rejected | PASS |
-| Cyclic graph does not recurse/crash | PASS |
-| Vibe preview does not mutate; apply creates the graph | PASS |
-| Max/MSP export JSON structure parses | PASS |
-| TouchDesigner Python export compiles | PASS |
-| WebKit manual save uses localStorage, not a fake download | PASS |
-| OSC / Art-Net without a bridge does not claim success | PASS |
-| Audio node publishes the engine level; missing engine is an error | PASS |
-| Electron source syntax check | PASS (`npm run check`) |
-| Packaged macOS arm64 cold launch + nested-box smoke | CI `.github/workflows/macos-arm64.yml` (`--smoke-test`) |
+| Racine → A → B → ×2 → retour = 6 | PASS (`nestedBoxSelfTest`) |
+| Hiérarchie imbriquée après JSON | PASS |
+| Boîte vide : le nombre parent traverse | PASS |
+| Profondeur arrêtée à 32 | PASS |
+| Connexion de types incompatibles refusée | PASS |
+| Cycle sans récursion | PASS |
+| Vibe : aperçu sans mutation, application, undo | PASS (unitaire + Playwright) |
+| Export Max JSON | PASS |
+| Export TouchDesigner compilable | PASS |
+| Sauvegarde WebKit locale, sans faux téléchargement | PASS |
+| OSC / Art-Net sans pont : pas de succès annoncé | PASS |
+| Audio : niveau moteur ; moteur absent = erreur | PASS |
+| Capteur sans API, en attente, ou avec mesure réelle | PASS |
+| Protocole distant : conflit de révision | PASS |
+| Canal WebSocket RFC (exemple `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=` + client) | PASS |
+| Zoom, pan, duplication, Preview/OUTPUT, préférences restaurées | PASS (Playwright) |
+| Syntaxe Electron / mobile / pont | PASS (`npm run check`) |
+| PWA : manifest, SW, hors-ligne, restauration, graphe 3×2, sous-patch, undo, Vibe, micro, caméra, MIDI, OSC, Art-Net, Serial, WebSocket, GO, zoom/pan, duplication, Preview/OUTPUT, préférences, viewports, bannière | PASS (19 tests Playwright) |
+| Lancement `.app` arm64 | non relancé ici (workflow `macos-arm64.yml` inchangé) |
 
-Hardware paths (camera, MIDI, serial, a live OSC/Art-Net bridge) still report a real failure instead of a simulated success.
+Les chemins matériels (MIDI physique, Serial, OSC/Art-Net live, capteurs, installation sur téléphone) restent des erreurs explicites tant qu’ils ne sont pas branchés. Ils ne sont pas simulés.

@@ -68,6 +68,70 @@ export class AudioEngine {
     if (gain != null) n.gain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.02);
   }
 
+  async ensureFilter(nodeId, { type = "lowpass", frequency = 800, q = 1, gain = 1 } = {}) {
+    await this.resume();
+    this.release(nodeId);
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = frequency;
+    filter.Q.value = q;
+    const g = this.ctx.createGain();
+    g.gain.value = gain;
+    const analyser = this.ctx.createAnalyser();
+    analyser.fftSize = 256;
+    const osc = this.ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.value = 110;
+    osc.connect(filter);
+    filter.connect(g);
+    g.connect(analyser);
+    analyser.connect(this.master);
+    osc.start();
+    this.nodes.set(nodeId, { type: "filter", osc, filter, gain: g, analyser });
+    return this.nodes.get(nodeId);
+  }
+
+  setFilterParams(nodeId, { frequency, q, gain, type } = {}) {
+    const n = this.nodes.get(nodeId);
+    if (!n || n.type !== "filter") return;
+    if (type) n.filter.type = type;
+    if (frequency != null) n.filter.frequency.setTargetAtTime(frequency, this.ctx.currentTime, 0.02);
+    if (q != null) n.filter.Q.setTargetAtTime(q, this.ctx.currentTime, 0.02);
+    if (gain != null) n.gain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.02);
+  }
+
+  async ensureDelay(nodeId, { delayTime = 0.25, feedback = 0.3, gain = 0.5 } = {}) {
+    await this.resume();
+    this.release(nodeId);
+    const delay = this.ctx.createDelay(2.0);
+    delay.delayTime.value = Math.max(0, Math.min(2, Number(delayTime) || 0));
+    const fb = this.ctx.createGain();
+    fb.gain.value = Math.max(0, Math.min(0.95, Number(feedback) || 0));
+    const g = this.ctx.createGain();
+    g.gain.value = Number(gain) || 0.5;
+    const analyser = this.ctx.createAnalyser();
+    analyser.fftSize = 256;
+    const osc = this.ctx.createOscillator();
+    osc.frequency.value = 220;
+    osc.connect(delay);
+    delay.connect(fb);
+    fb.connect(delay);
+    delay.connect(g);
+    g.connect(analyser);
+    analyser.connect(this.master);
+    osc.start();
+    this.nodes.set(nodeId, { type: "delay", osc, delay, feedback: fb, gain: g, analyser });
+    return this.nodes.get(nodeId);
+  }
+
+  readFft(nodeId) {
+    const n = this.nodes.get(nodeId);
+    if (!n?.analyser) return [];
+    const buf = new Uint8Array(n.analyser.frequencyBinCount);
+    n.analyser.getByteFrequencyData(buf);
+    return Array.from(buf);
+  }
+
   readLevel(nodeId) {
     const n = this.nodes.get(nodeId);
     if (!n?.analyser) return 0;
@@ -88,6 +152,9 @@ export class AudioEngine {
     try { n.osc?.disconnect(); } catch { /* */ }
     try { n.mic?.disconnect(); } catch { /* */ }
     try { n.gain?.disconnect(); } catch { /* */ }
+    try { n.filter?.disconnect(); } catch { /* */ }
+    try { n.delay?.disconnect(); } catch { /* */ }
+    try { n.feedback?.disconnect(); } catch { /* */ }
     try { n.analyser?.disconnect(); } catch { /* */ }
     if (n.stream) n.stream.getTracks().forEach(t => t.stop());
     this.nodes.delete(nodeId);

@@ -1,23 +1,19 @@
-# Matrice de preuves — No-de Vibe Designer 0.9.4
+# Matrice de preuves — No-de Vibe Designer 0.10.1
+
+Détail et statuts : `docs/SYSTEM_TEST.md`.
 
 | Fonction | Statut | Preuve |
 |---|---|---|
-| Patch create / connect / types / cycles | **vérifié réellement** (logiciel) | `node tests/run.mjs` |
-| Caméra → shader → Preview | **partiellement vérifié** | logiciel OK ; matériel caméra **à vérifier** |
-| OUTPUT fenêtre | **partiellement vérifié** | postMessage + runtime ; écran externe **à vérifier** |
-| MIDI bus → param shader | **partiellement vérifié** | logiciel ; hardware **à vérifier** |
-| Serial | **partiellement vérifié** | adaptateur + console ; hardware **à vérifier** |
-| OSC via bridge | **incomplet** sans bridge | erreur visible si non connecté |
-| Audio tone / stop propre | **vérifié réellement** (logiciel Web Audio) | processeur + release |
-| Audio micro | **partiellement vérifié** | code prêt ; permission **à vérifier** |
-| Sous-patch sérialisation / nav | **vérifié réellement** (logiciel) | tests + UI fil d’Ariane |
-| Boîtes imbriquées A→B→×2 | **vérifié réellement** (logiciel) | `nestedBoxSelfTest` = 6 |
-| Sauvegarde WebKit | **vérifié réellement** (logiciel) | plan localStorage, message honnête |
-| Export Max / TouchDesigner | **vérifié réellement** (logiciel) | JSON + `py_compile` |
-| Vibe aperçu / appliquer / undo | **vérifié réellement** (logiciel local) | UI preview + history |
-| IA distante | **bloqué par configuration** | endpoint utilisateur ; Grok/xAI refusé |
-| Autosave / export `.cvd.json` | **vérifié réellement** (logiciel) | round-trip tests |
-| `.app` Electron autonome | **à vérifier** sur build final | Chromium embarqué, non signé |
-| NDI / Syphon / bridges TD-Max | **incomplet** | nodes Library marqués indisponibles |
-
-Légende : un test automatisé ne remplace pas une preuve matérielle.
+| Patch, types, cycles | vérifié | `npm test` |
+| Nombre × multiplication | vérifié | unitaire + Playwright |
+| Sous-patch / boîtes imbriquées | vérifié | valeur 6, Playwright |
+| Vibe aperçu / appliquer / undo | vérifié | le preview ne mute pas |
+| PWA manifest + SW + hors-ligne + mise à jour | vérifié | 19 tests Playwright |
+| Sauvegarde IndexedDB | vérifié | fermeture / réouverture du contexte |
+| Cue GO | vérifié | Playwright |
+| OSC / Art-Net sans pont | vérifié | erreur visible, pas d’envoi |
+| MIDI / Serial / micro / caméra absents | vérifié | message explicite. Matériel : à valider |
+| Canal WebSocket RFC, y compris Chrome | vérifié | exemple RFC `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=` + Playwright sans `NVD_WS_GUID` |
+| Hôte desktop distant | partiel | code Electron, pas de fenêtre lancée |
+| Capteurs physiques, Pixel, réseau OSC réel | non testé | à valider sur matériel |
+| `.app` macOS | non testé | non reconstruit dans cette passe |

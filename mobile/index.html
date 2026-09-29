@@ -1,64 +1,186 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>No-de Vibe Designer Mobile</title><link rel="stylesheet" href="./mobile.css"></head>
-<body>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1113">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="No-de Vibe Designer">
+<title>No-de Vibe Designer</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="stylesheet" href="./mobile.css">
+</head>
+<body data-mobile-mode="plateau">
 <div class="mobile-app">
-  <header><button id="backBtn" class="ghost">‹</button><div><b>No-de Vibe Designer</b><small id="screenTitle">Plateau</small></div><div class="spacer"></div><div class="mobile-mode"><button id="mobileBureau">Bureau</button><button id="mobilePlateau" class="active">Plateau</button></div><button id="mobilePrefs" class="ghost">⚙</button><button id="saveBtn" class="ghost">●</button></header>
+  <header>
+    <button id="backBtn" class="ghost" type="button" aria-label="Retour">‹</button>
+    <div class="brand">
+      <b>No-de Vibe Designer</b>
+      <small><span id="screenTitle">Plateau</span> · <span id="appVersion">v1.0.0</span></small>
+    </div>
+    <div class="spacer"></div>
+    <span id="netDot" class="net-dot" title="Réseau">●</span>
+    <div class="mobile-mode">
+      <button id="mobileBureau" type="button">Bureau</button>
+      <button id="mobilePlateau" class="active" type="button">Plateau</button>
+    </div>
+    <button id="mobilePrefs" class="ghost" type="button" aria-label="Préférences">⚙</button>
+    <button id="saveBtn" class="ghost" type="button" aria-label="Enregistrer">●</button>
+  </header>
+  <div id="updateBanner" class="update-banner hidden" role="status">
+    <span>Nouvelle version disponible. Le patch en cours n’est pas rechargé.</span>
+    <button id="updateApply" type="button">Mettre à jour</button>
+  </div>
+  <div id="alertStack" class="alert-stack"></div>
+  <div id="graphErrors" class="graph-errors" hidden></div>
   <main>
     <section class="screen active" data-screen="stage">
       <div class="hero">
-        <canvas id="stageCanvas" width="720" height="1280"></canvas>
-        <div class="stage-actions"><button id="playBtn">▶</button><button id="stopBtn">■</button><button id="outputBtn">OUTPUT</button></div>
+        <canvas id="stageCanvas" width="1280" height="720"></canvas>
+        <div class="stage-actions">
+          <button id="playBtn" type="button">▶</button>
+          <button id="stopBtn" type="button">■</button>
+          <button id="goBtn" type="button">GO</button>
+          <button id="outputBtn" type="button">OUTPUT</button>
+        </div>
       </div>
-      <div class="quick-cues">
-        <button data-cue="1">TOP 1</button><button data-cue="2">TOP 2</button><button data-cue="3">TOP 3</button>
+      <div id="cueList" class="quick-cues"></div>
+      <div class="status-row">
+        <span id="runtimeStatus">READY</span>
+        <span id="sensorStatus">en attente</span>
+        <span id="liveValues">Aucune valeur</span>
       </div>
-      <div class="status-row"><span id="runtimeStatus">READY</span><span id="sensorStatus">Capteurs OFF</span></div>
     </section>
 
     <section class="screen" data-screen="patch">
-      <div class="toolbar"><button id="addNodeBtn">＋ Node</button><button id="fitBtn">Adapter</button></div>
+      <div class="toolbar">
+        <button id="newProjectBtn" type="button">Nouveau</button>
+        <input id="projectName" aria-label="Nom du projet" value="Nouveau projet">
+        <button id="addNodeBtn" type="button">＋ Node</button>
+        <button id="undoBtn" type="button">Undo</button>
+        <button id="redoBtn" type="button">Redo</button>
+        <button id="dupBtn" type="button">Dupliquer</button>
+        <button id="delBtn" type="button">Suppr.</button>
+        <button id="zoomOut" type="button">−</button>
+        <button id="zoomIn" type="button">+</button>
+        <button id="fitBtn" type="button">Adapter</button>
+      </div>
+      <div id="graphPath" class="graph-path"></div>
       <div id="mobilePatch" class="mobile-patch">
         <div id="patchWorld" class="patch-world"></div>
       </div>
-      <div id="nodeSheet" class="sheet hidden">
-        <div class="sheet-grip"></div><div class="sheet-head"><b>Ajouter un node</b><button id="closeNodeSheet">×</button></div>
-        <div id="nodeList" class="node-list"></div>
-      </div>
+      <p id="patchValues" class="live-line">Aucune valeur</p>
+      <details id="timelineDrawer" open>
+        <summary>Timeline et cues</summary>
+        <div class="toolbar">
+          <button id="addCueBtn" type="button">+ Cue</button>
+          <button id="addEffectBtn" type="button">+ Effet</button>
+        </div>
+        <div id="timelineList" class="timeline-list"></div>
+      </details>
     </section>
 
     <section class="screen" data-screen="vibe">
       <div class="vibe-mobile">
-        <textarea id="vibeInput" placeholder="Dis ce que tu veux créer…">Ajoute une caméra arrière, utilise le gyroscope pour déplacer légèrement l’image et crée un top de 5 secondes.</textarea>
-        <button id="applyVibeBtn">Mettre à jour le graphe</button>
+        <textarea id="vibeInput" placeholder="Dis ce que tu veux créer…">Crée un nombre et une multiplication.</textarea>
+        <button id="applyVibeBtn" type="button">Prévisualiser</button>
       </div>
-      <div class="explain"><b>Vibe mobile</b><p>Une seule zone d’intention, pas de terminal permanent. Les détails apparaissent seulement si nécessaire.</p></div>
+      <div id="vibePreview" class="vibe-preview hidden"></div>
+      <div class="explain"><b>Vibe</b><p>L’aperçu ne modifie pas le graphe. Appliquer est annulable avec Undo. Sans endpoint, le moteur local est annoncé comme tel.</p></div>
     </section>
 
     <section class="screen" data-screen="tools">
+      <section class="remote-card">
+        <h3>Bureau distant</h3>
+        <p class="hint">Le mobile envoie le projet au pont WebSocket. L’hôte desktop, s’il est connecté, applique la modification sur son moteur.</p>
+        <input id="remoteUrl" aria-label="URL WebSocket" value="ws://127.0.0.1:4174" spellcheck="false">
+        <label class="check"><input id="remoteFollow" type="checkbox"> Suivre l’hôte (remplace le projet local à chaque état)</label>
+        <div class="toolbar">
+          <button id="remoteConnect" type="button">Connecter</button>
+          <button id="remotePush" type="button">Envoyer le projet local</button>
+          <button id="remotePull" type="button">Charger le projet distant</button>
+          <button id="remotePing" type="button">Ping</button>
+          <button id="remoteDisconnect" type="button">Déconnecter</button>
+        </div>
+        <p id="remoteStatus">hors ligne</p>
+        <pre id="remoteLog"></pre>
+      </section>
       <div class="tool-cards">
-        <button data-tool="camera">Caméras</button><button data-tool="sensors">Capteurs</button><button data-tool="osc">OSC</button><button data-tool="network">Réseau</button>
-        <button data-tool="shader">Shaders</button><button data-tool="mapping">Mapping</button><button data-tool="arduino">Arduino</button><button data-tool="output">OUTPUT</button><button data-tool="routing">Routage pistes</button>
+        <button data-tool="midi" type="button">MIDI</button>
+        <button data-tool="osc" type="button">OSC</button>
+        <button data-tool="artnet" id="artnetBtn" type="button">Art-Net</button>
+        <button data-tool="serial" id="serialBtn" type="button">Serial</button>
+        <button data-tool="export-max" type="button">Export Max</button>
+        <button data-tool="export-td" type="button">Export TD</button>
+        <button data-tool="export-pd" type="button">Export PD</button>
+        <button data-tool="export-millumin" type="button">Millumin OSC</button>
+        <button data-tool="routing" type="button">Routage</button>
+        <button data-tool="manual" type="button">Manuel</button>
+        <button data-tool="demo" type="button">Démo</button>
       </div>
-      <div id="toolView" class="tool-view"><p>Choisis un outil.</p></div>
+      <div id="toolView" class="tool-view"><p>Choisis un outil. Une passerelle absente s’affiche ici, elle n’est pas simulée.</p></div>
+      <p id="bootLog" class="hint"></p>
     </section>
 
     <section class="screen" data-screen="device">
       <div class="device-grid">
-        <button id="frontCam">Caméra avant</button><button id="backCam">Caméra arrière</button><button id="motionBtn">Mouvement</button><button id="gpsBtn">GPS</button><button id="vibrateBtn">Vibration</button>
+        <button id="frontCam" type="button">Caméra avant</button>
+        <button id="backCam" type="button">Caméra arrière</button>
+        <button id="micBtn" type="button">Micro</button>
+        <button id="motionBtn" type="button">Mouvement</button>
+        <button id="orientBtn" type="button">Orientation</button>
+        <button id="gpsBtn" type="button">GPS</button>
+        <button id="vibrateBtn" type="button">Vibration</button>
+        <button id="bluetoothBtn" type="button">Bluetooth</button>
+        <button id="wifiBtn" type="button">Réseau / Wi-Fi</button>
+        <button id="midiBtn" type="button">MIDI</button>
       </div>
-      <pre id="sensorReadout">Aucune donnée capteur.</pre>
+      <div id="touchPad" class="touch-pad">Zone tactile — les touches réelles alimentent les nodes tactile / multitouch</div>
+      <pre id="sensorReadout">Aucune lecture.</pre>
     </section>
   </main>
-
   <nav>
-    <button data-nav="stage" class="active"><span>◉</span><small>Plateau</small></button>
-    <button data-nav="patch"><span>◇</span><small>Patch</small></button>
-    <button data-nav="vibe"><span>✦</span><small>Vibe</small></button>
-    <button data-nav="tools"><span>☰</span><small>Outils</small></button>
-    <button data-nav="device"><span>⌁</span><small>Device</small></button>
+    <button data-nav="stage" class="active" type="button"><span>◉</span><small>Plateau</small></button>
+    <button data-nav="patch" type="button"><span>◇</span><small>Patch</small></button>
+    <button data-nav="vibe" type="button"><span>✦</span><small>Vibe</small></button>
+    <button data-nav="tools" type="button"><span>☰</span><small>Outils</small></button>
+    <button data-nav="device" type="button"><span>⌁</span><small>Device</small></button>
   </nav>
 </div>
-<div id="mobilePreferences" class="sheet hidden"><div class="sheet-grip"></div><div class="sheet-head"><b>Préférences · Apparence</b><button id="closeMobilePrefs">×</button></div><div class="mobile-prefs-body"><label>Dominante <input id="mobileAccent" type="color" value="#d7b86a"></label><label>Secondaire <input id="mobileSecondary" type="color" value="#8fa79d"></label><button id="mobileResetAppearance">Réinitialiser</button></div></div>
+
+<div id="nodeSheet" class="sheet hidden">
+  <div class="sheet-grip"></div>
+  <div class="sheet-head"><b>Ajouter un node</b><button id="closeNodeSheet" type="button">×</button></div>
+  <input id="nodeSearch" placeholder="Rechercher…" aria-label="Rechercher un node">
+  <div id="nodeList" class="node-list"></div>
+</div>
+
+<div id="inspectorSheet" class="sheet hidden">
+  <div class="sheet-grip"></div>
+  <div class="sheet-head"><b id="inspectorTitle">Paramètres</b><button id="closeInspector" type="button">×</button></div>
+  <div id="inspectorBody" class="inspector-body"></div>
+</div>
+
+<div id="mobilePreferences" class="sheet hidden">
+  <div class="sheet-grip"></div>
+  <div class="sheet-head"><b>Préférences</b><button id="closeMobilePrefs" type="button">×</button></div>
+  <div class="mobile-prefs-body">
+    <p id="versionInfo"></p>
+    <label>Dominante <input id="mobileAccent" type="color" value="#d7b86a"></label>
+    <label>Secondaire <input id="mobileSecondary" type="color" value="#8fa79d"></label>
+    <button id="mobileResetAppearance" type="button">Réinitialiser l’apparence</button>
+    <label class="check"><input id="aiEnabled" type="checkbox" checked> IA activée si un endpoint est défini</label>
+    <label>Endpoint IA <input id="aiEndpoint" placeholder="https://…/v1/chat/completions"></label>
+    <label>Modèle <input id="aiModel" value="gpt-4o-mini"></label>
+    <label>Clé API <input id="aiKey" type="password" autocomplete="off"></label>
+    <button id="aiSave" type="button">Enregistrer l’IA</button>
+    <a id="manualLink" href="../docs/manual/index.html">Ouvrir le manuel</a>
+  </div>
+</div>
 <script type="module" src="./mobile.js"></script>
-</body></html>
+</body>
+</html>
