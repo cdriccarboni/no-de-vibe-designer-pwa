@@ -1,4 +1,5 @@
 import { APP_VERSION, PROJECT_FORMAT, PROJECT_SCHEMA } from "./version.js";
+import { migrateProject } from "./project-migrate.js";
 
 export function newProject() {
   return {
@@ -20,26 +21,16 @@ export function newProject() {
 }
 
 export function validateProject(p) {
-  if (!p || (p.schema !== PROJECT_SCHEMA && p.schema !== "cvd.graph")) {
-    throw new Error("Projet No-de Vibe Designer invalide");
-  }
-  p.schema = PROJECT_SCHEMA;
-  const incoming = Number(p.version) || 1;
-  if (incoming > PROJECT_FORMAT) {
-    throw new Error(`Projet version ${incoming} plus récent que ce moteur (${PROJECT_FORMAT})`);
-  }
-  p.version = PROJECT_FORMAT;
-  p.nodes ||= [];
-  p.edges ||= [];
-  p.timeline ||= [];
-  p.controls ||= [];
-  p.channels ||= [];
-  p.resources ||= [];
-  p.devices ||= [];
-  p.output ||= { width: 1280, height: 720, fps: 60, background: "#090b0d" };
-  p.meta ||= {};
-  p.appVersion ||= APP_VERSION;
+  const { project } = migrateProject(p, { keepOriginal: false });
+  // Mutate caller's object for legacy desktop callers that reuse the same ref
+  Object.keys(project).forEach((k) => { p[k] = project[k]; });
+  Object.keys(p).forEach((k) => { if (!(k in project)) delete p[k]; });
   return p;
+}
+
+/** Validate + keep original snapshot (migration N→N+1 without silent overwrite). */
+export function openProject(raw) {
+  return migrateProject(raw, { keepOriginal: true });
 }
 
 export function exportProject(p) {

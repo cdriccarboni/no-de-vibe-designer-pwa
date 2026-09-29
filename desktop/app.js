@@ -1,4 +1,4 @@
-import { newProject, validateProject, exportProject, createDemoProject } from "../shared/ir.js";
+import { newProject, validateProject, exportProject, createDemoProject, openProject } from "../shared/ir.js";
 import { Runtime } from "../shared/runtime.js";
 import { DESTINATIONS, ROUTE_MODES, ensureRouting, effectiveRoute } from "../shared/routing.js";
 import { DeviceManager } from "../shared/device-manager.js";
@@ -22,6 +22,19 @@ import { createRemoteCameraSession, makeRoomCode } from "../shared/remote-camera
 import { companionJoinUrl } from "../shared/remote-camera/url.js";
 import { rcStateLabel } from "../shared/remote-camera/states.js";
 import { ndiStatusMessage } from "../shared/remote-camera/ndi.js";
+import { markCrashRecovery, clearCrashRecovery, loadCrashRecovery, pushRecentProject } from "../shared/session-recovery.js";
+import {
+  loadSession,
+  saveSession,
+  rememberRemoteCameraRoom,
+  loadRemoteCameraRoom,
+  markProjectMeta,
+  COMPANION_BASE_KEY
+} from "../shared/session-store.js";
+import { LINK_STATES, linkFromRemoteCamera } from "../shared/connection-states.js";
+import { buildDiagnosticSnapshot, copyDiagnostic, formatDiagnosticText } from "../shared/diagnostic.js";
+import { mediaStatusForNode, MEDIA_STATUS } from "../shared/media-status.js";
+import { createRemoteGhostDemo, createVideoMagicFxDemo, createStageOscDemo } from "../shared/demos.js";
 
 const $ = s => document.querySelector(s);
 const qall = s => [...document.querySelectorAll(s)];
@@ -462,10 +475,11 @@ function selectNode(id, { additive = false } = {}) {
   }
   if (n.type === "remote-camera") {
     const st = runtime.remoteCamera?.state || n.params?.status || "WAITING";
-    extra += `<div class="camera-actions"><button id="rcHost" type="button">QR · démarrer hôte</button><button id="rcStop" class="stop" type="button">Couper / déconnecter</button></div>`;
-    extra += `<p class="hint">Remote Camera · PeerJS (ART Intercom). LIVE seulement après FIRST_FRAME. État : <b id="rcState">${st}</b> · ${rcStateLabel(st)}</p>`;
-    extra += `<div id="rcQrBox" class="hint">Companion : <code>npm run serve:companion</code> puis scanne le QR.</div>`;
-    if (runtime.remoteCamera?.room) extra += `<p class="hint">Salon <code>${runtime.remoteCamera.room}</code></p>`;
+    const knownRoom = n.params?.room || loadRemoteCameraRoom() || "";
+    extra += `<div class="camera-actions"><button id="rcHost" type="button">${knownRoom ? "Reprendre salon / QR" : "QR · démarrer hôte"}</button><button id="rcStop" class="stop" type="button">Couper / déconnecter</button></div>`;
+    extra += `<p class="hint">Remote Camera · PeerJS (ART Intercom). LIVE seulement après FIRST_FRAME. État : <b id="rcState">${st}</b> · ${rcStateLabel(st)} · lien ${linkFromRemoteCamera(st)}</p>`;
+    extra += `<div id="rcQrBox" class="hint">Companion : <code>npm run serve:companion</code>${knownRoom ? ` · salon connu <code>${knownRoom}</code> (pas de nouveau QR obligatoire)` : " puis scanne le QR."}</div>`;
+    if (runtime.remoteCamera?.room) extra += `<p class="hint">Salon actif <code>${runtime.remoteCamera.room}</code></p>`;
   }
   if (n.type === "ndi-out") {
     extra += `<p class="hint">${ndiStatusMessage()}</p>`;
@@ -630,7 +644,8 @@ function selectNode(id, { additive = false } = {}) {
     try {
       if (!window.Peer) throw new Error("PeerJS non chargé — recharge la page");
       rcSession?.stop();
-      const room = makeRoomCode();
+      const known = (n.params?.room || loadRemoteCameraRoom() || "").toUpperCase();
+      const room = known || makeRoomCode();
       n.params.room = room;
       n.params.status = "QR_OPEN";
       rcSession = createRemoteCameraSession({
@@ -663,13 +678,14 @@ function selectNode(id, { additive = false } = {}) {
         onLog: (msg) => log(msg)
       });
       await rcSession.startHost();
-      const base = localStorage.getItem("nvd.companionBase") || "http://127.0.0.1:4177/";
+      const base = localStorage.getItem(COMPANION_BASE_KEY) || localStorage.getItem("nvd.companionBase") || "http://127.0.0.1:4177/";
+      rememberRemoteCameraRoom(room, { companionBase: base, status: LINK_STATES.CONNECTING });
       const join = companionJoinUrl({ companionBase: base, room });
       const box = $("#rcQrBox");
       if (box) {
-        box.innerHTML = `<p>Salon <code>${room}</code></p><p><a href="${join}" target="_blank" rel="noopener">${join}</a></p><p class="hint">Ouvre ce lien sur le téléphone (HTTPS recommandé). HTTP LAN = PLATFORM-LIMITED pour getUserMedia.</p>`;
+        box.innerHTML = `<p>Salon <code>${room}</code>${known ? " · reprise" : ""}</p><p><a href="${join}" target="_blank" rel="noopener">${join}</a></p><p class="hint">Ouvre ce lien sur le téléphone (HTTPS recommandé). HTTP LAN = PLATFORM-LIMITED pour getUserMedia.</p>`;
       }
-      log(`Remote Camera · QR_OPEN · ${room}`);
+      log(`Remote Camera · ${known ? "REPRISE" : "QR_OPEN"} · ${room}`);
       autosave();
     } catch (e) {
       log(`Remote Camera · ${e.message || e}`);
@@ -869,7 +885,16 @@ function redraw() {
 }
 
 function autosave() {
-  try { localStorage.setItem("cvd.autosave", exportProject(project)); } catch { /* */ }
+  try {
+    const data = exportProject(project);
+    localStorage.setItem("cvd.autosave", data);
+    markCrashRecovery(data);
+    markProjectMeta(project.name, {
+      workspace: localStorage.getItem("cvd.workspace") || "bureau"
+    });
+  } catch (e) {
+    console.error("AUTOSAVE_FAILED", e?.message || e);
+  }
   try { publishHostState(); } catch { /* hôte distant optionnel */ }
 }
 
@@ -1636,13 +1661,32 @@ buildLibrary();
 let generalPrefs = { restoreAutosave: true, loadDemo: true };
 try { generalPrefs = { ...generalPrefs, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") }; } catch { /* */ }
 
+let recoveredFromCrash = false;
+try {
+  const crash = loadCrashRecovery();
+  if (crash && generalPrefs.restoreAutosave !== false) {
+    project = validateProject(crash);
+    recoveredFromCrash = true;
+    clearCrashRecovery();
+    log("Recovery crash · projet restauré (cvd.crash-recovery)");
+  }
+} catch (e) {
+  log(`Recovery crash · ${e.message || e}`);
+}
+
 const autosaved = localStorage.getItem("cvd.autosave");
-if (generalPrefs.restoreAutosave !== false && autosaved) {
+if (!recoveredFromCrash && generalPrefs.restoreAutosave !== false && autosaved) {
   try {
-    project = validateProject(JSON.parse(autosaved));
-    log("Autosave restaurée");
+    const opened = openProject(JSON.parse(autosaved));
+    project = opened.project;
+    log(opened.changed ? `Autosave restaurée · migration ${opened.migratedFrom}→${opened.migratedTo}` : "Autosave restaurée");
   } catch { /* */ }
 }
+try {
+  const session = loadSession();
+  if (session.lastProjectName) log(`Session · dernier projet « ${session.lastProjectName} »`);
+  if (session.remoteCamera?.room) log(`Session · Remote Camera connu ${session.remoteCamera.room} · ${session.remoteCamera.lastStatus || LINK_STATES.KNOWN}`);
+} catch { /* */ }
 if (project.nodes.length === 0 && generalPrefs.loadDemo !== false) {
   project = createDemoProject();
   log("Démo Baleine interactive initialisée · aucune permission requise");

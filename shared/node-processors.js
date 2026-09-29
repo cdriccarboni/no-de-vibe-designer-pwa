@@ -469,7 +469,8 @@ export function createNodeProcessors() {
     const out = new Map();
     const media = ctx.mediaElements?.get?.(node.id);
     if (!media) {
-      throw new Error("Fichier vidéo : média non chargé (choisir un fichier dans l'inspecteur)");
+      const label = node.params?.srcName ? `MEDIA MISSING · ${node.params.srcName}` : "MEDIA MISSING";
+      throw new Error(`${label} — Relocaliser (choisir un fichier dans l'inspecteur)`);
     }
     if (media.error) throw new Error(`Fichier vidéo : ${media.error}`);
     if (media.readyState < 2) {
