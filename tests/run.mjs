@@ -689,5 +689,66 @@ assert(/PLATFORM-LIMITED/.test(ndiOk.get(1)?.value || ""), "ndi-out status text"
 assert(ndiCtx.honestFlags.has("ndi-native-relay"), "ndi honest flag");
 assert(isExecutable("remote-camera") && isExecutable("ndi-out"), "remote-camera+ndi executable");
 
+console.log("companion-studio");
+const {
+  newCompanionDocument,
+  validateCompanionDocument,
+  exportCompanionDocument,
+  COMPANION_SCHEMA,
+  COMPANION_FORMAT
+} = await import("../shared/companion-studio/schema.js");
+const { makeStudioAction, makeStudioFeedback, rttFromPong, STUDIO_MSG } = await import("../shared/companion-studio/protocol.js");
+const { applyCompanionBinding, findWidget } = await import("../shared/companion-studio/bindings.js");
+const { ensureCompanionLayout, saveCompanionLayout, loadCompanionLayout } = await import("../shared/companion-studio/store.js");
+const { createUnavailableTransport, TRANSPORT_KINDS } = await import("../shared/companion-studio/transport.js");
+const { DETECT_ACTIONS, formatDetectBanner } = await import("../shared/companion-studio/detect.js");
+const { p0Widgets } = await import("../shared/companion-studio/widgets.js");
+
+const cDoc = newCompanionDocument({ name: "Test Companion" });
+assert(cDoc.schema === COMPANION_SCHEMA && cDoc.version === COMPANION_FORMAT, "companion schema/format");
+cDoc.pages[0].widgets.push({
+  id: "w1",
+  type: "button",
+  presentation: { label: "GO", x: 0, y: 0, w: 2, h: 1 },
+  binding: { kind: "action", action: "ping" }
+});
+const validated = validateCompanionDocument(cDoc);
+assert(validated.pages[0].widgets[0].presentation.label === "GO", "widget normalize");
+assert(exportCompanionDocument(validated).includes("nvd.companion"), "export companion json");
+
+const cMem = new Map();
+const cStorage = {
+  setItem: (k, v) => cMem.set(k, v),
+  getItem: (k) => cMem.get(k) ?? null,
+  removeItem: (k) => cMem.delete(k)
+};
+const seeded = ensureCompanionLayout(cStorage);
+assert(seeded.pages[0].widgets.length >= 2, "seed layout has buttons");
+saveCompanionLayout(seeded, cStorage);
+assert(loadCompanionLayout(cStorage).name === seeded.name, "layout round-trip local");
+
+const pingFb = applyCompanionBinding({
+  widget: findWidget(seeded, "w-ping") || seeded.pages[0].widgets.find(w => w.binding?.action === "ping"),
+  value: true,
+  project: newProject(),
+  onLog: () => {}
+});
+assert(pingFb.type === STUDIO_MSG.FEEDBACK && pingFb.ok === true, "bidirectional ping feedback");
+assert(typeof pingFb.rttMs === "number" && pingFb.rttMs >= 0, "feedback rtt measured (not faked absent)");
+
+const action = makeStudioAction({ widgetId: "w1", action: "press", value: true });
+assert(action.type === STUDIO_MSG.ACTION && action.widgetId === "w1", "studio action message");
+const fb = makeStudioFeedback({ widgetId: "w1", value: true, ok: true, detail: "ok", rttMs: 4 });
+assert(fb.rttMs === 4, "feedback keeps real rtt");
+assert(rttFromPong({ t: Date.now() - 12 }, Date.now()) >= 10, "rttFromPong measures delta");
+
+const usb = createUnavailableTransport(TRANSPORT_KINDS.USB, "not plugged");
+let usbFail = false;
+try { await usb.connect(); } catch { usbFail = true; }
+assert(usbFail && /PLATFORM-LIMITED/.test(usb.statusLine()), "USB transport honest unavailable");
+assert(p0Widgets().some(w => w.type === "button"), "p0 widget catalog has button");
+assert(formatDetectBanner({ name: "phone", rttMs: 4 }).includes("4 ms"), "detect banner shows rtt");
+assert(DETECT_ACTIONS.OPEN_STUDIO === "open-studio", "detect actions");
+
 console.log(`\nRésultat : ${passed} OK · ${failed} FAIL\n`);
 process.exit(failed ? 1 : 0);

@@ -35,6 +35,10 @@ import { LINK_STATES, linkFromRemoteCamera } from "../shared/connection-states.j
 import { buildDiagnosticSnapshot, copyDiagnostic, formatDiagnosticText } from "../shared/diagnostic.js";
 import { mediaStatusForNode, MEDIA_STATUS } from "../shared/media-status.js";
 import { createRemoteGhostDemo, createVideoMagicFxDemo, createStageOscDemo } from "../shared/demos.js";
+import { STUDIO_MSG } from "../shared/companion-studio/protocol.js";
+import { applyCompanionBinding, findWidget } from "../shared/companion-studio/bindings.js";
+import { loadCompanionLayout, ensureCompanionLayout } from "../shared/companion-studio/store.js";
+import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref } from "../shared/companion-studio/detect.js";
 
 const $ = s => document.querySelector(s);
 const qall = s => [...document.querySelectorAll(s)];
@@ -1701,6 +1705,8 @@ window.__nvdSelfTest = () => nestedBoxSelfTest();
 let remoteRevision = 0;
 let remoteSession = null;
 let applyingRemote = false;
+let companionLayout = null;
+try { companionLayout = loadCompanionLayout() || ensureCompanionLayout(); } catch { companionLayout = null; }
 
 function publishHostState() {
   if (!remoteSession?.online || applyingRemote) return;
@@ -1708,11 +1714,72 @@ function publishHostState() {
   remoteSession.pushState({ revision: remoteRevision, project });
 }
 
+function hideCompanionDetect() {
+  $("#companionDetect")?.classList.add("hidden");
+}
+
+function showCompanionDetect(payload = {}) {
+  const pref = loadDetectPref();
+  if (pref === DETECT_ACTIONS.IGNORE) {
+    log(`Companion · détecté (${payload.clientId || "?"}) · ignoré (préférence)`);
+    return;
+  }
+  const banner = $("#companionDetect");
+  const text = $("#companionDetectText");
+  if (!banner || !text) {
+    log(formatDetectBanner({ name: payload.clientId || "Companion" }));
+    return;
+  }
+  text.textContent = formatDetectBanner({
+    name: payload.clientId || "Companion Studio",
+    transport: "LAN"
+  });
+  banner.dataset.clientId = payload.clientId || "";
+  banner.classList.remove("hidden");
+}
+
+function handleCompanionStudioMessage(msg) {
+  if (!msg?.type) return;
+  if (msg.type === STUDIO_MSG.DETECT) {
+    showCompanionDetect(msg);
+    log(`Companion Studio · détecté · ${msg.clientId || "?"}`);
+    return;
+  }
+  if (msg.type === STUDIO_MSG.DISCONNECT) {
+    log(`Companion · déconnecté · ${msg.clientId || "?"}`);
+    hideCompanionDetect();
+    return;
+  }
+  if (msg.type === STUDIO_MSG.ACTION) {
+    const layout = companionLayout || loadCompanionLayout() || ensureCompanionLayout();
+    companionLayout = layout;
+    const widget = findWidget(layout, msg.widgetId) || {
+      id: msg.widgetId,
+      binding: { kind: "action", action: msg.action === "press" ? "ping" : msg.action }
+    };
+    const feedback = applyCompanionBinding({
+      widget,
+      value: msg.value,
+      project,
+      runtime,
+      applyCue,
+      listCues,
+      onLog: (m) => log(m)
+    });
+    remoteSession?.send?.({ ...feedback, clientId: msg.clientId });
+    if (feedback.ok) {
+      autosave();
+      redraw();
+    }
+  }
+}
+
 function startDesktopRemoteHost() {
   const params = new URLSearchParams(location.search);
   const query = params.get("remoteHost");
   const electron = window.nvdDesktop?.runtime === "electron";
-  if (!query && !electron) return;
+  // Always allow ?companionHost=1 or electron; also enable with remoteHost
+  if (!query && !electron && params.get("companionHost") !== "1") return;
   const url = query && query.startsWith("ws") ? query : `ws://127.0.0.1:${window.nvdDesktop?.remotePort || REMOTE_PORT}`;
   remoteSession = connectRemote({
     url,
@@ -1739,10 +1806,41 @@ function startDesktopRemoteHost() {
       }
     },
     onStatus: (s) => log(`Distant · ${s.state}${s.detail ? " · " + s.detail : ""}`),
-    onLog: (m) => log(`Distant · ${m}`)
+    onLog: (m) => log(`Distant · ${m}`),
+    onMessage: handleCompanionStudioMessage
   });
+  log(`Companion host · écoute ${url}`);
 }
 startDesktopRemoteHost();
+
+$("#companionDetect")?.querySelectorAll("[data-detect]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const action = btn.dataset.detect;
+    rememberDetectPref(action);
+    const clientId = $("#companionDetect")?.dataset.clientId || "";
+    if (action === DETECT_ACTIONS.OPEN_STUDIO) {
+      window.open("http://127.0.0.1:4177/studio/", "_blank", "noopener");
+      log("Companion · Open Studio");
+    } else if (action === DETECT_ACTIONS.SYNC) {
+      if (companionLayout && remoteSession?.online) {
+        remoteSession.send({
+          type: STUDIO_MSG.LAYOUT,
+          layout: companionLayout,
+          clientId: clientId || undefined,
+          t: Date.now()
+        });
+        log("Companion · Sync layout envoyé");
+      } else log("Companion · Sync · layout ou lien manquant");
+    } else if (action === DETECT_ACTIONS.MONITOR) {
+      log("Companion · Use as Monitor · P2 (pas encore câblé)");
+    } else if (action === DETECT_ACTIONS.CONTROLLER) {
+      log("Companion · Use as Controller · layout actif");
+    } else {
+      log("Companion · Ignore");
+    }
+    hideCompanionDetect();
+  });
+});
 
 try {
   const self = window.__nvdSelfTest();

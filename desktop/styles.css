@@ -137,3 +137,11 @@ html.electron-macos .topbar{padding-left:84px}
 .camera-actions button{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);cursor:pointer}
 .camera-actions .stop{border-color:#7f4545}
 @media(max-width:760px){.magic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.control-channel{grid-template-columns:1fr}.control-channel output{text-align:left}}
+
+/* Companion Studio detect banner */
+.companion-detect{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:200;min-width:min(640px,94vw);background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow)}
+.companion-detect.hidden{display:none}
+.companion-detect p{margin:0 0 8px;font-size:12px}
+.companion-detect-actions{display:flex;flex-wrap:wrap;gap:6px}
+.companion-detect-actions button{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:7px 10px;font-size:11px;cursor:pointer}
+.companion-detect-actions button.ghost{background:transparent;color:var(--muted)}
