@@ -1,6 +1,6 @@
 # No-de Vibe Designer
 
-**Source canonique de développement : 1.0.0** (branche `cursor/no-de-ultimate-20260928`).  
+**Source canonique de développement : 1.1.0** (branche `cursor/no-de-ultimate-20260928`).  
 Checkpoint 0.10.1 : `cursor/mobile-pwa-reprise-a257` / PR #3, intact.
 
 L’ancienne ligne `main` (0.8.0, `110a59f`) reste l’archive `archive/main-0.8.0-110a59f` et la branche `archive/main-0.8.0`. Elle n’est pas la version à construire.
