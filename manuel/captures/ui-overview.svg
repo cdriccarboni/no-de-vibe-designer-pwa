@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#101214"/>
+  <rect x="12" y="12" width="936" height="36" rx="6" fill="#171a1e" stroke="#2d333b"/>
+  <text x="24" y="36" fill="#d7b86a" font-family="system-ui" font-size="14" font-weight="700">No-de Vibe Designer</text>
+  <text x="220" y="36" fill="#8b949e" font-family="system-ui" font-size="11">Library</text>
+  <text x="400" y="36" fill="#8b949e" font-family="system-ui" font-size="11">Patch Canvas</text>
+  <text x="620" y="36" fill="#8b949e" font-family="system-ui" font-size="11">Preview / OUTPUT</text>
+  <rect x="12" y="60" width="160" height="360" rx="8" fill="#171a1e" stroke="#2d333b"/>
+  <text x="24" y="84" fill="#8b949e" font-family="system-ui" font-size="10">LIBRARY</text>
+  <rect x="24" y="96" width="136" height="28" rx="4" fill="#1d2126" stroke="#d7b86a"/>
+  <text x="32" y="114" fill="#e8eaed" font-family="system-ui" font-size="11">Caméra live </text>
+  <rect x="24" y="132" width="136" height="28" rx="4" fill="#1d2126" stroke="#d7b86a"/>
+  <text x="32" y="150" fill="#e8eaed" font-family="system-ui" font-size="11">Shader Lab </text>
+  <rect x="24" y="168" width="136" height="28" rx="4" fill="#1d2126" stroke="#454d57" opacity="0.6"/>
+  <text x="32" y="186" fill="#8b949e" font-family="system-ui" font-size="11">Audio Lab Ë</text>
+  <rect x="184" y="60" width="420" height="280" rx="8" fill="#171a1e" stroke="#2d333b"/>
+  <text x="196" y="84" fill="#8b949e" font-family="system-ui" font-size="10">PATCH</text>
+  <rect x="210" y="110" width="140" height="70" rx="6" fill="#1d2126" stroke="#d7b86a"/>
+  <text x="224" y="140" fill="#e8eaed" font-family="system-ui" font-size="12">Caméra</text>
+  <rect x="400" y="150" width="140" height="70" rx="6" fill="#1d2126" stroke="#d7b86a"/>
+  <text x="420" y="180" fill="#e8eaed" font-family="system-ui" font-size="12">Shader</text>
+  <path d="M350 145 C375 145, 375 185, 400 185" fill="none" stroke="#8fa79d" stroke-width="2"/>
+  <rect x="616" y="60" width="332" height="280" rx="8" fill="#090b0d" stroke="#2d333b"/>
+  <text x="628" y="84" fill="#8b949e" font-family="system-ui" font-size="10">PREVIEW</text>
+  <circle cx="780" cy="200" r="48" fill="#2a3037" stroke="#6f7882"/>
+  <rect x="184" y="352" width="764" height="68" rx="8" fill="#171a1e" stroke="#2d333b"/>
+  <text x="196" y="380" fill="#8b949e" font-family="system-ui" font-size="10">VIBE · Entrée = envoyer</text>
+  <text x="196" y="402" fill="#e8eaed" font-family="system-ui" font-size="12">Crée une caméra reliée à un shader&</text>
+  <rect x="12" y="432" width="936" height="96" rx="8" fill="#171a1e" stroke="#2d333b"/>
+  <text x="24" y="460" fill="#8b949e" font-family="system-ui" font-size="10">TIMELINE + CONSOLE</text>
+  <text x="24" y="490" fill="#7dcea0" font-family="ui-monospace,monospace" font-size="11">[ready] No-de Vibe Designer 0.9.0 · moteur graphe actif</text>
+</svg>
