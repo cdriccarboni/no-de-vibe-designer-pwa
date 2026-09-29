@@ -18,6 +18,10 @@ import { applyCue, listCues, nextCue, previousCue } from "../shared/stage/cues.j
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
 import { createHostCard, hostCardToQrPayload } from "../shared/discovery/host-card.js";
 import { discoveryCapabilities } from "../shared/discovery/lan-beacon.js";
+import { createRemoteCameraSession, makeRoomCode } from "../shared/remote-camera/session.js";
+import { companionJoinUrl } from "../shared/remote-camera/url.js";
+import { rcStateLabel } from "../shared/remote-camera/states.js";
+import { ndiStatusMessage } from "../shared/remote-camera/ndi.js";
 
 const $ = s => document.querySelector(s);
 const qall = s => [...document.querySelectorAll(s)];
@@ -40,6 +44,7 @@ let panDrag = null;
 /** Pile de navigation sous-patch : [{ id, title }] */
 let graphPath = [];
 let pendingVibe = null;
+let rcSession = null;
 
 const runtime = new Runtime($("#previewCanvas"), {
   onGraphEvent: ev => {
@@ -455,6 +460,16 @@ function selectNode(id, { additive = false } = {}) {
   if (["camera", "phone-camera-front", "phone-camera-back"].includes(n.type)) {
     extra += `<div class="camera-actions"><button id="cameraStart" type="button">Activer la caméra</button><button id="cameraStop" class="stop" type="button">Couper caméra</button></div><p class="hint">La caméra ne démarre jamais automatiquement. L'action ci-dessus demande explicitement l'accès.</p>`;
   }
+  if (n.type === "remote-camera") {
+    const st = runtime.remoteCamera?.state || n.params?.status || "WAITING";
+    extra += `<div class="camera-actions"><button id="rcHost" type="button">QR · démarrer hôte</button><button id="rcStop" class="stop" type="button">Couper / déconnecter</button></div>`;
+    extra += `<p class="hint">Remote Camera · PeerJS (ART Intercom). LIVE seulement après FIRST_FRAME. État : <b id="rcState">${st}</b> · ${rcStateLabel(st)}</p>`;
+    extra += `<div id="rcQrBox" class="hint">Companion : <code>npm run serve:companion</code> puis scanne le QR.</div>`;
+    if (runtime.remoteCamera?.room) extra += `<p class="hint">Salon <code>${runtime.remoteCamera.room}</code></p>`;
+  }
+  if (n.type === "ndi-out") {
+    extra += `<p class="hint">${ndiStatusMessage()}</p>`;
+  }
   if (n.type === "whale") {
     extra += `<div class="field"><label>Échelle</label><input id="nScale" type="range" min=".35" max="2.2" step=".01" value="${n.params.scale ?? 1}"></div>`;
     extra += `<div class="field"><label>Traînée</label><input id="nTrailAmount" type="range" min="0" max=".7" step=".01" value="${n.params.trail ?? .18}"></div>`;
@@ -611,6 +626,63 @@ function selectNode(id, { additive = false } = {}) {
     log(ok ? "Caméra active · action utilisateur" : "Caméra non activée");
   };
   if ($("#cameraStop")) $("#cameraStop").onclick = () => runtime.stopCamera();
+  if ($("#rcHost")) $("#rcHost").onclick = async () => {
+    try {
+      if (!window.Peer) throw new Error("PeerJS non chargé — recharge la page");
+      rcSession?.stop();
+      const room = makeRoomCode();
+      n.params.room = room;
+      n.params.status = "QR_OPEN";
+      rcSession = createRemoteCameraSession({
+        role: "host",
+        room,
+        videoEl: runtime.remoteVideo,
+        onState: ({ state, error, metrics, room: r }) => {
+          n.params.status = state;
+          runtime.setRemoteCamera({
+            state,
+            live: state === "LIVE",
+            videoEl: runtime.remoteVideo,
+            metrics,
+            room: r
+          });
+          const el = $("#rcState");
+          if (el) el.textContent = state;
+          if (state === "LIVE") log("Remote Camera · LIVE (FIRST_FRAME)");
+          if (error) log(`Remote Camera · ${error}`);
+        },
+        onStream: (stream) => {
+          runtime.setRemoteCamera({
+            state: runtime.remoteCamera?.state || "PEER_CONNECTED",
+            live: false,
+            stream,
+            videoEl: runtime.remoteVideo,
+            room
+          });
+        },
+        onLog: (msg) => log(msg)
+      });
+      await rcSession.startHost();
+      const base = localStorage.getItem("nvd.companionBase") || "http://127.0.0.1:4177/";
+      const join = companionJoinUrl({ companionBase: base, room });
+      const box = $("#rcQrBox");
+      if (box) {
+        box.innerHTML = `<p>Salon <code>${room}</code></p><p><a href="${join}" target="_blank" rel="noopener">${join}</a></p><p class="hint">Ouvre ce lien sur le téléphone (HTTPS recommandé). HTTP LAN = PLATFORM-LIMITED pour getUserMedia.</p>`;
+      }
+      log(`Remote Camera · QR_OPEN · ${room}`);
+      autosave();
+    } catch (e) {
+      log(`Remote Camera · ${e.message || e}`);
+    }
+  };
+  if ($("#rcStop")) $("#rcStop").onclick = () => {
+    rcSession?.stop();
+    rcSession = null;
+    runtime.stopRemoteCameraTracks();
+    n.params.status = "DISCONNECTED";
+    log("Remote Camera · coupé · tracks arrêtées");
+    renderInspector(n.id);
+  };
   if ($("#exposeChannelBtn")) $("#exposeChannelBtn").onclick = () => {
     const key = $("#channelParam")?.value;
     const def = channelDefs.find(([k]) => k === key);

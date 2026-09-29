@@ -2,7 +2,7 @@
 export const NODE_GROUPS = [
  ["Interaction / corps",[["Pointer / Souris","pointer"],["Baleine interactive","whale"],["Blob organique","blob"],["Tracking / points","tracking"],["Body Clone / Ombre","bodyclone"]]],
  ["Magic FX",[["Threshold","threshold"],["Ghost","ghost"],["Miroir","mirror"],["Ombre miroir","shadow"],["Transform","transform"],["Composite","composite"],["Trou noir","blackhole"]]],
- ["Vidéo / caméra",[["Caméra live","camera"],["Fichier vidéo","videofile"],["Retour vidéo régie","videoreturn"],["Mapping vidéo","mapping"],["Anaglyphe","anaglyph"]]],
+ ["Vidéo / caméra",[["Caméra live","camera"],["Remote Camera","remote-camera"],["Fichier vidéo","videofile"],["Retour vidéo régie","videoreturn"],["Mapping vidéo","mapping"],["NDI Out (relais natif)","ndi-out"],["Anaglyphe","anaglyph"]]],
  ["Shaders / visuels",[["Shader Lab","shader"],["Creative FX","creativefx"],["Storm Forge","storm"],["Bending Lab","bending"],["Transmute","transmute"]]],
  ["Code / génératif",[["Processing / p5.js","p5"],["TouchDesigner tools","td"],["Mini Isadora","isadora"],["Sketch Lab","sketch"]]],
  ["Audio",[["Audio Lab","audio"],["Filtre audio","audiofilter"],["Delay audio","audiodelay"],["FFT audio","audiofft"],["Organic Audio","organicaudio"],["Mémo sonore","soundmemo"]]],
@@ -17,6 +17,8 @@ export const NODE_GROUPS = [
 export function spec(type){
   const m={
     camera:["Caméra live",["video","tracking","out"]],
+    "remote-camera":["Remote Camera",["video","status","out"]],
+    "ndi-out":["NDI Out (relais natif)",["video","status"]],
     pointer:["Pointer / Souris",["x","y","speed"]],
     whale:["Baleine interactive",["x","y","speed","out"]],
     blob:["Blob organique",["x","y","size","out"]],

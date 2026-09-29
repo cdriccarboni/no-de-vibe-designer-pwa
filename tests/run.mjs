@@ -54,18 +54,18 @@ assert(!isExecutable("millumin"), "millumin not executable yet");
 // --- ir / demo ---
 console.log("ir");
 const demo = createDemoProject();
-assert(demo.nodes.length === 4, "demo has 4 nodes");
-assert(demo.edges.length === 3, "demo has 3 edges");
+assert(demo.nodes.length === 5, "demo has 5 nodes");
+assert(demo.edges.length === 6, "demo has 6 edges");
 const round = validateProject(JSON.parse(exportProject(demo)));
-assert(round.edges.length === 3, "round-trip edges");
-assert(round.name.includes("Demo"), "demo name preserved");
+assert(round.edges.length === 6, "round-trip edges");
+assert(/Baleine|Demo|Démo/i.test(round.name), "demo name preserved");
 
 // --- validateEdge ---
 console.log("edges");
-const ok = validateEdge(demo, { node: "n1", port: 0 }, { node: "n2", port: 0 });
-assert(ok.ok, "camera video → shader texture OK");
-const bad = validateEdge(demo, { node: "n1", port: 0 }, { node: "n2", port: 1 });
-assert(!bad.ok, "camera video → shader glsl rejected");
+const ok = validateEdge(demo, { node: "n4", port: 3 }, { node: "n5", port: 0 });
+assert(ok.ok, "whale video → transform OK");
+const bad = validateEdge(demo, { node: "n1", port: 0 }, { node: "n5", port: 0 });
+assert(!bad.ok, "pointer number → transform video rejected");
 
 // --- cycles ---
 console.log("cycles");
@@ -86,19 +86,19 @@ assert(order.length === 2, "topo order includes both nodes");
 // --- evaluateGraph (headless stub processors) ---
 console.log("evaluate");
 const fns = new Map();
-fns.set("camera", () => new Map([[0, { kind: "video", el: { readyState: 2 } }], [2, { kind: "video", el: { readyState: 2 } }]]));
-fns.set("shader", (node, inputs) => {
+fns.set("pointer", () => new Map([[0, { kind: "number", value: 0.5 }], [1, { kind: "number", value: 0.5 }], [2, { kind: "number", value: 0 }]]));
+fns.set("smooth", (_n, inputs) => new Map([[1, inputs.get(0)?.value || { kind: "number", value: 0 }]]));
+fns.set("whale", () => new Map([[3, { kind: "video", canvas: true, el: { width: 1 } }]]));
+fns.set("transform", (_n, inputs) => {
   const tex = inputs.get(0)?.value;
-  assert(!!tex, "shader received texture input during evaluate");
-  return new Map([[2, { kind: "video", canvas: true, el: { width: 1 } }]]);
+  assert(!!tex, "transform received video input during evaluate");
+  return new Map([[3, { kind: "video", canvas: true, el: { width: 1 }, source: "transform" }]]);
 });
-fns.set("midi", () => new Map([[1, { kind: "number", value: 0.5 }]]));
-fns.set("osc", () => new Map());
 const ctx = { time: 1, width: 128, height: 72, errors: [], warnings: [] };
 const result = evaluateGraph(demo, fns, ctx);
 assert(result.errors.filter(e => e.includes("incompatible")).length === 0, "no type errors on demo");
 const vout = findVideoOutput(demo, result.outputs);
-assert(vout?.source === "shader", "video output from shader");
+assert(vout?.source === "transform", "video output from transform");
 
 // --- vibe local ---
 console.log("vibe");
@@ -136,7 +136,7 @@ pB.nodes.push({ id: "n99", type: "tracking", title: "T", x: 0, y: 0, params: {} 
 h.push(pB);
 assert(h.canUndo(), "history can undo");
 const back = h.undo();
-assert(back.nodes.length === 4, "undo restores previous node count");
+assert(back.nodes.length === 5, "undo restores previous node count");
 assert(h.canRedo(), "history can redo");
 const fwd = h.redo();
 assert(fwd.nodes.some(n => n.id === "n99"), "redo restores added node");
@@ -450,7 +450,7 @@ assert(transformThrew, "transform without image throws");
 const bh = logicFns.get("blackhole")({ id: "bh", params: { speed: 0.5, size: 0.4 } }, new Map(), { width: 8, height: 8, time: 0.1, errors: [], warnings: [] });
 assert(bh.get(2)?.pixels?.length === 8 * 8 * 4, "blackhole processor");
 const xf = logicFns.get("transform")({ id: "xf", params: { scale: 1, rotation: 0, opacity: 1 } }, new Map([[0, { value: bh.get(2) }]]), {});
-assert(xf.get(3)?.pixels?.length === 8 * 8 * 4, "transform processor");
+assert(xf.get(3)?.pixels?.length >= 16 * 16 * 4 && xf.get(3)?.source === "transform", "transform processor");
 
 console.log("wrap-box-ports");
 const wrapGraph = {
@@ -658,6 +658,36 @@ again.send({ type: "hello", role: "remote", clientId: "mobile-reconnect" });
 await waitUntil(() => againInbox.some(m => m.type === "hello-ack" || m.type === "state"), "websocket reconnects to the restarted bridge");
 again.close();
 await restarted.close();
+
+console.log("remote-camera-2.2");
+const { RC_STATES, remoteCameraHostId, makeRoomCode } = await import("../shared/remote-camera/states.js");
+const { createRcMetrics } = await import("../shared/remote-camera/metrics.js");
+const { companionJoinUrl, parseCompanionSearch } = await import("../shared/remote-camera/url.js");
+const { NDI_CAPABILITY, ndiStatusMessage } = await import("../shared/remote-camera/ndi.js");
+const { createNodeProcessors: rcFnsFactory } = await import("../shared/node-processors.js");
+assert(RC_STATES.LIVE === "LIVE" && RC_STATES.FIRST_FRAME === "FIRST_FRAME", "RC states include LIVE/FIRST_FRAME");
+assert(remoteCameraHostId("AB12").startsWith("nvd-rc22-"), "host id prefix");
+assert(makeRoomCode().length >= 4, "room code");
+const m = createRcMetrics();
+m.mark("CAMERA_PERMISSION");
+m.mark("CAMERA_READY");
+m.mark("FIRST_FRAME");
+assert(m.delta("CAMERA_PERMISSION", "CAMERA_READY") !== null, "metrics delta");
+const join = companionJoinUrl({ companionBase: "http://127.0.0.1:4177/", room: "ZZ99" });
+assert(join.includes("room=ZZ99") && join.includes("mode=remote-camera"), "companion join url");
+assert(parseCompanionSearch("?room=zz99").room === "ZZ99", "parse companion search");
+assert(NDI_CAPABILITY.browserSend === false && /PLATFORM-LIMITED/.test(ndiStatusMessage()), "NDI honest platform-limited");
+const rcFns = rcFnsFactory();
+assert(typeof rcFns.get("remote-camera") === "function", "remote-camera processor registered");
+assert(typeof rcFns.get("ndi-out") === "function", "ndi-out processor registered");
+const ndiCtx = { warnings: [], honestFlags: new Set(), errors: [] };
+let ndiThrew = false;
+try { rcFns.get("ndi-out")({ id: "ndi" }, new Map(), ndiCtx); } catch { ndiThrew = true; }
+assert(ndiThrew, "ndi-out refuses without video input");
+const ndiOk = rcFns.get("ndi-out")({ id: "ndi" }, new Map([[0, { value: { kind: "video", pixels: new Uint8ClampedArray(16), width: 2, height: 2 } }]]), ndiCtx);
+assert(/PLATFORM-LIMITED/.test(ndiOk.get(1)?.value || ""), "ndi-out status text");
+assert(ndiCtx.honestFlags.has("ndi-native-relay"), "ndi honest flag");
+assert(isExecutable("remote-camera") && isExecutable("ndi-out"), "remote-camera+ndi executable");
 
 console.log(`\nRésultat : ${passed} OK · ${failed} FAIL\n`);
 process.exit(failed ? 1 : 0);

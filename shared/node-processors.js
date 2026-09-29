@@ -9,6 +9,7 @@ import { extractSilhouette, mirrorFrame, offsetFrame, shadowTrail } from "./grap
 import { rasterizeVideoValue } from "./graphics/frame-utils.js";
 import { renderWhale } from "./graphics/whale.js";
 import { renderBlob } from "./graphics/blob.js";
+import { ndiStatusMessage } from "./remote-camera/ndi.js";
 
 function videoVal(el, opacity = 1) {
   return { kind: "video", el, opacity };
@@ -84,6 +85,35 @@ export function createNodeProcessors() {
     }
     out.set(1, { kind: "number", value: ctx.time || 0 });
     return out;
+  });
+
+  fns.set("remote-camera", (node, _inputs, ctx) => {
+    const out = new Map();
+    const remote = ctx.remoteCamera;
+    const el = remote?.videoEl || ctx.remoteVideoEl;
+    const streamLive = remote?.state === "LIVE" || remote?.live === true;
+    if (streamLive && el && (el.readyState >= 2 || el.videoWidth > 0)) {
+      const v = videoVal(el, node.params?.opacity ?? 1);
+      out.set(0, v);
+      out.set(2, v);
+    } else if (el?.srcObject && el.readyState >= 2) {
+      // Frame present but state not yet LIVE — still not claim LIVE in status
+      const v = videoVal(el, node.params?.opacity ?? 1);
+      out.set(0, v);
+      out.set(2, v);
+    }
+    const status = remote?.state || node.params?.status || "WAITING";
+    out.set(1, { kind: "text", value: status });
+    return out;
+  });
+
+  fns.set("ndi-out", (node, inputs, ctx) => {
+    const hasVideo = !!inputs.get(0)?.value;
+    const msg = ndiStatusMessage();
+    ctx.warnings?.push?.(msg);
+    ctx.honestFlags?.add?.("ndi-native-relay");
+    if (!hasVideo) throw new Error(`${msg} · aucune vidéo en entrée`);
+    return new Map([[1, { kind: "text", value: msg }]]);
   });
 
   fns.set("phone-camera-front", (node, inputs, ctx) => fns.get("camera")(node, inputs, ctx));
@@ -348,9 +378,14 @@ export function createNodeProcessors() {
     const maxW = Math.max(160, Math.min(720, Number(node.params?.analysisWidth ?? 560)));
     const aspect = (ctx.height || 720) / Math.max(1, (ctx.width || 1280));
     const maxH = Math.max(90, Math.round(maxW * aspect));
+    // Keep native pixel size when already rasterized and within analysis budget (Node tests + cheap frames).
+    const nativeW = value?.pixels && value.width ? value.width : null;
+    const nativeH = value?.pixels && value.height ? value.height : null;
+    const width = nativeW && nativeH && nativeW <= maxW && nativeH <= maxH ? nativeW : maxW;
+    const height = nativeW && nativeH && nativeW <= maxW && nativeH <= maxH ? nativeH : maxH;
     return rasterizeVideoValue(value, {
-      width: maxW,
-      height: maxH,
+      width,
+      height,
       key: `${suffix}:${node.id}`,
       scratchMap: ctx.frameScratch
     });

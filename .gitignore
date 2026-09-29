@@ -12,6 +12,10 @@ npm-debug.log*
 !.env.example
 *.pem
 *.key
+*.jks
+*.keystore
+*.p12
+certs/
 test-results/
 playwright-report/
 
