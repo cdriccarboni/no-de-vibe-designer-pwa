@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+def uploadStore = System.getenv("NVD_UPLOAD_STORE_FILE")
+def uploadStorePassword = System.getenv("NVD_UPLOAD_STORE_PASSWORD")
+def uploadKeyAlias = System.getenv("NVD_UPLOAD_KEY_ALIAS")
+def uploadKeyPassword = System.getenv("NVD_UPLOAD_KEY_PASSWORD")
+def uploadSigningConfigured = [uploadStore, uploadStorePassword, uploadKeyAlias, uploadKeyPassword].every { it != null && !it.trim().isEmpty() }
+
 android {
     namespace = "fr.acousmatic.nodevibedesigner"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -11,21 +17,34 @@ android {
         versionName "1.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    signingConfigs {
+        if (uploadSigningConfigured) {
+            create("upload") {
+                storeFile file(uploadStore)
+                storePassword uploadStorePassword
+                keyAlias uploadKeyAlias
+                keyPassword uploadKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (uploadSigningConfigured) {
+                signingConfig signingConfigs.getByName("upload")
+            }
         }
     }
 }
 
 repositories {
-    flatDir{
+    flatDir {
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
     }
 }
@@ -43,6 +62,22 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+afterEvaluate {
+    def uploadMissing = signingConfigs.findByName("upload") == null
+    tasks.configureEach { task ->
+        if (task.name in ["assembleRelease", "bundleRelease", "packageReleaseBundle", "signReleaseBundle"]) {
+            task.doFirst {
+                if (uploadMissing) {
+                    throw new GradleException(
+                        "Build Play/release refusé : vraie clé d'importation absente. " +
+                        "Définis NVD_UPLOAD_STORE_FILE, NVD_UPLOAD_STORE_PASSWORD, NVD_UPLOAD_KEY_ALIAS et NVD_UPLOAD_KEY_PASSWORD."
+                    )
+                }
+            }
+        }
+    }
+}
 
 try {
     def servicesJSON = file('google-services.json')

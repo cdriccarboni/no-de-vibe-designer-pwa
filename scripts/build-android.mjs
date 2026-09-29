@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Build Android APK without mutating the machine-wide Java config.
- * Prefers Android Studio JBR, then Homebrew openjdk@17 / @21.
+ * Build Android without mutating the machine-wide Java config.
+ * Debug APK needs no private key.
+ * Release APK/AAB require NVD_UPLOAD_* env vars (Play upload keystore — never commit secrets).
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -74,9 +75,22 @@ console.log(`ANDROID_HOME=${sdk}`);
 
 run("npm", ["run", "android:sync"], { env });
 
-const wantRelease = process.argv.includes("--release");
-const tasks = wantRelease ? ["assembleDebug", "assembleRelease"] : ["assembleDebug"];
+const wantAab = process.argv.includes("--aab");
+const wantReleaseApk = process.argv.includes("--release");
 const gradlew = path.join(root, "android", "gradlew");
+
+if (wantAab) {
+  run(gradlew, ["bundleRelease", "--no-daemon"], { cwd: path.join(root, "android"), env });
+  const aab = path.join(root, "android/app/build/outputs/bundle/release/app-release.aab");
+  if (!exists(aab)) {
+    console.error(`AAB release introuvable : ${aab}`);
+    process.exit(1);
+  }
+  console.log(`OK · AAB Play signé ${aab}`);
+  process.exit(0);
+}
+
+const tasks = wantReleaseApk ? ["assembleDebug", "assembleRelease"] : ["assembleDebug"];
 run(gradlew, [...tasks, "--no-daemon"], { cwd: path.join(root, "android"), env });
 
 const apkDebug = path.join(root, "android/app/build/outputs/apk/debug/app-debug.apk");
@@ -86,15 +100,11 @@ if (!exists(apkDebug)) {
 }
 console.log(`OK · APK debug ${apkDebug}`);
 
-if (wantRelease) {
-  const candidates = [
-    path.join(root, "android/app/build/outputs/apk/release/app-release-unsigned.apk"),
-    path.join(root, "android/app/build/outputs/apk/release/app-release.apk")
-  ];
-  const found = candidates.find(exists);
-  if (!found) {
-    console.error("APK release introuvable (unsigned attendu sans keystore)");
+if (wantReleaseApk) {
+  const apkRelease = path.join(root, "android/app/build/outputs/apk/release/app-release.apk");
+  if (!exists(apkRelease)) {
+    console.error(`APK release signé introuvable : ${apkRelease}`);
     process.exit(1);
   }
-  console.log(`OK · APK release ${found}`);
+  console.log(`OK · APK release signé ${apkRelease}`);
 }

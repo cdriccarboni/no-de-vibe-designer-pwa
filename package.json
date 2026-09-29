@@ -24,7 +24,8 @@
     "dist:mac": "electron-builder --mac zip --arm64",
     "pack:linux": "electron-builder --linux zip --x64",
     "serve:web": "node scripts/serve-web.mjs",
-    "release:check": "npm test && npm run check"
+    "release:check": "npm test && npm run check",
+    "android:aab": "node scripts/build-android.mjs --aab"
   },
   "build": {
     "appId": "fr.acousmatic.nodevibedesigner",
