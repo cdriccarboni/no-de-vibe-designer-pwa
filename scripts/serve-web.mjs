@@ -23,7 +23,7 @@ function safeFile(urlPath){
 const server=http.createServer((req,res)=>{
   if(req.url?.split("?")[0]==="/health"){
     res.writeHead(200,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"});
-    res.end(JSON.stringify({ok:true,app:"No-de Vibe Designer",version:"1.1.0"}));
+    res.end(JSON.stringify({ok:true,app:"No-de Vibe Designer",version:"1.3.1"}));
     return;
   }
   const file=safeFile(req.url);
