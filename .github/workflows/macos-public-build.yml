@@ -301,4 +301,19 @@ jobs:
             gh release create "$TAG"               --target "$GITHUB_SHA"               --title "No-de Vibe Designer $APP_VERSION"               --notes "Build de distribution No-de Vibe Designer $APP_VERSION."               || gh release view "$TAG" >/dev/null
           fi
 
-          gh release upload "$TAG"             "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"             "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"             "dist/No-de-Vibe-Designer-macOS-arm64.zip"             "dist/No-de-Vibe-Designer-macOS-arm64.dmg"             "dist/SHA256SUMS-macOS.txt"             --clobber
+          upload_asset() {
+            local file="$1"
+            for attempt in 1 2 3; do
+              if gh release upload "$TAG" "$file" --clobber; then
+                return 0
+              fi
+              sleep $((attempt * 2))
+            done
+            return 1
+          }
+
+          upload_asset "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"
+          upload_asset "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"
+          upload_asset "dist/No-de-Vibe-Designer-macOS-arm64.zip"
+          upload_asset "dist/No-de-Vibe-Designer-macOS-arm64.dmg"
+          upload_asset "dist/SHA256SUMS-macOS.txt"
