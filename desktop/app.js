@@ -15,8 +15,9 @@ import { planManualSave, planManualOpen, saveStatusMessage, MANUAL_SAVE_KEY } fr
 import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { connectRemote } from "../shared/remote-client.js";
 import { REMOTE_PORT } from "../shared/remote-protocol.js";
-import { applyCue, listCues, nextCue, previousCue, standingByCue, setCuePlayhead, advanceCuePlayhead, buildCueState } from "../shared/stage/cues.js";
+import { applyCue, listCues, nextCue, previousCue } from "../shared/stage/cues.js";
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
+import { generateVibeOut, VIBE_OUT_TARGETS } from "../shared/vibe-out.js";
 import { createHostCard, hostCardToQrPayload } from "../shared/discovery/host-card.js";
 import { discoveryCapabilities } from "../shared/discovery/lan-beacon.js";
 import { createRemoteCameraSession, makeRoomCode } from "../shared/remote-camera/session.js";
@@ -44,11 +45,16 @@ import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref 
 import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT } from "../shared/graphics/sketch-engine.js";
 import { applyShowManifest, showManifestSummary } from "../shared/show-importer.js";
 import { DEFAULT_FRAGMENT } from "../shared/adapters/shader-surface.js";
+import { RUDIMENTS, rudimentMeta, createRudimentNode } from "../shared/rudiments.js";
+import { DEFAULT_QUAD, normalizeQuad, mappingParams } from "../shared/graphics/mapping-v3.js";
+import { superNodePreset, applySuperNodePreset } from "../shared/supernodes-v3.js";
+import { analyzeImageFile, imageVibePrompt, imageVibeOps, imageVibeSummary } from "../shared/image-vibe.js";
 
 installSurfaceSwitcher({ current:"designer" });
 
 const $ = s => document.querySelector(s);
 const qall = s => [...document.querySelectorAll(s)];
+const htmlSafe = value => String(value ?? "").replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
 
 if ("serviceWorker" in navigator && window.nvdDesktop?.runtime !== "electron") {
   window.addEventListener("load", () => {
@@ -68,6 +74,7 @@ let panDrag = null;
 /** Pile de navigation sous-patch : [{ id, title }] */
 let graphPath = [];
 let pendingVibe = null;
+let imageVibeState = { analysis:null, previewUrl:"" };
 let rcSession = null;
 const DEMO_DISMISSED_KEY = `nvd.demo.dismissed.${APP_VERSION}`;
 let demoReturnProject = null;
@@ -90,7 +97,7 @@ function enterShowcaseDemo({ preserve = true } = {}) {
   runtime.play();
   syncPlayButton();
   setDemoBanner(true);
-  log("EXEMPLE · Wow interactif V2.2 · souris + pinch trackpad dans le Preview");
+  log("EXEMPLE · Wow interactif chargé · déplace la souris dans le Preview");
 }
 
 function exitShowcaseDemo() {
@@ -282,6 +289,113 @@ runtime.setBridgeSend(packet => {
   catch (err) { throw err; }
 });
 runtime.setSerialSend(text => devices.serial.send(text));
+
+async function requestAiForNode(options = {}) {
+  const cfg = readAiConfig();
+  if (typeof window.nvdDesktop?.aiNodeRequest === "function") {
+    return window.nvdDesktop.aiNodeRequest({
+      ...options,
+      apiKey: options.apiKey || cfg.apiKey || ""
+    });
+  }
+  const protocol = String(options.protocol || "ollama").toLowerCase();
+  const prompt = String(options.prompt || "");
+  if (protocol === "ollama") {
+    const base = String(options.baseUrl || cfg.localBaseUrl || "http://127.0.0.1:11434").replace(/\/+$/, "");
+    const res = await fetch(base + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type":"application/json" },
+      body: JSON.stringify({
+        model: options.model || cfg.localModel || "qwen2.5-coder:7b",
+        stream: false,
+        messages: [
+          { role:"system", content: options.system || "Tu es une IA créative reliée à No-de Vibe Designer." },
+          { role:"user", content: prompt }
+        ]
+      })
+    });
+    if (!res.ok) throw new Error("Ollama HTTP " + res.status);
+    const data = await res.json();
+    return { ok:true, content:String(data?.message?.content || ""), model:data?.model || options.model };
+  }
+  const endpoint = String(options.endpoint || cfg.endpoint || "").trim();
+  if (!endpoint) throw new Error("Endpoint IA manquant");
+  const headers = { "Content-Type":"application/json" };
+  const key = options.apiKey || cfg.apiKey || "";
+  if (key) headers.Authorization = "Bearer " + key;
+  const body = protocol === "generic"
+    ? { model: options.model || cfg.model || "", prompt, input: prompt }
+    : {
+        model: options.model || cfg.model || "gpt-4o-mini",
+        messages: [
+          { role:"system", content: options.system || "Tu es une IA créative reliée à No-de Vibe Designer." },
+          { role:"user", content: prompt }
+        ]
+      };
+  const res = await fetch(endpoint, { method:"POST", headers, body:JSON.stringify(body) });
+  const text = await res.text();
+  if (!res.ok) throw new Error("Endpoint IA HTTP " + res.status + " · " + text.slice(0,160));
+  let data = null;
+  try { data = JSON.parse(text); } catch { /* texte brut accepté */ }
+  return {
+    ok:true,
+    content:String(data?.choices?.[0]?.message?.content ?? data?.message?.content ?? data?.response ?? data?.text ?? text)
+  };
+}
+runtime.setAiRequest(async options => {
+  try { return await requestAiForNode(options); }
+  finally { queueMicrotask(() => runtime.render()); }
+});
+
+async function requestAiAsset(options = {}) {
+  const cfg = readAiConfig();
+  const endpoint = String(options.endpoint || cfg.mediaEndpoint || cfg.endpoint || "").trim();
+  if (!endpoint) throw new Error("Endpoint média IA manquant");
+  if (typeof window.nvdDesktop?.aiAssetRequest === "function") {
+    return window.nvdDesktop.aiAssetRequest({
+      ...options,
+      endpoint,
+      apiKey: cfg.apiKey || ""
+    });
+  }
+  const headers = { "Content-Type":"application/json" };
+  if (cfg.apiKey) headers.Authorization = "Bearer " + cfg.apiKey;
+  const res = await fetch(endpoint, {
+    method:"POST",
+    headers,
+    body:JSON.stringify({
+      kind:options.kind,
+      model:options.model || "",
+      prompt:options.prompt || "",
+      input:options.prompt || "",
+      referenceUrl:options.referenceUrl || "",
+      ...(options.params || {})
+    })
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error("Endpoint média IA HTTP " + res.status + " · " + text.slice(0,160));
+  let data = null;
+  try { data = JSON.parse(text); } catch { /* URL brute acceptée */ }
+  const url = String(data?.url ?? data?.output_url ?? data?.outputUrl ?? data?.data?.[0]?.url ?? (/^(https?:|data:)/.test(text.trim()) ? text.trim() : ""));
+  if (!url) throw new Error("Endpoint média IA : aucune URL de sortie");
+  return { ok:true, url, kind:options.kind, model:options.model || "" };
+}
+runtime.setAiAssetRequest(async options => {
+  try { return await requestAiAsset(options); }
+  finally { queueMicrotask(() => runtime.render()); }
+});
+
+async function installLocalModel(model) {
+  const cfg = readAiConfig();
+  if (typeof window.nvdDesktop?.installLocalAi !== "function") {
+    throw new Error("Installation automatique disponible dans l’application ordinateur");
+  }
+  log(`Local AI · installation ${model}…`);
+  const result = await window.nvdDesktop.installLocalAi({ baseUrl:cfg.localBaseUrl, model });
+  log(`Local AI · ${model} · ${result?.status || "installé"}`);
+  return result;
+}
+
 if (typeof window.nvdDesktop?.sendOscUdp === "function") {
   runtime.setOscUdpSend(msg => window.nvdDesktop.sendOscUdp(msg));
 }
@@ -292,8 +406,12 @@ if (typeof window.nvdDesktop?.sendArtNetUdp === "function") {
 ensureRouting(project);
 
 /** Catalogue UI — mêmes groupes ; marque visuelle des nodes exécutables. */
-const LIB = NODE_GROUPS.map(([title, items]) => [title, items]);
+const LIB = [
+  ["Rudiments / Modules", RUDIMENTS.map(r => [r.label, `rudiment:${r.id}`])],
+  ...NODE_GROUPS.map(([title, items]) => [title, items])
+];
 const OSC_BRIDGE_TYPES = new Set(["twozero","td","isadora","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
+const AI_NODE_TYPES = new Set(["ai","ai-image","ai-video","ai-audio","ai-3d"]);
 const SERIAL_NODE_TYPES = new Set(["arduino","esp","servo","rfid"]);
 let showExperimental = localStorage.getItem("nvd.showExperimental") === "1";
 const LIBRARY_EXPANDED_KEY = "nvd.library.expandedGroups";
@@ -310,7 +428,15 @@ function saveExpandedLibraryGroups() {
 }
 
 function spec(t) {
+  if (String(t).startsWith("rudiment:")) {
+    const meta = rudimentMeta(String(t).slice("rudiment:".length));
+    return [meta?.label || "Rudiment", meta?.ports || ["in","params","out"]];
+  }
   return sharedSpec(t);
+}
+
+function isLibraryExecutable(type) {
+  return String(type).startsWith("rudiment:") || isExecutable(type);
 }
 
 function log(msg) {
@@ -376,6 +502,7 @@ const NODE_RUNTIME_REQUIREMENTS = new Map([
 ]);
 
 function nodeReadiness(type) {
+  if (String(type).startsWith("rudiment:")) return "Prêt · sous-patch ouvert et modifiable";
   if (!isExecutable(type)) return "Indisponible · moteur non câblé";
   const requirement = NODE_RUNTIME_REQUIREMENTS.get(type);
   return requirement ? `Prêt · ${requirement}` : "Prêt";
@@ -384,7 +511,7 @@ function nodeReadiness(type) {
 function buildLibrary() {
   const q = $("#search")?.value?.trim?.().toLowerCase?.() || "";
   $("#libraryList").innerHTML = LIB.map(([title, items], groupIndex) => {
-    const visible = items.filter(([, t]) => showExperimental || isExecutable(t));
+    const visible = items.filter(([, t]) => showExperimental || isLibraryExecutable(t));
     if (!visible.length) return "";
     const expanded = Boolean(q) || expandedLibraryGroups.has(groupIndex);
     return `<div class="lib-section ${expanded ? "expanded" : "collapsed"}" data-lib-group="${groupIndex}">
@@ -392,7 +519,7 @@ function buildLibrary() {
         <span>${title}</span><span class="lib-chevron" aria-hidden="true">▾</span>
       </button>
       <div class="lib-items">${visible.map(([n, t]) => {
-        const ok = isExecutable(t);
+        const ok = isLibraryExecutable(t);
         return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${nodeReadiness(t)}"><span>${n}${ok ? "" : " · expérimental"}</span><span>${ok ? "＋" : "○"}</span></div>`;
       }).join("")}</div>
     </div>`;
@@ -410,7 +537,7 @@ function buildLibrary() {
   if (q) qall(".lib-item").forEach(x => {
     x.style.display = x.textContent.toLowerCase().includes(q) ? "flex" : "none";
   });
-  const expCount = LIB.flatMap(([, items]) => items).filter(([, t]) => !isExecutable(t)).length;
+  const expCount = LIB.flatMap(([, items]) => items).filter(([, t]) => !isLibraryExecutable(t)).length;
   const mode = document.querySelector(".library-mode");
   if (mode) mode.style.display = expCount ? "flex" : "none";
 }
@@ -657,6 +784,21 @@ $("#companionEditorDialog")?.addEventListener("close", () => { const frame=$("#c
 
 function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq / 4) * 110) {
   const g = activeGraph();
+  if (String(type).startsWith("rudiment:")) {
+    const rid = String(type).slice("rudiment:".length);
+    const seq = (g.nodes.reduce((m, n) => Math.max(m, parseInt(String(n.id).replace(/\D/g, "")) || 0), 0) + 1);
+    nodeSeq = Math.max(nodeSeq, seq);
+    const n = createRudimentNode(rid, { nodeId:`n${seq}`, x, y });
+    g.nodes.push(n);
+    if (isRootGraph()) project.nodes = g.nodes;
+    drawNode(n);
+    selectNode(n.id);
+    if (isRootGraph()) runtime.setProject(project);
+    autosave();
+    commitHistory();
+    log(`Rudiment ajouté · ${n.title} · double-clic pour ouvrir`);
+    return n;
+  }
   const seq = (g.nodes.reduce((m, n) => Math.max(m, parseInt(String(n.id).replace(/\D/g, "")) || 0), 0) + 1);
   nodeSeq = Math.max(nodeSeq, seq);
   const [title] = spec(type);
@@ -789,6 +931,27 @@ function selectNode(id, { additive = false } = {}) {
   let extra = "";
   if (n.type === "shader") {
     extra += `<div class="field"><label>Intensité</label><input id="nInt" type="range" min="0" max="2" step=".01" value="${n.params.intensity ?? 1}"></div>`;
+  }
+  if (AI_NODE_TYPES.has(n.type)) {
+    const cfg = readAiConfig();
+    const media = n.type !== "ai";
+    const defaultProtocol = media ? "generic" : "ollama";
+    const protocol = n.params.protocol || defaultProtocol;
+    const endpoint = n.params.endpoint || (media ? (cfg.mediaEndpoint || cfg.endpoint || "") : (cfg.endpoint || ""));
+    const baseUrl = n.params.baseUrl || cfg.localBaseUrl || "http://127.0.0.1:11434";
+    const model = n.params.model || (n.type === "ai" ? (cfg.localModel || "qwen2.5-coder:7b") : "");
+    extra += `<div class="field"><label>Mode IA</label><select id="nAiProtocol"><option value="ollama">Ollama local / LAN</option><option value="openai">OpenAI-compatible</option><option value="generic">HTTP générique</option></select></div>`;
+    extra += `<div class="field"><label>Adresse Ollama</label><input id="nAiBase" value="${htmlSafe(baseUrl)}" placeholder="http://192.168.1.20:11434"></div>`;
+    extra += `<div class="field"><label>Endpoint externe</label><input id="nAiEndpoint" value="${htmlSafe(endpoint)}" placeholder="https://…"></div>`;
+    extra += `<div class="field"><label>Modèle</label><input id="nAiModel" value="${htmlSafe(model)}" placeholder="${media ? "nom du modèle média" : "qwen2.5-coder:7b"}"></div>`;
+    extra += `<div class="field"><label>Prompt</label><textarea id="nAiPrompt" rows="5" spellcheck="false">${htmlSafe(n.params.prompt || "")}</textarea></div>`;
+    if (n.type === "ai") {
+      extra += `<div class="field"><label>Rôle / système</label><textarea id="nAiSystem" rows="3" spellcheck="false">${htmlSafe(n.params.system || "Tu es une IA créative connectée à No-de Vibe Designer.")}</textarea></div>`;
+    }
+    extra += `<div class="field"><label>Auto au changement</label><select id="nAiAuto"><option value="false">Non · Run/Trigger</option><option value="true">Oui</option></select></div>`;
+    extra += `<div class="camera-actions"><button id="nAiRun" type="button">Run IA</button></div>`;
+    extra += `<p class="hint">${media ? "Sortie typée câblable comme un node classique. Le backend doit renvoyer une URL de média exploitable." : "La réponse texte sort du port response. Trigger ou Run évite les appels à chaque frame."}</p>`;
+    n.params.protocol = protocol;
   }
   if (["camera", "phone-camera-front", "phone-camera-back"].includes(n.type)) {
     extra += `<div class="camera-actions"><button id="cameraStart" type="button">Activer la caméra</button><button id="cameraStop" class="stop" type="button">Couper caméra</button></div><p class="hint">La caméra ne démarre jamais automatiquement. L'action ci-dessus demande explicitement l'accès.</p>`;
@@ -976,6 +1139,16 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="camera-actions"><button id="shadowMirrorBtn" type="button">Danse miroir</button><button id="shadowDetachBtn" type="button">Décrocher l’ombre</button><button id="shadowAttachBtn" type="button">Rattacher</button></div>`;
     extra += `<p class="hint">Décrocher mémorise la silhouette du moment. Elle peut ensuite vivre en autonomie dans sa zone.</p>`;
   }
+  if (n.type === "mapping") {
+    const q = normalizeQuad(n.params?.corners || DEFAULT_QUAD);
+    extra += `<div class="field"><label>Quick Map</label><span class="hint">HG · HD · BD · BG</span></div>`;
+    q.forEach((p, i) => {
+      const labels = ["HG","HD","BD","BG"];
+      extra += `<div class="field mapping-corner"><label>${labels[i]}</label><input id="nMapC${i}x" type="number" min="0" max="1" step=".001" value="${p.x.toFixed(4)}"><input id="nMapC${i}y" type="number" min="0" max="1" step=".001" value="${p.y.toFixed(4)}"></div>`;
+    });
+    extra += `<div class="camera-actions"><button id="mappingResetBtn" type="button">Rectangle</button></div>`;
+    extra += `<p class="hint">Téléphone : Mobile → Outils → Quick Map. Connecté au Bureau distant, les quatre coins sont envoyés au node Mapping en une calibration.</p>`;
+  }
   if (n.type === "stage-output") {
     extra += `<div class="field"><label>Surface / destination</label><input id="nSurfaceName" value="${n.params.surfaceName || ""}" placeholder="Rideau de fils, cyclo, écran fond…"></div>`;
     extra += `<p class="hint">Nom scénique de la destination. Le node reste une sortie vidéo locale et ne déclenche aucun matériel externe.</p>`;
@@ -1014,6 +1187,25 @@ function selectNode(id, { additive = false } = {}) {
     commitHistory();
   };
   if ($("#nInt")) $("#nInt").oninput = e => { n.params.intensity = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nAiProtocol")) {
+    $("#nAiProtocol").value = n.params.protocol || (n.type === "ai" ? "ollama" : "generic");
+    $("#nAiProtocol").onchange = e => { n.params.protocol = e.target.value; autosave(); commitHistory(); };
+  }
+  if ($("#nAiBase")) $("#nAiBase").onchange = e => { n.params.baseUrl = e.target.value.trim(); autosave(); commitHistory(); };
+  if ($("#nAiEndpoint")) $("#nAiEndpoint").onchange = e => { n.params.endpoint = e.target.value.trim(); autosave(); commitHistory(); };
+  if ($("#nAiModel")) $("#nAiModel").onchange = e => { n.params.model = e.target.value.trim(); autosave(); commitHistory(); };
+  if ($("#nAiPrompt")) $("#nAiPrompt").oninput = e => { n.params.prompt = e.target.value; autosave(); };
+  if ($("#nAiSystem")) $("#nAiSystem").oninput = e => { n.params.system = e.target.value; autosave(); };
+  if ($("#nAiAuto")) {
+    $("#nAiAuto").value = String(n.params.auto === true);
+    $("#nAiAuto").onchange = e => { n.params.auto = e.target.value === "true"; autosave(); commitHistory(); runtime.render(); };
+  }
+  if ($("#nAiRun")) $("#nAiRun").onclick = () => {
+    n.params.manualRunNonce = Date.now();
+    runtime.render();
+    autosave();
+    log(`IA · Run · ${n.title || n.type}`);
+  };
   if ($("#nHost")) $("#nHost").onchange = e => { n.params.host = e.target.value; autosave(); commitHistory(); };
   if ($("#nAddr")) $("#nAddr").onchange = e => { n.params.address = e.target.value; autosave(); commitHistory(); };
   if ($("#nPort")) $("#nPort").onchange = e => { n.params.port = Math.max(1, Math.min(65535, +e.target.value || 9000)); autosave(); commitHistory(); };
@@ -1098,6 +1290,34 @@ function selectNode(id, { additive = false } = {}) {
   if ($("#nSpeed")) $("#nSpeed").oninput = e => { n.params.speed = +e.target.value; runtime.render(); autosave(); };
   if ($("#nSize")) $("#nSize").oninput = e => { n.params.size = +e.target.value; runtime.render(); autosave(); };
   if ($("#nScale")) $("#nScale").onchange = e => { n.params.scale = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if (n.type === "mapping") {
+    const applyMappingCorners = (source = "designer") => {
+      const current = normalizeQuad(n.params?.corners || DEFAULT_QUAD);
+      const next = current.map((p, i) => ({
+        x: Number($("#nMapC"+i+"x")?.value ?? p.x),
+        y: Number($("#nMapC"+i+"y")?.value ?? p.y)
+      }));
+      try {
+        n.params = { ...(n.params || {}), ...mappingParams(next, { source }) };
+        runtime.render(); autosave();
+      } catch (e) {
+        log(`Quick Map · ${e?.message || e}`);
+      }
+    };
+    for (let i = 0; i < 4; i++) {
+      ["x","y"].forEach(axis => {
+        const el = $("#nMapC"+i+axis);
+        if (!el) return;
+        el.oninput = () => applyMappingCorners("designer");
+        el.onchange = () => { applyMappingCorners("designer"); commitHistory(); };
+      });
+    }
+    if ($("#mappingResetBtn")) $("#mappingResetBtn").onclick = () => {
+      n.params = { ...(n.params || {}), ...mappingParams(DEFAULT_QUAD, { source: "designer-reset" }) };
+      renderInspector(n.id); runtime.render(); autosave(); commitHistory();
+    };
+  }
+
   if ($("#nRot")) $("#nRot").onchange = e => { n.params.rotation = +e.target.value; runtime.render(); autosave(); commitHistory(); };
   if ($("#nFxAmount")) $("#nFxAmount").oninput = e => {
     const key = n.type === "anaglyph" ? "depth" : "amount";
@@ -1430,43 +1650,11 @@ function autosave() {
   try { publishHostState(); } catch { /* hôte distant optionnel */ }
 }
 
-const previewOverlay = $("#previewOverlay");
-let previewPinchSpread = Number(runtime.pointer?.spread || 0);
-let safariPinchStartSpread = previewPinchSpread;
-
-previewOverlay.addEventListener("pointermove", e => {
+$("#previewOverlay").addEventListener("pointermove", e => {
   const r = e.currentTarget.getBoundingClientRect();
   runtime.setPointer((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
 });
-
-// Chrome/Edge on macOS expose trackpad pinch as ctrl+wheel.
-// Pinch-out opens the digital curtain; pinch-in closes it.
-previewOverlay.addEventListener("wheel", e => {
-  if (!e.ctrlKey) return;
-  e.preventDefault();
-  const delta = Math.max(-80, Math.min(80, -e.deltaY));
-  previewPinchSpread = Math.max(0, Math.min(1, previewPinchSpread + delta * .0065));
-  runtime.setGestureSpread(previewPinchSpread);
-  if (document.body.classList.contains("demo-mode")) {
-    const pct = Math.round(previewPinchSpread * 100);
-    $("#demoModeBanner span").textContent = `Souris = mouvement · écarte/pince 2 doigts = ouverture ${pct}%`;
-  }
-}, { passive:false });
-
-// Safari/WebKit native gesture events.
-previewOverlay.addEventListener("gesturestart", e => {
-  e.preventDefault();
-  safariPinchStartSpread = previewPinchSpread;
-}, { passive:false });
-previewOverlay.addEventListener("gesturechange", e => {
-  e.preventDefault();
-  const scale = Math.max(.25, Math.min(4, Number(e.scale) || 1));
-  previewPinchSpread = Math.max(0, Math.min(1, safariPinchStartSpread + (scale - 1) * .72));
-  runtime.setGestureSpread(previewPinchSpread);
-}, { passive:false });
-previewOverlay.addEventListener("gestureend", e => e.preventDefault(), { passive:false });
-
-previewOverlay.onclick = e => {
+$("#previewOverlay").onclick = e => {
   const r = e.currentTarget.getBoundingClientRect();
   addPoint((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
   log("Point image ajouté");
@@ -1597,155 +1785,31 @@ $("#magicFxClose")?.addEventListener("click", () => $("#magicFxModal")?.classLis
 $("#magicFxModal")?.addEventListener("click", e => { if (e.target.id === "magicFxModal") e.currentTarget.classList.add("hidden"); });
 qall("[data-magic-fx]").forEach(b => b.onclick = () => applyMagicFx(b.dataset.magicFx));
 
-let audioRackTicker = null;
+function applySuperNodeV3(id) {
+  const preset = superNodePreset(id);
+  if (!preset) return log(`SuperNode inconnu · ${id}`);
+  const source = selectedNode ? nodeById(selectedNode) : null;
+  const n = addNode(preset.engine, source ? source.x + 220 : 340, source ? source.y + 20 : 160);
+  applySuperNodePreset(n, id);
 
-function rackMeta(slot) {
-  project.meta ||= {};
-  project.meta.audioRack ||= { players:{} };
-  project.meta.audioRack.players ||= {};
-  project.meta.audioRack.players[slot] ||= {
-    name:`Player ${slot}`, gain:1, pan:0, loop:false,
-    inPoint:0, loopStart:0, loopEnd:0, outPoint:0
-  };
-  return project.meta.audioRack.players[slot];
-}
-
-function updateRackStatus(slot) {
-  const el = document.querySelector(`[data-player-status="${slot}"]`);
-  if (!el) return;
-  const state = sharedAudio.playerState(slot);
-  if (!state.loaded) {
-    el.textContent = rackMeta(slot).name || `Player ${slot}`;
-    return;
-  }
-  const pos = Number(state.currentTime || 0).toFixed(1);
-  const dur = Number(state.duration || 0).toFixed(1);
-  el.textContent = `${state.playing ? "▶" : "■"} ${state.name || rackMeta(slot).name} · ${pos}s / ${dur}s`;
-}
-
-function renderAudioRack() {
-  const grid = $("#audioRackGrid");
-  if (!grid) return;
-  grid.innerHTML = "";
-  for (let slot=1; slot<=12; slot++) {
-    const meta = rackMeta(slot);
-    const state = sharedAudio.playerState(slot);
-    const card = document.createElement("section");
-    card.className = "audio-player-card";
-    card.dataset.playerSlot = String(slot);
-    card.innerHTML = `
-      <header><b>P${slot}</b><span data-player-status="${slot}">Aucun son chargé</span></header>
-      <label class="audio-file">Son <input type="file" accept="audio/*" data-player-file="${slot}"></label>
-      <div class="audio-player-actions">
-        <button type="button" data-player-action="play" data-slot="${slot}">▶ Play</button>
-        <button type="button" data-player-action="pause" data-slot="${slot}">Ⅱ</button>
-        <button type="button" data-player-action="stop" data-slot="${slot}">■</button>
-        <label><input type="checkbox" data-player-loop="${slot}" ${meta.loop ? "checked" : ""}> Loop</label>
-      </div>
-      <label>Niveau <input type="range" min="0" max="1.5" step="0.01" value="${state.loaded ? state.gain : meta.gain}" data-player-gain="${slot}"></label>
-      <label>Pan L↔R <input type="range" min="-1" max="1" step="0.01" value="${state.loaded ? state.pan : meta.pan}" data-player-pan="${slot}"></label>
-      <div class="audio-player-points">
-        <button type="button" data-player-point="in" data-slot="${slot}">IN</button>
-        <button type="button" data-player-point="loop-start" data-slot="${slot}">LOOP A</button>
-        <button type="button" data-player-point="loop-end" data-slot="${slot}">LOOP B</button>
-        <button type="button" data-player-point="out" data-slot="${slot}">OUT</button>
-      </div>`;
-    grid.appendChild(card);
-    updateRackStatus(slot);
+  if (source) {
+    const outPort = videoOutputPort(source);
+    const labels = portLabels(n.type, n) || [];
+    const firstIsVideoInput = labels.length
+      && portDirection(n.type, 0, labels.length, n) === "in"
+      && portDataType(n.type, 0, n) === "video";
+    if (outPort != null && firstIsVideoInput) connectNodes(source, outPort, n, 0);
   }
 
-  grid.querySelectorAll("[data-player-file]").forEach(input => {
-    input.onchange = async () => {
-      const slot = Number(input.dataset.playerFile);
-      const file = input.files?.[0];
-      if (!file) return;
-      const meta = rackMeta(slot);
-      meta.name = file.name;
-      try {
-        await sharedAudio.attachPlayerFile(slot, file, meta);
-        autosave();
-        updateRackStatus(slot);
-        log(`Audio P${slot} · ${file.name} chargé`);
-      } catch (e) {
-        log(`Audio P${slot} · ${e?.message || e}`);
-      }
-    };
-  });
-
-  grid.querySelectorAll("[data-player-action]").forEach(btn => {
-    btn.onclick = async () => {
-      const slot = Number(btn.dataset.slot);
-      try {
-        await sharedAudio.controlPlayer(slot, btn.dataset.playerAction);
-        updateRackStatus(slot);
-      } catch (e) { log(`Audio P${slot} · ${e?.message || e}`); }
-    };
-  });
-
-  grid.querySelectorAll("[data-player-loop]").forEach(input => {
-    input.onchange = async () => {
-      const slot = Number(input.dataset.playerLoop);
-      rackMeta(slot).loop = input.checked;
-      try { await sharedAudio.controlPlayer(slot, "loop", input.checked); }
-      catch (e) { log(`Audio P${slot} · ${e?.message || e}`); }
-      autosave();
-    };
-  });
-
-  grid.querySelectorAll("[data-player-gain]").forEach(input => {
-    input.oninput = () => {
-      const slot = Number(input.dataset.playerGain), value = Number(input.value);
-      rackMeta(slot).gain = value;
-      sharedAudio.controlPlayer(slot, "gain", value).catch(()=>{});
-      autosave();
-    };
-  });
-
-  grid.querySelectorAll("[data-player-pan]").forEach(input => {
-    input.oninput = () => {
-      const slot = Number(input.dataset.playerPan), value = Number(input.value);
-      rackMeta(slot).pan = value;
-      sharedAudio.controlPlayer(slot, "pan", value).catch(()=>{});
-      autosave();
-    };
-  });
-
-  grid.querySelectorAll("[data-player-point]").forEach(btn => {
-    btn.onclick = async () => {
-      const slot = Number(btn.dataset.slot), action = btn.dataset.playerPoint;
-      const node = sharedAudio.playerNode(slot);
-      if (!node) return log(`Audio P${slot} · charge d'abord un son`);
-      const at = Number(node.el.currentTime) || 0;
-      const key = action === "in" ? "inPoint" : action === "loop-start" ? "loopStart" : action === "loop-end" ? "loopEnd" : "outPoint";
-      rackMeta(slot)[key] = at;
-      try { await sharedAudio.controlPlayer(slot, action, at); }
-      catch (e) { log(`Audio P${slot} · ${e?.message || e}`); }
-      autosave();
-      log(`Audio P${slot} · ${action.toUpperCase()} = ${at.toFixed(2)}s`);
-    };
-  });
+  redraw();
+  selectNode(n.id);
+  runtime.setProject(project);
+  autosave();
+  commitHistory();
+  log(`SuperNode V3 · ${n.title}`);
+  $("#magicFxModal")?.classList.add("hidden");
 }
-
-$("#audioRackBtn")?.addEventListener("click", () => {
-  renderAudioRack();
-  $("#audioRackModal")?.classList.remove("hidden");
-  clearInterval(audioRackTicker);
-  audioRackTicker = setInterval(() => {
-    for (let slot=1; slot<=12; slot++) updateRackStatus(slot);
-  }, 250);
-});
-$("#audioRackClose")?.addEventListener("click", () => {
-  $("#audioRackModal")?.classList.add("hidden");
-  clearInterval(audioRackTicker);
-  audioRackTicker = null;
-});
-$("#audioRackModal")?.addEventListener("click", e => {
-  if (e.target.id === "audioRackModal") {
-    e.currentTarget.classList.add("hidden");
-    clearInterval(audioRackTicker);
-    audioRackTicker = null;
-  }
-});
+qall("[data-supernode]").forEach(b => b.onclick = () => applySuperNodeV3(b.dataset.supernode));
 
 $("#controlsBtn")?.addEventListener("click", () => {
   renderControlSurface();
@@ -1755,153 +1819,64 @@ $("#controlsClose")?.addEventListener("click", () => $("#controlsModal")?.classL
 $("#controlsRefresh")?.addEventListener("click", renderControlSurface);
 $("#controlsModal")?.addEventListener("click", e => { if (e.target.id === "controlsModal") e.currentTarget.classList.add("hidden"); });
 
-function sendCueState(clientId = "") {
-  if (!remoteSession?.online) return false;
-  remoteSession.send({
-    type: STUDIO_MSG.CUE_STATE,
-    state: buildCueState(project),
-    clientId: clientId || undefined,
-    t: Date.now()
-  });
-  return true;
-}
-
-function bumpCueRevision() {
-  project.meta ||= {};
-  project.meta.cueRevision = (Number(project.meta.cueRevision) || 0) + 1;
-}
-
-function selectDesktopCue(cue) {
-  if (!cue) return null;
-  setCuePlayhead(project, cue.id);
-  bumpCueRevision();
-  autosave();
-  sendCueState();
-  log(`STANDBY · ${cue.number || ""} ${cue.label || cue.id}`);
-  return cue;
-}
-
 function fireDesktopCue(cue) {
   if (!cue) {
-    log("ERREUR · aucun cue en attente");
+    log("ERREUR · aucun cue");
     return;
   }
   const applied = applyCue(project, {
-    ...cue,
+    id: cue.id,
+    label: cue.label,
     time: cue.time ?? cue.start,
-    actions: cue.actions?.length ? cue.actions : [{ type: "jump-time", value: cue.time ?? cue.start }]
+    actions: cue.actions || [{ type: "jump-time", value: cue.time ?? cue.start }]
   });
   project = applied.project;
-
-  let hasError = false;
   for (const effect of applied.effects) {
     if (effect.type === "jump-time" || effect.type === "go") {
       runtime.time = Number(effect.time ?? cue.time ?? cue.start) || 0;
       runtime.play();
       syncPlayButton();
     }
-    if (effect.type === "error") {
-      hasError = true;
-      log(`ERREUR cue · ${effect.error}`);
-    }
-    if (effect.type === "osc") {
-      try {
-        if (typeof window.nvdDesktop?.sendOscUdp === "function") {
-          window.nvdDesktop.sendOscUdp({
-            host: effect.host || "127.0.0.1",
-            port: effect.port || 9000,
-            address: effect.address,
-            args: effect.args || []
-          });
-        } else {
-          devices.bridge.send({ type:"osc", ...effect });
-        }
-      } catch (e) { log(`Cue OSC · ${e?.message || e}`); }
-    }
-    if (effect.type === "artnet") {
-      try {
-        if (typeof window.nvdDesktop?.sendArtNetUdp === "function") window.nvdDesktop.sendArtNetUdp(effect);
-        else devices.bridge.send({ type:"artnet", ...effect });
-      } catch (e) { log(`Cue Art-Net · ${e?.message || e}`); }
-    }
+    if (effect.type === "error") log(`ERREUR cue · ${effect.error}`);
+    if (effect.type === "osc") log(`Cue OSC déclaré · ${effect.address} (à transmettre)`);
+    if (effect.type === "artnet") log(`Cue Art-Net déclaré · u${effect.universe} ch${effect.channel}=${effect.value}`);
+    if (effect.type === "panic") log("PANIC · audio coupé dans le projet");
   }
-  if (hasError) {
-    sendCueState();
-    return;
-  }
-
-  project.meta ||= {};
-  project.meta.transport = {
-    action: "go",
-    cueId: cue.id,
-    start: cue.time ?? cue.start,
-    label: cue.label,
-    firedAt: Date.now()
-  };
-  project.meta.activeCueId = cue.id;
-  const next = advanceCuePlayhead(project, cue.id);
-  bumpCueRevision();
-
+  project.meta = project.meta || {};
+  project.meta.transport = { action: "go", cueId: cue.id, start: cue.time ?? cue.start, label: cue.label };
   try { publishHostState(); } catch { /* */ }
   redraw();
   autosave();
-  sendCueState();
-  log(`GO · ${cue.number || ""} ${cue.label || cue.id}`);
-
-  const mode = cue.continueMode || (cue.autoFollow ? "auto-follow" : cue.autoContinue ? "auto-continue" : "manual");
-  if (next && mode !== "manual") {
-    const waitMs = mode === "auto-follow"
-      ? Math.max(0, Number(cue.duration || 0) + Number(cue.postWait || 0)) * 1000
-      : Math.max(0, Number(cue.postWait || 0)) * 1000;
-    window.setTimeout(() => {
-      const standby = standingByCue(project);
-      if (standby?.id === next.id) fireDesktopCue(next);
-    }, waitMs);
-  }
+  log(`GO · ${cue.label || cue.id}`);
 }
 
-function handleCueCommand(action, cueId = "") {
+$("#cueGo").onclick = () => {
   const cues = listCues(project);
-  if (!cues.length) {
-    log("Conduite · aucune cue");
-    return null;
-  }
-  const standby = standingByCue(project, cues);
-
-  if (action === "go") {
-    fireDesktopCue(standby);
-    return standby;
-  }
-  if (action === "select") {
-    return selectDesktopCue(cues.find(cue => cue.id === cueId) || standby);
-  }
-  if (action === "next") {
-    const cue = nextCue(cues, standby?.id) || standby;
-    return selectDesktopCue(cue);
-  }
-  if (action === "prev") {
-    const cue = previousCue(cues, standby?.id) || standby;
-    return selectDesktopCue(cue);
-  }
-  if (action === "panic") {
-    const applied = applyCue(project, null, { panic: true });
-    project = applied.project;
-    runtime.stop();
-    syncPlayButton();
-    bumpCueRevision();
-    redraw();
-    autosave();
-    sendCueState();
-    log("PANIC");
-    return null;
-  }
-  return standby;
-}
-
-$("#cueGo").onclick = () => handleCueCommand("go");
-$("#cueNext").onclick = () => handleCueCommand("next");
-$("#cuePrev").onclick = () => handleCueCommand("prev");
-$("#cuePanic").onclick = () => handleCueCommand("panic");
+  const current = project.meta?.transport?.cueId;
+  const cue = cues.find(c => c.id === current) || cues[0];
+  fireDesktopCue(cue);
+};
+$("#cueNext").onclick = () => {
+  const cues = listCues(project);
+  const cue = nextCue(cues, project.meta?.transport?.cueId);
+  if (!cue) return log("ERREUR · pas de cue suivant");
+  fireDesktopCue(cue);
+};
+$("#cuePrev").onclick = () => {
+  const cues = listCues(project);
+  const cue = previousCue(cues, project.meta?.transport?.cueId);
+  if (!cue) return log("ERREUR · pas de cue précédent");
+  fireDesktopCue(cue);
+};
+$("#cuePanic").onclick = () => {
+  const applied = applyCue(project, null, { panic: true });
+  project = applied.project;
+  runtime.stop();
+  syncPlayButton();
+  redraw();
+  autosave();
+  log("PANIC");
+};
 
 function downloadText(content, fileName, mime = "text/plain") {
   const blob = new Blob([content], { type: mime });
@@ -1934,6 +1909,113 @@ $("#exportMaxBtn")?.addEventListener("click", () => runExport("max"));
 $("#exportTdBtn")?.addEventListener("click", () => runExport("td"));
 $("#exportPdBtn")?.addEventListener("click", () => runExport("pd"));
 $("#exportMilluminBtn")?.addEventListener("click", () => runExport("millumin"));
+
+let lastVibeOut = null;
+
+async function askVibeOutAi(prompt, provider = "auto") {
+  const cfg = readAiConfig();
+  const local = () => requestAiForNode({
+    protocol:"ollama",
+    baseUrl:cfg.localBaseUrl || "http://127.0.0.1:11434",
+    model:cfg.localModel || "qwen2.5-coder:7b",
+    system:prompt.system,
+    prompt:prompt.user,
+    temperature:.12
+  }).then(r => ({ ...r, provider:"local" }));
+  const external = () => {
+    if (!cfg.enabled || !cfg.endpoint) throw new Error("Endpoint externe non configuré");
+    return requestAiForNode({
+      protocol:"openai",
+      endpoint:cfg.endpoint,
+      model:cfg.model || "gpt-4o-mini",
+      apiKey:cfg.apiKey || "",
+      system:prompt.system,
+      prompt:prompt.user,
+      temperature:.12
+    }).then(r => ({ ...r, provider:"external" }));
+  };
+  if (provider === "local") return local();
+  if (provider === "external") return external();
+  try { return await local(); }
+  catch (e) {
+    if (cfg.enabled && cfg.endpoint) return external();
+    throw e;
+  }
+}
+
+function vibeOutFallback(target) {
+  if (target === "maxpat") return exportMax(project);
+  if (target === "touchdesigner") return exportTouchDesigner(project);
+  if (target === "puredata") return exportPureData(project);
+  throw new Error("Pas de fallback structurel pour cette cible");
+}
+
+function vibeOutFileName(target, ext) {
+  const base = String(project.name || "patch").replace(/[^a-zA-Z0-9._-]+/g, "-");
+  return `${base}-vibe-out.${ext || VIBE_OUT_TARGETS[target]?.extension || "txt"}`;
+}
+
+$("#vibeOutGenerate")?.addEventListener("click", async () => {
+  const btn = $("#vibeOutGenerate");
+  const copy = $("#vibeOutCopy");
+  const dl = $("#vibeOutDownload");
+  const status = $("#vibeOutStatus");
+  const resultBox = $("#vibeOutResult");
+  const target = $("#vibeOutTarget")?.value || "max";
+  const provider = $("#vibeOutProvider")?.value || "auto";
+  const instruction = $("#vibeOutInstruction")?.value?.trim() || "";
+  const spec = VIBE_OUT_TARGETS[target];
+  if (!spec) return;
+  btn.disabled = true;
+  copy.disabled = true;
+  dl.disabled = true;
+  status.textContent = "Génération…";
+  resultBox.value = "";
+  try {
+    const fallback = ["maxpat","touchdesigner","puredata"].includes(target)
+      ? () => vibeOutFallback(target)
+      : null;
+    const result = await generateVibeOut({
+      target,
+      project,
+      instruction,
+      askAi: prompt => askVibeOutAi(prompt, provider),
+      fallback
+    });
+    lastVibeOut = { ...result, target, fileName:vibeOutFileName(target, result.extension) };
+    resultBox.value = result.content || "";
+    copy.disabled = !result.content;
+    dl.disabled = !result.content;
+    status.textContent = result.source === "ai"
+      ? `Prêt · ${spec.label} · ${result.model || result.provider || "IA"}`
+      : `Prêt · export structurel de secours${result.warning ? " · " + result.warning : ""}`;
+    log(`Vibe Out · ${spec.label} · ${result.source}`);
+  } catch (e) {
+    lastVibeOut = null;
+    status.textContent = "Échec · " + (e?.message || e);
+    log("Vibe Out · ÉCHEC · " + (e?.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("#vibeOutCopy")?.addEventListener("click", async () => {
+  const content = lastVibeOut?.content || $("#vibeOutResult")?.value || "";
+  if (!content) return;
+  try {
+    await navigator.clipboard.writeText(content);
+    $("#vibeOutStatus").textContent = "Code copié · prêt à coller dans le logiciel cible";
+  } catch {
+    $("#vibeOutResult")?.select?.();
+    document.execCommand?.("copy");
+    $("#vibeOutStatus").textContent = "Code sélectionné/copier";
+  }
+});
+
+$("#vibeOutDownload")?.addEventListener("click", () => {
+  if (!lastVibeOut?.content) return;
+  downloadText(lastVibeOut.content, lastVibeOut.fileName, lastVibeOut.mime || "text/plain");
+});
 
 function currentShowDiagnostic() {
   const experimental = (project.nodes || []).filter(n => !isExecutable(n.type)).map(n => n.type);
@@ -2023,13 +2105,56 @@ setInterval(() => {
   $("#playhead").style.left = `calc(92px + ${(runtime.time / 60) * 100}% * .86)`;
 }, 100);
 
+async function setImageVibeFile(file) {
+  if (!file) return;
+  try {
+    if (imageVibeState.previewUrl) URL.revokeObjectURL(imageVibeState.previewUrl);
+    const loaded = await analyzeImageFile(file);
+    imageVibeState = loaded;
+    const thumb = $("#vibeImageThumb");
+    thumb.src = loaded.previewUrl;
+    thumb.classList.remove("hidden");
+    $("#vibeImageClear")?.classList.remove("hidden");
+    $("#vibeImageInfo").textContent = imageVibeSummary(loaded.analysis);
+    log(`Image Vibe · ${loaded.analysis.fileName || "image"} · analyse locale prête`);
+  } catch (e) {
+    log(`Image Vibe ÉCHEC · ${e?.message || e}`);
+  }
+}
+
+function clearImageVibe() {
+  if (imageVibeState.previewUrl) URL.revokeObjectURL(imageVibeState.previewUrl);
+  imageVibeState = { analysis:null, previewUrl:"" };
+  const thumb = $("#vibeImageThumb");
+  if (thumb) { thumb.removeAttribute("src"); thumb.classList.add("hidden"); }
+  $("#vibeImageClear")?.classList.add("hidden");
+  if ($("#vibeImageInfo")) $("#vibeImageInfo").textContent = "Image optionnelle · analyse locale";
+}
+
+$("#vibeImageFile")?.addEventListener("change", e => setImageVibeFile(e.target.files?.[0]));
+$("#vibeImageClear")?.addEventListener("click", () => {
+  clearImageVibe();
+  if ($("#vibeImageFile")) $("#vibeImageFile").value = "";
+});
+
 async function applyVibeFromUi() {
   const text = $("#vibeText").value.trim();
-  if (!text) { log("Vibe · texte vide"); return; }
-  log("Vibe · analyse…");
+  if (!text && !imageVibeState.analysis) { log("Vibe · texte ou image requis"); return; }
+  log(imageVibeState.analysis ? "Image Vibe · analyse + génération…" : "Vibe · analyse…");
   $("#applyVibe").disabled = true;
   try {
-    const result = await runVibe(text, project);
+    const target = $("#vibeImageTarget")?.value || "auto";
+    const promptText = imageVibeState.analysis ? imageVibePrompt(text, imageVibeState.analysis, target) : text;
+    let result = await runVibe(promptText, project);
+    if (imageVibeState.analysis) {
+      const seedOps = imageVibeOps(imageVibeState.analysis, target, text);
+      result = {
+        ...result,
+        engine: `image-vibe+${result.engine || "local"}`,
+        ops: [...seedOps, ...(result.ops || [])],
+        note: `Image → Vibe · ${target} · ${result.note || "analyse locale"}`
+      };
+    }
     if (result.aiError) log(`Vibe · IA indisponible · ${result.aiError}`);
     if (result.aiUnavailable) log(`Vibe · ${result.note}`);
     else log(`Vibe · ${result.note || result.engine}`);
@@ -2226,6 +2351,8 @@ function openPreferences(tab = "general") {
   if ($("#aiLocalEnabled")) $("#aiLocalEnabled").checked = ai.localEnabled !== false;
   if ($("#aiLocalBase")) $("#aiLocalBase").value = ai.localBaseUrl || "http://127.0.0.1:11434";
   if ($("#aiLocalModel")) $("#aiLocalModel").value = ai.localModel || "qwen2.5-coder:7b";
+  if ($("#aiLocalSecondaryModel")) $("#aiLocalSecondaryModel").value = ai.localSecondaryModel || "gemma3:1b";
+  if ($("#aiLocalParallel")) $("#aiLocalParallel").checked = ai.localParallel !== false;
   if ($("#aiEnabled")) $("#aiEnabled").checked = ai.enabled === true;
   if ($("#aiEndpoint")) $("#aiEndpoint").value = ai.endpoint || "";
   if ($("#aiKey")) $("#aiKey").value = ai.apiKey || "";
@@ -2265,6 +2392,8 @@ function collectAiConfig() {
     localEnabled: $("#aiLocalEnabled")?.checked !== false,
     localBaseUrl: $("#aiLocalBase")?.value?.trim() || "http://127.0.0.1:11434",
     localModel: $("#aiLocalModel")?.value?.trim() || "qwen2.5-coder:7b",
+    localSecondaryModel: $("#aiLocalSecondaryModel")?.value?.trim() || "gemma3:1b",
+    localParallel: $("#aiLocalParallel")?.checked !== false,
     enabled: $("#aiEnabled")?.checked === true,
     endpoint: $("#aiEndpoint")?.value?.trim() || "",
     apiKey: $("#aiKey")?.value?.trim() || "",
@@ -2284,6 +2413,28 @@ $("#aiSave")?.addEventListener("click", () => {
   log(`Préférences IA enregistrées · local ${cfg.localEnabled ? cfg.localModel : "désactivé"}`);
 });
 
+$("#aiInstallQwen")?.addEventListener("click", async () => {
+  const status = $("#aiLocalStatus");
+  try {
+    if (status) status.textContent = "Installation Qwen…";
+    await installLocalModel("qwen2.5-coder:7b");
+    if (status) status.textContent = "Qwen installé · teste la connexion";
+  } catch (e) {
+    if (status) status.textContent = "Échec Qwen · " + (e?.message || e);
+  }
+});
+
+$("#aiInstallGemma")?.addEventListener("click", async () => {
+  const status = $("#aiLocalStatus");
+  try {
+    if (status) status.textContent = "Installation Gemma…";
+    await installLocalModel("gemma3:1b");
+    if (status) status.textContent = "Gemma installé · teste la connexion";
+  } catch (e) {
+    if (status) status.textContent = "Échec Gemma · " + (e?.message || e);
+  }
+});
+
 $("#aiLocalProbe")?.addEventListener("click", async () => {
   const status = $("#aiLocalStatus");
   if (status) status.textContent = "Test…";
@@ -2293,13 +2444,16 @@ $("#aiLocalProbe")?.addEventListener("click", async () => {
   if (result.ok && result.available) {
     const names = Array.isArray(result.models) ? result.models : [];
     const selected = result.model || cfg.localModel;
+    const selectedModels = Array.isArray(result.localModels) ? result.localModels : [selected].filter(Boolean);
     if ($("#aiLocalModel") && selected) $("#aiLocalModel").value = selected;
-    saveAiConfig({ ...cfg, localModel: selected });
+    const second = selectedModels.find(m => m !== selected) || cfg.localSecondaryModel;
+    if ($("#aiLocalSecondaryModel") && second) $("#aiLocalSecondaryModel").value = second;
+    saveAiConfig({ ...cfg, localModel:selected, localSecondaryModel:second });
     if (status) status.textContent = names.length
-      ? `Prêt · ${selected} · ${names.length} modèle(s)`
+      ? `Prêt · ${selectedModels.join(" + ") || selected} · ${names.length} modèle(s)`
       : "Ollama joignable · aucun modèle installé";
     log(names.length
-      ? `Local AI Core · prêt · ${selected}`
+      ? `Local AI Core · prêt · ${selectedModels.join(" + ") || selected}`
       : "Local AI Core · Ollama OK mais aucun modèle installé");
   } else {
     if (status) status.textContent = `Indisponible · ${result.error || "Ollama non joignable"}`;
@@ -2470,6 +2624,35 @@ async function runCmd() {
       enterShowcaseDemo({ preserve: true });
     } else if (v === "exit" || v === "exit demo") {
       exitShowcaseDemo();
+    } else if (v === "ai probe") {
+      const result = await probeLocalAi(readAiConfig(), { fresh:true });
+      log(result.ok ? `AI · ${(result.localModels || [result.model]).filter(Boolean).join(" + ") || "Ollama OK"}` : `AI · indisponible · ${result.error || "?"}`);
+    } else if (v === "ai install qwen") {
+      await installLocalModel("qwen2.5-coder:7b");
+    } else if (v === "ai install gemma") {
+      await installLocalModel("gemma3:1b");
+    } else if (v.startsWith("ai host ")) {
+      const host = raw.slice(8).trim();
+      if (!/^https?:\/\//i.test(host)) throw new Error("Exemple : ai host http://192.168.1.20:11434");
+      const cfg = { ...readAiConfig(), localBaseUrl:host };
+      saveAiConfig(cfg);
+      log(`AI · hôte local/LAN = ${host}`);
+    } else if (v.startsWith("ai model ")) {
+      const model = raw.slice(9).trim();
+      if (!model) throw new Error("Nom de modèle requis");
+      const cfg = { ...readAiConfig(), localModel:model };
+      saveAiConfig(cfg);
+      log(`AI · modèle principal = ${model}`);
+    } else if (v.startsWith("ai endpoint ")) {
+      const endpoint = raw.slice(12).trim();
+      if (!/^https?:\/\//i.test(endpoint)) throw new Error("Endpoint HTTP/HTTPS requis");
+      const cfg = { ...readAiConfig(), enabled:true, endpoint };
+      const allowed = assertAiProviderAllowed(cfg);
+      if (!allowed.ok) throw new Error(allowed.error);
+      saveAiConfig(cfg);
+      log(`AI · endpoint externe = ${endpoint}`);
+    } else if (v === "ai add" || v === "node ai") {
+      addNode("ai");
     } else if (await devices.command(raw)) { /* handled */ }
     else {
       const types = ["camera", "tracking", "shader", "shadow", "osc", "midi", "dmx", "arduino", "esp", "servo"];
@@ -2573,7 +2756,7 @@ if (project.nodes.length === 0 && generalPrefs.loadDemo !== false && localStorag
   try { demoReturnProject = JSON.parse(JSON.stringify(project)); } catch { demoReturnProject = newProject(); }
   project = createDemoProject();
   setDemoBanner(true);
-  log("EXEMPLE · V2.2 initialisé · souris + écartement 2 doigts · aucune permission requise");
+  log("EXEMPLE · Wow interactif initialisé · aucune permission requise");
 } else {
   setDemoBanner(false);
 }
@@ -2758,21 +2941,6 @@ function handleCompanionStudioMessage(msg) {
     showCompanionDetect(msg);
     log(`Companion Studio · détecté · ${msg.clientId || "?"}`);
     if (companionLayout) sendCompanionLayout(msg.clientId || "");
-    sendCueState(msg.clientId || "");
-    return;
-  }
-  if (msg.type === STUDIO_MSG.CUE_ACTION) {
-    const result = handleCueCommand(msg.action || "go", msg.cueId || "");
-    sendCueState(msg.clientId || "");
-    remoteSession?.send?.({
-      type: STUDIO_MSG.FEEDBACK,
-      widgetId: "cue-list",
-      value: result?.id || null,
-      ok: true,
-      detail: msg.action || "go",
-      clientId: msg.clientId,
-      t: Date.now()
-    });
     return;
   }
   if (msg.type === STUDIO_MSG.LAYOUT) {
@@ -2855,22 +3023,6 @@ function handleCompanionStudioMessage(msg) {
         else runtime.toggle();
         syncPlayButton();
       },
-      audioPlayerControl: (slot, action, value) => {
-        const normalizedValue = action === "pan" ? ((Number(value) || 0) * 2 - 1) : value;
-        sharedAudio.controlPlayer(slot, action, normalizedValue)
-          .then(() => {
-            remoteSession?.send?.({
-              type: STUDIO_MSG.STATUS,
-              channel: "audio-player",
-              slot,
-              state: sharedAudio.playerState(slot),
-              t: Date.now()
-            });
-          })
-          .catch(e => log(`Audio P${slot} · ${e?.message || e}`));
-        return sharedAudio.playerState(slot);
-      },
-      stageControl: (action) => handleCueCommand(action),
       onLog: (m) => log(m)
     });
     remoteSession?.send?.({ ...feedback, clientId: msg.clientId });
