@@ -9,6 +9,46 @@ const path = require("path");
 const { pathToFileURL } = require("url");
 
 const APP_NAME = "No-de Vibe Designer";
+
+const LOCAL_AI_DEFAULT_BASE = "http://127.0.0.1:11434";
+
+function normalizeLocalAiBase(value = LOCAL_AI_DEFAULT_BASE) {
+  const raw = String(value || LOCAL_AI_DEFAULT_BASE).trim().replace(/\/+$/, "");
+  let url;
+  try { url = new URL(raw); } catch { throw new Error("URL IA locale invalide"); }
+  const host = url.hostname.toLowerCase();
+  if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(host)) {
+    throw new Error("IA locale refusée : seul localhost est autorisé");
+  }
+  if (!["http:", "https:"].includes(url.protocol)) throw new Error("Protocole IA locale invalide");
+  return url.origin;
+}
+
+async function localAiRequest(pathname, { baseUrl = LOCAL_AI_DEFAULT_BASE, method = "GET", body = null, timeoutMs = 45000 } = {}) {
+  const base = normalizeLocalAiBase(baseUrl);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 45000));
+  try {
+    const response = await fetch(base + pathname, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal
+    });
+    const text = await response.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { /* handled below */ }
+    if (!response.ok) throw new Error(`Ollama HTTP ${response.status} · ${text.slice(0, 240)}`);
+    if (data == null) throw new Error("Réponse IA locale non JSON");
+    return data;
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("IA locale : délai dépassé");
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 let mainWindow = null;
 let httpServer = null;
 let httpPort = 0;
@@ -156,6 +196,41 @@ ipcMain.handle("nvd:host-card", async () => {
   if (!hostCard) throw new Error("Carte hôte indisponible");
   return hostCard;
 });
+
+
+ipcMain.handle("nvd:local-ai-probe", async (_event, options = {}) => {
+  const data = await localAiRequest("/api/tags", { baseUrl: options.baseUrl, timeoutMs: 3500 });
+  const models = Array.isArray(data.models) ? data.models.map(m => m?.name || m?.model).filter(Boolean) : [];
+  const requested = String(options.model || "qwen2.5-coder:7b");
+  const installed = models.includes(requested) || models.some(name => name.split(":")[0] === requested.split(":")[0]);
+  return { ok: true, baseUrl: normalizeLocalAiBase(options.baseUrl), requested, installed, models };
+});
+
+ipcMain.handle("nvd:local-ai-chat", async (_event, options = {}) => {
+  const model = String(options.model || "qwen2.5-coder:7b").trim();
+  if (!model) throw new Error("Modèle IA local manquant");
+  const messages = Array.isArray(options.messages) ? options.messages.slice(-12).map(m => ({
+    role: ["system", "user", "assistant"].includes(m?.role) ? m.role : "user",
+    content: String(m?.content || "").slice(0, 30000)
+  })) : [];
+  if (!messages.length) throw new Error("Messages IA locale absents");
+  const data = await localAiRequest("/api/chat", {
+    baseUrl: options.baseUrl,
+    method: "POST",
+    timeoutMs: options.timeoutMs || 60000,
+    body: {
+      model,
+      stream: false,
+      format: "json",
+      options: { temperature: Math.max(0, Math.min(1, Number(options.temperature ?? 0.15))) },
+      messages
+    }
+  });
+  const content = data?.message?.content;
+  if (typeof content !== "string" || !content.trim()) throw new Error("IA locale : réponse vide");
+  return { ok: true, model: data.model || model, content, totalDuration: data.total_duration || null, evalCount: data.eval_count || null };
+});
+
 
 async function createWindow() {
   await startRemoteBridge();
