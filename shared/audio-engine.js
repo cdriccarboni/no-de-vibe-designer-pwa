@@ -44,132 +44,6 @@ export class AudioEngine {
     return this.nodes.get(nodeId);
   }
 
-
-  async attachPlayerFile(slot, file, opts = {}) {
-    const id = `player:${Math.max(1, Math.min(12, Number(slot) || 1))}`;
-    await this.resume();
-    this.release(id);
-
-    if (!file) throw new Error("Fichier audio manquant");
-    const el = document.createElement("audio");
-    el.preload = "auto";
-    el.playsInline = true;
-    el.src = typeof file === "string" ? file : URL.createObjectURL(file);
-
-    await new Promise((resolve, reject) => {
-      el.onloadedmetadata = () => resolve();
-      el.onerror = () => reject(new Error("Impossible de charger le fichier audio"));
-    });
-
-    const source = this.ctx.createMediaElementSource(el);
-    const gain = this.ctx.createGain();
-    const pan = typeof this.ctx.createStereoPanner === "function" ? this.ctx.createStereoPanner() : null;
-    const analyser = this.ctx.createAnalyser();
-    analyser.fftSize = 256;
-
-    source.connect(gain);
-    if (pan) {
-      gain.connect(pan);
-      pan.connect(analyser);
-    } else {
-      gain.connect(analyser);
-    }
-    analyser.connect(this.master);
-
-    const state = {
-      type:"player",
-      slot:Number(slot),
-      el, source, gain, pan, analyser,
-      objectUrl: typeof file === "string" ? "" : el.src,
-      name: opts.name || file?.name || `Player ${slot}`,
-      inPoint: Math.max(0, Number(opts.inPoint) || 0),
-      loopStart: Math.max(0, Number(opts.loopStart) || 0),
-      loopEnd: Math.max(0, Number(opts.loopEnd) || 0),
-      outPoint: Math.max(0, Number(opts.outPoint) || 0),
-      loop: !!opts.loop
-    };
-    gain.gain.value = Math.max(0, Math.min(1.5, Number(opts.gain ?? 1)));
-    if (pan) pan.pan.value = Math.max(-1, Math.min(1, Number(opts.pan ?? 0)));
-    this.nodes.set(id, state);
-
-    el.addEventListener("timeupdate", () => {
-      const n = this.nodes.get(id);
-      if (!n || n.type !== "player") return;
-      const t = el.currentTime || 0;
-      if (n.loop && n.loopEnd > n.loopStart && t >= n.loopEnd) {
-        el.currentTime = n.loopStart;
-        el.play().catch(() => {});
-      } else if (n.outPoint > n.inPoint && t >= n.outPoint) {
-        el.pause();
-        el.currentTime = n.inPoint;
-      }
-    });
-
-    return this.playerState(slot);
-  }
-
-  playerNode(slot) {
-    return this.nodes.get(`player:${Math.max(1, Math.min(12, Number(slot) || 1))}`) || null;
-  }
-
-  playerState(slot) {
-    const n = this.playerNode(slot);
-    if (!n || n.type !== "player") {
-      return { slot:Number(slot), loaded:false, playing:false, paused:false, name:"", duration:0, currentTime:0, gain:1, pan:0, loop:false, inPoint:0, loopStart:0, loopEnd:0, outPoint:0 };
-    }
-    return {
-      slot:n.slot, loaded:true, playing:!n.el.paused, paused:n.el.paused,
-      name:n.name || "", duration:Number(n.el.duration)||0, currentTime:Number(n.el.currentTime)||0,
-      gain:Number(n.gain?.gain?.value ?? 1), pan:Number(n.pan?.pan?.value ?? 0),
-      loop:!!n.loop, inPoint:n.inPoint||0, loopStart:n.loopStart||0, loopEnd:n.loopEnd||0, outPoint:n.outPoint||0
-    };
-  }
-
-  playerBankState() {
-    return Array.from({ length:12 }, (_, i) => this.playerState(i + 1));
-  }
-
-  async controlPlayer(slot, action, value = null) {
-    const n = this.playerNode(slot);
-    if (!n || n.type !== "player") throw new Error(`Lecteur ${slot} : aucun son chargé`);
-    await this.resume();
-    const a = String(action || "play").toLowerCase();
-
-    if (a === "play" || a === "go") {
-      if (n.el.currentTime < n.inPoint || (n.outPoint > n.inPoint && n.el.currentTime >= n.outPoint)) n.el.currentTime = n.inPoint;
-      await n.el.play();
-    } else if (a === "pause") {
-      n.el.pause();
-    } else if (a === "stop") {
-      n.el.pause();
-      n.el.currentTime = n.inPoint || 0;
-    } else if (a === "toggle") {
-      if (n.el.paused) await this.controlPlayer(slot, "play");
-      else n.el.pause();
-    } else if (a === "gain" || a === "level") {
-      const v = Math.max(0, Math.min(1.5, Number(value) || 0));
-      n.gain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.015);
-    } else if (a === "pan") {
-      const v = Number.isFinite(Number(value)) ? Number(value) : 0;
-      if (n.pan) n.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, v)), this.ctx.currentTime, 0.015);
-    } else if (a === "seek") {
-      n.el.currentTime = Math.max(0, Math.min(Number(n.el.duration)||Infinity, Number(value)||0));
-    } else if (a === "in") {
-      n.inPoint = Math.max(0, Number(value ?? n.el.currentTime) || 0);
-    } else if (a === "loop-start") {
-      n.loopStart = Math.max(0, Number(value ?? n.el.currentTime) || 0);
-    } else if (a === "loop-end") {
-      n.loopEnd = Math.max(0, Number(value ?? n.el.currentTime) || 0);
-    } else if (a === "out") {
-      n.outPoint = Math.max(0, Number(value ?? n.el.currentTime) || 0);
-    } else if (a === "loop") {
-      n.loop = value == null ? !n.loop : !!value;
-    } else {
-      throw new Error(`Lecteur ${slot} : action inconnue ${action}`);
-    }
-    return this.playerState(slot);
-  }
-
   async ensureMic(nodeId) {
     await this.resume();
     this.release(nodeId);
@@ -277,18 +151,12 @@ export class AudioEngine {
     try { n.osc?.stop(); } catch { /* */ }
     try { n.osc?.disconnect(); } catch { /* */ }
     try { n.mic?.disconnect(); } catch { /* */ }
-    try { n.el?.pause?.(); } catch { /* */ }
-    try { n.source?.disconnect(); } catch { /* */ }
     try { n.gain?.disconnect(); } catch { /* */ }
-    try { n.pan?.disconnect(); } catch { /* */ }
     try { n.filter?.disconnect(); } catch { /* */ }
     try { n.delay?.disconnect(); } catch { /* */ }
     try { n.feedback?.disconnect(); } catch { /* */ }
     try { n.analyser?.disconnect(); } catch { /* */ }
     if (n.stream) n.stream.getTracks().forEach(t => t.stop());
-    if (n.objectUrl) {
-      try { URL.revokeObjectURL(n.objectUrl); } catch { /* */ }
-    }
     this.nodes.delete(nodeId);
   }
 
