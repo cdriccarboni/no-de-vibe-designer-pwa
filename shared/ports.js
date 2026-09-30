@@ -237,6 +237,36 @@ export const EXECUTABLE_PORTS = {
   "box-out": [
     { name: "in", dir: "in", data: "any" }
   ],
+  p5: [
+    { name: "seed", dir: "in", data: "number" },
+    { name: "energy", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  td: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  isadora: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  sketch: [
+    { name: "seed", dir: "in", data: "number" },
+    { name: "energy", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  showimport: [
+    { name: "manifest", dir: "in", data: "text" },
+    { name: "cue count", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  dream: [
+    { name: "seed", dir: "in", data: "number" },
+    { name: "intensity", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
   audio: [
     { name: "in", dir: "in", data: "number" },
     { name: "process", dir: "in", data: "number" },
