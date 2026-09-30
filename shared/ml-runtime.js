@@ -67,18 +67,23 @@ export function createMlRuntime({ onUpdate = () => {} } = {}) {
     if (current?.kind === kind && current.media === media) return current;
 
     current?.model?.detectStop?.();
-    set(id, { status:"LOADING", results:[] });
-    const ml5 = await loadScript(ML5_SRC, "ml5");
-    const model = kind === "hand"
-      ? await ml5.handPose(options.model || undefined)
-      : await ml5.bodyPose(options.model || undefined);
-    const tracker = { kind, media, model };
-    trackers.set(id, tracker);
-    model.detectStart(media, results => {
-      set(id, { status:"LIVE", results:Array.isArray(results) ? results : [] });
-    });
-    set(id, { status:"READY", results:[] });
-    return tracker;
+    set(id, { status:"LOADING", results:[], error:"" });
+    try {
+      const ml5 = await loadScript(ML5_SRC, "ml5");
+      const model = kind === "hand"
+        ? await ml5.handPose(options.model || undefined)
+        : await ml5.bodyPose(options.model || undefined);
+      const tracker = { kind, media, model };
+      trackers.set(id, tracker);
+      model.detectStart(media, results => {
+        set(id, { status:"LIVE", results:Array.isArray(results) ? results : [], error:"" });
+      });
+      set(id, { status:"READY", results:[], error:"" });
+      return tracker;
+    } catch (error) {
+      set(id, { status:"ERROR", results:[], error:error?.message || String(error) });
+      throw error;
+    }
   }
 
   function readTracker(id, kind, media) {
@@ -106,14 +111,24 @@ export function createMlRuntime({ onUpdate = () => {} } = {}) {
 
   async function runBrain(id, input, networkJson) {
     if (!networkJson) {
-      set(id, { status:"NEEDS MODEL", output:0 });
+      set(id, { status:"NEEDS MODEL", output:0, error:"" });
       return 0;
     }
-    set(id, { status:"LOADING" });
-    const brain = await loadScript(BRAIN_SRC, "brain");
+    set(id, { status:"LOADING", error:"" });
+    let brain;
+    try {
+      brain = await loadScript(BRAIN_SRC, "brain");
+    } catch (error) {
+      set(id, { status:"ERROR", output:0, error:error?.message || String(error) });
+      throw error;
+    }
     let parsed;
     try { parsed = typeof networkJson === "string" ? JSON.parse(networkJson) : networkJson; }
-    catch { throw new Error("Brain.js : JSON réseau invalide"); }
+    catch {
+      const error = new Error("Brain.js : JSON réseau invalide");
+      set(id, { status:"ERROR", output:0, error:error.message });
+      throw error;
+    }
     const signature = JSON.stringify(parsed);
     let cached = brainNets.get(id);
     if (!cached || cached.signature !== signature) {
