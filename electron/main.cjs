@@ -231,6 +231,42 @@ ipcMain.handle("nvd:local-ai-probe", async (_event, options = {}) => {
   return { ok: true, baseUrl: normalizeLocalAiBase(options.baseUrl), requested, installed, models };
 });
 
+ipcMain.handle("nvd:local-ai-show", async (_event, options = {}) => {
+  const model = String(options.model || "").trim();
+  if (!model) throw new Error("Modèle IA local manquant");
+  return localAiRequest("/api/show", {
+    baseUrl: options.baseUrl,
+    method: "POST",
+    timeoutMs: 5000,
+    body: { model }
+  });
+});
+
+ipcMain.handle("nvd:local-ai-agents-scan", async (_event, options = {}) => {
+  const baseUrl = normalizeLocalAiBase(options.baseUrl);
+  const data = await localAiRequest("/api/tags", { baseUrl, timeoutMs: 3500 });
+  const models = Array.isArray(data.models) ? data.models.map(m => m?.name || m?.model).filter(Boolean) : [];
+  const agents = [];
+  for (let i = 0; i < models.length; i += 4) {
+    const batch = models.slice(i, i + 4);
+    const rows = await Promise.all(batch.map(async model => {
+      try {
+        const show = await localAiRequest("/api/show", {
+          baseUrl,
+          method: "POST",
+          timeoutMs: 5000,
+          body: { model }
+        });
+        return { model, show };
+      } catch {
+        return { model, show: {} };
+      }
+    }));
+    agents.push(...rows);
+  }
+  return { ok:true, baseUrl, agents };
+});
+
 ipcMain.handle("nvd:local-ai-install", async (_event, options = {}) => {
   const model = String(options.model || "").trim();
   if (!model || model.length > 120 || /[\r\n]/.test(model)) throw new Error("Nom de modèle Ollama invalide");

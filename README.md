@@ -1,6 +1,6 @@
 # No-de Vibe Designer
 
-**Source canonique : `main` · No-de Vibe Designer V3.0.3.**  
+**Source canonique : `main` · No-de Vibe Designer V3.1.0.**  
 Production readiness : `docs/PRODUCTION_READINESS.md`.  
 La Library est à **105/105 nodes exécutables** ; les limites matérielles ou logicielles externes restent explicitement signalées.
 
@@ -114,3 +114,17 @@ npm run test:pwa
 ```
 
 `release:check` lance l’audit 105/105, les tests, les checks syntaxiques et le build PWA.
+
+
+## Agents locaux
+
+No-de reprend le principe de scan d'engines de CX hub sous une forme adaptée à Vibe :
+
+- détection de tous les modèles Ollama sur localhost ou le LAN ;
+- lecture des capacités quand Ollama les expose ;
+- classification automatique : Code / Vision / Rapide / Chat / Embedding / Utilitaire ;
+- activation/désactivation et rôle modifiable dans Préférences → IA ;
+- Vibe choisit un agent Code pour les patches et un agent Vision pour Image → Vibe ;
+- les modèles d'embedding restent visibles mais ne sont jamais utilisés comme générateurs.
+
+Le registre est local-first et les choix sont conservés entre deux scans.

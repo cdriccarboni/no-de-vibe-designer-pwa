@@ -177,3 +177,18 @@ html.electron-macos .topbar{padding-left:84px}
 .copyright-link:hover .copyright-default,.copyright-link:focus-visible .copyright-default{display:none}
 .copyright-link:hover .copyright-hover,.copyright-link:focus-visible .copyright-hover{display:inline}
 .copyright-link:hover,.copyright-link:focus-visible{color:var(--accent);text-decoration:none;outline:none}
+
+.local-agents{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:10px;margin:10px 0}
+.local-agents-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.local-agents-head>div{display:flex;align-items:baseline;gap:8px;min-width:0}
+.local-agents-list{display:grid;gap:6px;max-height:260px;overflow:auto}
+.local-agent-row{display:grid;grid-template-columns:auto minmax(0,1fr) 138px;align-items:center;gap:8px;border-top:1px solid var(--line);padding:7px 0}
+.local-agent-row:first-child{border-top:0}
+.local-agent-info{min-width:0;display:grid;gap:2px}
+.local-agent-info b{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.local-agent-info small{font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.local-agent-row select{height:28px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;font-size:10px;padding:0 5px}
+.local-agent-row.unavailable{opacity:.58}
+.ai-legacy{margin-top:9px;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.ai-legacy summary{cursor:pointer;color:var(--muted);font-size:11px}
+@media(max-width:760px){.local-agent-row{grid-template-columns:auto minmax(0,1fr)}.local-agent-row select{grid-column:2}}

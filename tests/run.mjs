@@ -21,6 +21,7 @@ import { DEFAULT_QUAD, validateQuad, homographyFromUnitSquare, transformPoint, w
 import { createQuickMapSession, setQuickMapCorner, quickMapRemoteOperation } from "../shared/quick-map.js";
 import { detectGraphicsCapabilities } from "../shared/graphics/engine-v3.js";
 import { analyzeImagePixels, autoImageVibeTarget, imageVibeOps, imageVibePrompt } from "../shared/image-vibe.js";
+import { classifyLocalAgent, makeLocalAgent, mergeLocalAgentRegistry, selectLocalAgents, localAgentRegistrySummary } from "../shared/local-agent-registry.js";
 import { encodeOscMessage, decodeOscMessage } from "../shared/protocols/osc.js";
 import { createNodeProcessors } from "../shared/node-processors.js";
 import { NODE_GROUPS } from "../shared/node-specs.js";
@@ -233,6 +234,28 @@ assert(isForbiddenAiProvider("", "grok-beta"), "blocks grok model name");
 assert(!isForbiddenAiProvider("https://api.openai.com/v1/chat/completions", "gpt-4o-mini"), "allows OpenAI");
 assert(!assertAiProviderAllowed({ endpoint: "https://api.x.ai/v1", model: "grok" }).ok, "assert rejects xAI");
 
+// --- local agent registry ---
+console.log("local-agent-registry");
+const coderAgent = makeLocalAgent({ baseUrl:"http://127.0.0.1:11434", model:"qwen2.5-coder:7b", show:{ capabilities:["completion"] } });
+const visionAgent = makeLocalAgent({ baseUrl:"http://127.0.0.1:11434", model:"qwen2.5vl:7b", show:{ capabilities:["completion","vision"] } });
+const fastAgent = makeLocalAgent({ baseUrl:"http://127.0.0.1:11434", model:"gemma3:1b", show:{ capabilities:["completion"] } });
+const embedAgent = makeLocalAgent({ baseUrl:"http://127.0.0.1:11434", model:"qwen3-embedding:0.6b", show:{ capabilities:["embedding"] } });
+assert(coderAgent.role === "code" && coderAgent.generative, "agent registry classifies coder");
+assert(visionAgent.role === "vision" && visionAgent.generative, "agent registry classifies vision capability");
+assert(fastAgent.role === "fast", "small Gemma is fast unless vision capability is declared");
+assert(embedAgent.role === "embedding" && embedAgent.generative === false && embedAgent.enabled === false, "embedding stays visible but non-generative");
+const mergedAgents = mergeLocalAgentRegistry(
+  [coderAgent, visionAgent, fastAgent, embedAgent],
+  [{ ...coderAgent, role:"chat", roleOverride:"chat", enabled:true }]
+);
+assert(mergedAgents.find(a => a.model === coderAgent.model)?.role === "chat", "agent role override survives rescan");
+const patchAgents = selectLocalAgents([coderAgent, visionAgent, fastAgent], { task:"patch", limit:2 });
+const imageAgents = selectLocalAgents([coderAgent, visionAgent, fastAgent], { task:"vision", limit:1 });
+assert(patchAgents[0]?.model === coderAgent.model, "patch task prefers code agent");
+assert(imageAgents[0]?.model === visionAgent.model, "image task prefers vision agent");
+const agentStats = localAgentRegistrySummary([coderAgent, visionAgent, fastAgent, embedAgent]);
+assert(agentStats.total === 4 && agentStats.active === 3, "agent registry summary excludes embedding from active generative agents");
+
 // --- local generative AI ---
 console.log("local-generative-ai");
 const aiMem = new Map();
@@ -264,6 +287,33 @@ const localProbe = await probeLocalAi();
 assert(localProbe.ok && localProbe.installed, "local Ollama probe uses desktop bridge");
 const localAiRun = await runVibe("Ajoute un nombre", newProject());
 assert(localAiRun.engine === "local-ai-duo" && localAiRun.ops[0]?.type === "number", "Vibe uses local Qwen + Gemma duo when both are installed");
+
+const routedCalls = [];
+localStorage.setItem("nvd.ai", JSON.stringify({
+  localEnabled:true,
+  localBaseUrl:"http://127.0.0.1:11434",
+  localModel:"qwen2.5-coder:7b",
+  localSecondaryModel:"gemma3:1b",
+  localParallel:false,
+  localAgents:[
+    { id:"coder", provider:"ollama", baseUrl:"http://127.0.0.1:11434", model:"qwen2.5-coder:7b", role:"code", autoRole:"code", enabled:true, generative:true, capabilities:["completion"] },
+    { id:"vision", provider:"ollama", baseUrl:"http://127.0.0.1:11434", model:"llava:7b", role:"vision", autoRole:"vision", enabled:true, generative:true, capabilities:["completion","vision"] }
+  ],
+  enabled:false
+}));
+globalThis.nvdDesktop.localAiChat = async ({ model }) => {
+  routedCalls.push(model);
+  return {
+    ok:true,
+    model,
+    content:JSON.stringify({
+      ops:[{ op:"addNode", type:"shader", x:20, y:30 }],
+      summary:"Image locale"
+    })
+  };
+};
+const visionAiRun = await runVibe("[Image → Vibe] donne vie à cette photo", newProject());
+assert(visionAiRun.localModel === "llava:7b" && routedCalls.at(-1) === "llava:7b", "image prompt routes to vision local agent");
 
 const guardedProject = newProject();
 guardedProject.nodes.push({ id: "servo-ai", type: "servo", title: "Servo", x: 0, y: 0, params: { enabled: true, auto: false } });
@@ -847,7 +897,7 @@ assert(oscBad, "unsupported osc type throws");
 
 console.log("project-format");
 const pFresh = newProject();
-assert(pFresh.version === 2 && APP_VERSION === "3.0.3", "project format 2 / app 3.0.3");
+assert(pFresh.version === 2 && APP_VERSION === "3.1.0", "project format 2 / app 3.1.0");
 const old = validateProject({ schema: "cvd.graph", version: 1, name: "old", nodes: [], edges: [] });
 assert(old.version === 2, "v1 projects migrate to format 2");
 let futureFail = false;

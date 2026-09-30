@@ -49,6 +49,7 @@ import { RUDIMENTS, rudimentMeta, createRudimentNode } from "../shared/rudiments
 import { DEFAULT_QUAD, normalizeQuad, mappingParams } from "../shared/graphics/mapping-v3.js";
 import { superNodePreset, applySuperNodePreset } from "../shared/supernodes-v3.js";
 import { analyzeImageFile, imageVibePrompt, imageVibeOps, imageVibeSummary } from "../shared/image-vibe.js";
+import { scanLocalAgents, selectLocalAgents, LOCAL_AGENT_ROLES, localAgentRegistrySummary } from "../shared/local-agent-registry.js";
 
 installSurfaceSwitcher({ current:"designer" });
 
@@ -75,6 +76,7 @@ let panDrag = null;
 let graphPath = [];
 let pendingVibe = null;
 let imageVibeState = { analysis:null, previewUrl:"" };
+let agentAutoScanAttempted = false;
 let rcSession = null;
 const DEMO_DISMISSED_KEY = `nvd.demo.dismissed.${APP_VERSION}`;
 let demoReturnProject = null;
@@ -2343,6 +2345,77 @@ function readAppearance() {
   try { return JSON.parse(localStorage.getItem("cvd.appearance")) || {}; } catch { return {}; }
 }
 
+function agentRoleOptions(agent) {
+  const selected = agent?.roleOverride ? agent.role : "auto";
+  return LOCAL_AGENT_ROLES.map(role => {
+    const isSelected = role.id === selected ? " selected" : "";
+    const label = role.id === "auto" ? `Auto · ${agent?.autoRole || "chat"}` : role.label;
+    return `<option value="${htmlSafe(role.id)}"${isSelected}>${htmlSafe(label)}</option>`;
+  }).join("");
+}
+
+function renderLocalAgentRegistry(agents = []) {
+  const list = $("#aiAgentsList");
+  const summary = $("#aiAgentsSummary");
+  if (!list) return;
+  const rows = Array.isArray(agents) ? agents : [];
+  const stats = localAgentRegistrySummary(rows);
+  if (summary) summary.textContent = rows.length
+    ? `${stats.active}/${stats.total} actif(s)`
+    : "Non détectés";
+  if (!rows.length) {
+    list.innerHTML = '<p class="hint">Détecte automatiquement les modèles Ollama disponibles, comme CX hub, puis choisis leur rôle.</p>';
+    return;
+  }
+  list.innerHTML = rows.map((agent, index) => {
+    const caps = Array.isArray(agent.capabilities) && agent.capabilities.length ? agent.capabilities.join(", ") : agent.reason || "capacité déduite du nom";
+    const detail = [agent.parameterSize, agent.quantization, caps].filter(Boolean).join(" · ");
+    const disabled = agent.generative === false ? " disabled" : "";
+    const checked = agent.enabled !== false && agent.generative !== false ? " checked" : "";
+    return `<div class="local-agent-row${agent.generative === false ? " unavailable" : ""}" data-agent-index="${index}">
+      <input type="checkbox" data-agent-enabled aria-label="Activer ${htmlSafe(agent.model)}"${checked}${disabled}>
+      <div class="local-agent-info"><b>${htmlSafe(agent.label || agent.model)}</b><small>${htmlSafe(detail)}</small></div>
+      <select data-agent-role aria-label="Rôle de ${htmlSafe(agent.model)}"${disabled}>${agentRoleOptions(agent)}</select>
+    </div>`;
+  }).join("");
+}
+
+function routedAgentConfig(cfg, agents) {
+  const selected = selectLocalAgents(agents, { task:"patch", limit:2 });
+  return {
+    ...cfg,
+    localAgents:agents,
+    localModel:selected[0]?.model || cfg.localModel || "qwen2.5-coder:7b",
+    localSecondaryModel:selected[1]?.model || cfg.localSecondaryModel || "gemma3:1b"
+  };
+}
+
+function persistAgentRegistryFromUi() {
+  const current = readAiConfig();
+  const agents = Array.isArray(current.localAgents) ? current.localAgents.map(a => ({ ...a })) : [];
+  qall("#aiAgentsList [data-agent-index]").forEach(row => {
+    const index = Number(row.dataset.agentIndex);
+    const agent = agents[index];
+    if (!agent) return;
+    const enabled = row.querySelector("[data-agent-enabled]");
+    const role = row.querySelector("[data-agent-role]")?.value || "auto";
+    agent.enabled = agent.generative !== false && enabled?.checked !== false;
+    if (role === "auto") {
+      agent.role = agent.autoRole || agent.role || "chat";
+      agent.roleOverride = "";
+    } else {
+      agent.role = role;
+      agent.roleOverride = role;
+    }
+  });
+  const next = routedAgentConfig(current, agents);
+  saveAiConfig(next);
+  if ($("#aiLocalModel")) $("#aiLocalModel").value = next.localModel;
+  if ($("#aiLocalSecondaryModel")) $("#aiLocalSecondaryModel").value = next.localSecondaryModel;
+  renderLocalAgentRegistry(agents);
+  return next;
+}
+
 function openPreferences(tab = "general") {
   $("#preferencesModal").classList.remove("hidden");
   qall("[data-pref-tab]").forEach(b => b.classList.toggle("active", b.dataset.prefTab === tab));
@@ -2357,6 +2430,11 @@ function openPreferences(tab = "general") {
   if ($("#aiEndpoint")) $("#aiEndpoint").value = ai.endpoint || "";
   if ($("#aiKey")) $("#aiKey").value = ai.apiKey || "";
   if ($("#aiModel")) $("#aiModel").value = ai.model || "gpt-4o-mini";
+  renderLocalAgentRegistry(ai.localAgents || []);
+  if (tab === "ai" && ai.localEnabled !== false && !(ai.localAgents || []).length && !agentAutoScanAttempted) {
+    agentAutoScanAttempted = true;
+    queueMicrotask(() => $("#aiAgentsScan")?.click());
+  }
   if ($("#versionInfo")) $("#versionInfo").textContent = BUILD_LABEL;
   try {
     const g = JSON.parse(localStorage.getItem("nvd.general") || "{}");
@@ -2394,6 +2472,7 @@ function collectAiConfig() {
     localModel: $("#aiLocalModel")?.value?.trim() || "qwen2.5-coder:7b",
     localSecondaryModel: $("#aiLocalSecondaryModel")?.value?.trim() || "gemma3:1b",
     localParallel: $("#aiLocalParallel")?.checked !== false,
+    localAgents: Array.isArray(readAiConfig().localAgents) ? readAiConfig().localAgents : [],
     enabled: $("#aiEnabled")?.checked === true,
     endpoint: $("#aiEndpoint")?.value?.trim() || "",
     apiKey: $("#aiKey")?.value?.trim() || "",
@@ -2432,6 +2511,37 @@ $("#aiInstallGemma")?.addEventListener("click", async () => {
     if (status) status.textContent = "Gemma installé · teste la connexion";
   } catch (e) {
     if (status) status.textContent = "Échec Gemma · " + (e?.message || e);
+  }
+});
+
+$("#aiAgentsList")?.addEventListener("change", event => {
+  if (!event.target.closest("[data-agent-enabled],[data-agent-role]")) return;
+  const next = persistAgentRegistryFromUi();
+  const stats = localAgentRegistrySummary(next.localAgents || []);
+  log(`Agents locaux · ${stats.active}/${stats.total} actif(s)`);
+});
+
+$("#aiAgentsScan")?.addEventListener("click", async () => {
+  const summary = $("#aiAgentsSummary");
+  const button = $("#aiAgentsScan");
+  const base = $("#aiLocalBase")?.value?.trim() || "http://127.0.0.1:11434";
+  const current = { ...readAiConfig(), ...collectAiConfig(), localBaseUrl:base };
+  if (summary) summary.textContent = "Détection…";
+  if (button) button.disabled = true;
+  try {
+    const agents = await scanLocalAgents({ baseUrl:base, saved:current.localAgents || [] });
+    const next = routedAgentConfig(current, agents);
+    saveAiConfig(next);
+    if ($("#aiLocalModel")) $("#aiLocalModel").value = next.localModel;
+    if ($("#aiLocalSecondaryModel")) $("#aiLocalSecondaryModel").value = next.localSecondaryModel;
+    renderLocalAgentRegistry(agents);
+    const stats = localAgentRegistrySummary(agents);
+    log(`Agents locaux · ${stats.total} détecté(s) · ${stats.active} actif(s) · principal ${next.localModel}`);
+  } catch (e) {
+    if (summary) summary.textContent = "Détection impossible";
+    log(`Agents locaux · ${e?.message || e}`);
+  } finally {
+    if (button) button.disabled = false;
   }
 });
 
@@ -2619,6 +2729,14 @@ async function runCmd() {
   log("> " + raw);
   try {
     if (v === "output" || v === "output main") openOutput("main-output");
+    else if (v === "ai agents") {
+      const cfg = readAiConfig();
+      const agents = await scanLocalAgents({ baseUrl:cfg.localBaseUrl, saved:cfg.localAgents || [] });
+      const next = routedAgentConfig(cfg, agents);
+      saveAiConfig(next);
+      renderLocalAgentRegistry(agents);
+      log(`Agents locaux · ${agents.length} détecté(s) · principal ${next.localModel}`);
+    }
     else if (v === "output secondary") openOutput("local-window");
     else if (v === "demo" || v === "load demo") {
       enterShowcaseDemo({ preserve: true });

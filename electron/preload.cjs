@@ -26,6 +26,12 @@ contextBridge.exposeInMainWorld("nvdDesktop", {
   async probeLocalAi(options = {}) {
     return ipcRenderer.invoke("nvd:local-ai-probe", options);
   },
+  async localAiShow(options = {}) {
+    return ipcRenderer.invoke("nvd:local-ai-show", options);
+  },
+  async localAiAgentsScan(options = {}) {
+    return ipcRenderer.invoke("nvd:local-ai-agents-scan", options);
+  },
   async localAiChat(options = {}) {
     return ipcRenderer.invoke("nvd:local-ai-chat", options);
   },
