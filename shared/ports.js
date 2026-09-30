@@ -32,6 +32,21 @@ export function typesCompatible(fromType, toType) {
 
 /** Ports explicites pour nodes exécutables. index = position dans la liste affichée. */
 export const EXECUTABLE_PORTS = {
+  presence: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "x", dir: "out", data: "number" },
+    { name: "y", dir: "out", data: "number" },
+    { name: "activity", dir: "out", data: "number" },
+    { name: "out", dir: "out", data: "video" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  livingshadow: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "décrocher", dir: "in", data: "trigger" },
+    { name: "autonomie", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" },
+    { name: "state", dir: "out", data: "text" }
+  ],
   camera: [
     { name: "video", dir: "out", data: "video" },
     { name: "tracking", dir: "out", data: "number" },
@@ -61,6 +76,51 @@ export const EXECUTABLE_PORTS = {
     { name: "y", dir: "out", data: "number" },
     { name: "speed", dir: "out", data: "number" }
   ],
+  threadcurtain: [
+    { name: "x", dir: "in", data: "number" },
+    { name: "y", dir: "in", data: "number" },
+    { name: "force", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  flowfield: [
+    { name: "x", dir: "in", data: "number" },
+    { name: "y", dir: "in", data: "number" },
+    { name: "energy", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  reactiondiffusion: [
+    { name: "out", dir: "out", data: "video" }
+  ],
+  ribbontrail: [
+    { name: "x", dir: "in", data: "number" },
+    { name: "y", dir: "in", data: "number" },
+    { name: "energy", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  metaballs: [
+    { name: "x", dir: "in", data: "number" },
+    { name: "y", dir: "in", data: "number" },
+    { name: "energy", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  sand: [
+    { name: "x", dir: "in", data: "number" },
+    { name: "y", dir: "in", data: "number" },
+    { name: "energy", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  swarm: [
+    { name: "x", dir: "in", data: "number" },
+    { name: "y", dir: "in", data: "number" },
+    { name: "energy", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  ripple: [
+    { name: "x", dir: "in", data: "number" },
+    { name: "y", dir: "in", data: "number" },
+    { name: "energy", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
   whale: [
     { name: "x", dir: "in", data: "number" },
     { name: "y", dir: "in", data: "number" },
@@ -76,6 +136,36 @@ export const EXECUTABLE_PORTS = {
   threshold: [
     { name: "video", dir: "in", data: "video" },
     { name: "threshold", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  depthmask: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "threshold", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  opticalflow: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "motion", dir: "out", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  feedbackfx: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "decay", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  fluidwarp: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "amount", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  refraction: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "amount", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  pointcloud: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "depth", dir: "in", data: "number" },
     { name: "out", dir: "out", data: "video" }
   ],
   mirror: [
@@ -106,6 +196,17 @@ export const EXECUTABLE_PORTS = {
     { name: "host", dir: "in", data: "text" },
     { name: "address", dir: "in", data: "text" },
     { name: "value", dir: "in", data: "number" }
+  ],
+  surface: [
+    { name: "in", dir: "in", data: "any" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "out", dir: "out", data: "any" }
+  ],
+  inputmapper: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "out min", dir: "in", data: "number" },
+    { name: "out max", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "number" }
   ],
   stageio: [
     { name: "in", dir: "in", data: "any" },
@@ -185,11 +286,81 @@ export const EXECUTABLE_PORTS = {
     { name: "time", dir: "out", data: "number" },
     { name: "out", dir: "out", data: "video" }
   ],
+  videoreturn: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  mapping: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "scale", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  "stage-output": [
+    { name: "video", dir: "in", data: "video" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  anaglyph: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "depth", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  creativefx: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "amount", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  storm: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "amount", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  bending: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "amount", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  transmute: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "amount", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
   "box-in": [
     { name: "out", dir: "out", data: "any" }
   ],
   "box-out": [
     { name: "in", dir: "in", data: "any" }
+  ],
+  p5: [
+    { name: "seed", dir: "in", data: "number" },
+    { name: "energy", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  td: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  isadora: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  sketch: [
+    { name: "seed", dir: "in", data: "number" },
+    { name: "energy", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  showimport: [
+    { name: "manifest", dir: "in", data: "text" },
+    { name: "cue count", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  dream: [
+    { name: "seed", dir: "in", data: "number" },
+    { name: "intensity", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
   ],
   audio: [
     { name: "in", dir: "in", data: "number" },
@@ -225,6 +396,132 @@ export const EXECUTABLE_PORTS = {
     { name: "universe", dir: "in", data: "number" },
     { name: "address", dir: "in", data: "number" },
     { name: "value", dir: "in", data: "number" }
+  ],
+  arduino: [
+    { name: "command", dir: "in", data: "text" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  esp: [
+    { name: "command", dir: "in", data: "text" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  servo: [
+    { name: "channel", dir: "in", data: "number" },
+    { name: "angle", dir: "in", data: "number" },
+    { name: "speed", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  rfid: [
+    { name: "tag", dir: "out", data: "text" },
+    { name: "present", dir: "out", data: "boolean" },
+    { name: "raw", dir: "out", data: "text" }
+  ],
+  sensors: [
+    { name: "sensor", dir: "in", data: "text" },
+    { name: "value", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  twozero: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  chataigne: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  millumin: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  touchdesigner: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  isadorabridge: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  max: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  pd: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  supercollider: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  automation: [
+    { name: "speed", dir: "in", data: "number" },
+    { name: "phase", dir: "in", data: "number" },
+    { name: "value", dir: "out", data: "number" }
+  ],
+  force: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "strength", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "number" }
+  ],
+  noise: [
+    { name: "speed", dir: "in", data: "number" },
+    { name: "seed", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "number" }
+  ],
+  curlfield: [
+    { name: "x", dir: "in", data: "number" },
+    { name: "y", dir: "in", data: "number" },
+    { name: "strength", dir: "in", data: "number" },
+    { name: "dx", dir: "out", data: "number" },
+    { name: "dy", dir: "out", data: "number" }
+  ],
+  particle: [
+    { name: "x", dir: "in", data: "number" },
+    { name: "y", dir: "in", data: "number" },
+    { name: "size", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  trail: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "decay", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  spring: [
+    { name: "target", dir: "in", data: "number" },
+    { name: "stiffness", dir: "in", data: "number" },
+    { name: "damping", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "number" }
+  ],
+  sdf: [
+    { name: "x", dir: "in", data: "number" },
+    { name: "y", dir: "in", data: "number" },
+    { name: "radius", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  datalab: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "scale", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "number" }
+  ],
+  universal: [
+    { name: "in", dir: "in", data: "any" },
+    { name: "out", dir: "out", data: "any" }
+  ],
+  connectors: [
+    { name: "in", dir: "in", data: "any" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "out", dir: "out", data: "any" }
   ],
   "phone-mic": [
     { name: "audio", dir: "out", data: "number" },
