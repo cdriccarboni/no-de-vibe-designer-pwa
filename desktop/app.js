@@ -1597,6 +1597,156 @@ $("#magicFxClose")?.addEventListener("click", () => $("#magicFxModal")?.classLis
 $("#magicFxModal")?.addEventListener("click", e => { if (e.target.id === "magicFxModal") e.currentTarget.classList.add("hidden"); });
 qall("[data-magic-fx]").forEach(b => b.onclick = () => applyMagicFx(b.dataset.magicFx));
 
+let audioRackTicker = null;
+
+function rackMeta(slot) {
+  project.meta ||= {};
+  project.meta.audioRack ||= { players:{} };
+  project.meta.audioRack.players ||= {};
+  project.meta.audioRack.players[slot] ||= {
+    name:`Player ${slot}`, gain:1, pan:0, loop:false,
+    inPoint:0, loopStart:0, loopEnd:0, outPoint:0
+  };
+  return project.meta.audioRack.players[slot];
+}
+
+function updateRackStatus(slot) {
+  const el = document.querySelector(`[data-player-status="${slot}"]`);
+  if (!el) return;
+  const state = sharedAudio.playerState(slot);
+  if (!state.loaded) {
+    el.textContent = rackMeta(slot).name || `Player ${slot}`;
+    return;
+  }
+  const pos = Number(state.currentTime || 0).toFixed(1);
+  const dur = Number(state.duration || 0).toFixed(1);
+  el.textContent = `${state.playing ? "▶" : "■"} ${state.name || rackMeta(slot).name} · ${pos}s / ${dur}s`;
+}
+
+function renderAudioRack() {
+  const grid = $("#audioRackGrid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  for (let slot=1; slot<=12; slot++) {
+    const meta = rackMeta(slot);
+    const state = sharedAudio.playerState(slot);
+    const card = document.createElement("section");
+    card.className = "audio-player-card";
+    card.dataset.playerSlot = String(slot);
+    card.innerHTML = `
+      <header><b>P${slot}</b><span data-player-status="${slot}">Aucun son chargé</span></header>
+      <label class="audio-file">Son <input type="file" accept="audio/*" data-player-file="${slot}"></label>
+      <div class="audio-player-actions">
+        <button type="button" data-player-action="play" data-slot="${slot}">▶ Play</button>
+        <button type="button" data-player-action="pause" data-slot="${slot}">Ⅱ</button>
+        <button type="button" data-player-action="stop" data-slot="${slot}">■</button>
+        <label><input type="checkbox" data-player-loop="${slot}" ${meta.loop ? "checked" : ""}> Loop</label>
+      </div>
+      <label>Niveau <input type="range" min="0" max="1.5" step="0.01" value="${state.loaded ? state.gain : meta.gain}" data-player-gain="${slot}"></label>
+      <label>Pan L↔R <input type="range" min="-1" max="1" step="0.01" value="${state.loaded ? state.pan : meta.pan}" data-player-pan="${slot}"></label>
+      <div class="audio-player-points">
+        <button type="button" data-player-point="in" data-slot="${slot}">IN</button>
+        <button type="button" data-player-point="loop-start" data-slot="${slot}">LOOP A</button>
+        <button type="button" data-player-point="loop-end" data-slot="${slot}">LOOP B</button>
+        <button type="button" data-player-point="out" data-slot="${slot}">OUT</button>
+      </div>`;
+    grid.appendChild(card);
+    updateRackStatus(slot);
+  }
+
+  grid.querySelectorAll("[data-player-file]").forEach(input => {
+    input.onchange = async () => {
+      const slot = Number(input.dataset.playerFile);
+      const file = input.files?.[0];
+      if (!file) return;
+      const meta = rackMeta(slot);
+      meta.name = file.name;
+      try {
+        await sharedAudio.attachPlayerFile(slot, file, meta);
+        autosave();
+        updateRackStatus(slot);
+        log(`Audio P${slot} · ${file.name} chargé`);
+      } catch (e) {
+        log(`Audio P${slot} · ${e?.message || e}`);
+      }
+    };
+  });
+
+  grid.querySelectorAll("[data-player-action]").forEach(btn => {
+    btn.onclick = async () => {
+      const slot = Number(btn.dataset.slot);
+      try {
+        await sharedAudio.controlPlayer(slot, btn.dataset.playerAction);
+        updateRackStatus(slot);
+      } catch (e) { log(`Audio P${slot} · ${e?.message || e}`); }
+    };
+  });
+
+  grid.querySelectorAll("[data-player-loop]").forEach(input => {
+    input.onchange = async () => {
+      const slot = Number(input.dataset.playerLoop);
+      rackMeta(slot).loop = input.checked;
+      try { await sharedAudio.controlPlayer(slot, "loop", input.checked); }
+      catch (e) { log(`Audio P${slot} · ${e?.message || e}`); }
+      autosave();
+    };
+  });
+
+  grid.querySelectorAll("[data-player-gain]").forEach(input => {
+    input.oninput = () => {
+      const slot = Number(input.dataset.playerGain), value = Number(input.value);
+      rackMeta(slot).gain = value;
+      sharedAudio.controlPlayer(slot, "gain", value).catch(()=>{});
+      autosave();
+    };
+  });
+
+  grid.querySelectorAll("[data-player-pan]").forEach(input => {
+    input.oninput = () => {
+      const slot = Number(input.dataset.playerPan), value = Number(input.value);
+      rackMeta(slot).pan = value;
+      sharedAudio.controlPlayer(slot, "pan", value).catch(()=>{});
+      autosave();
+    };
+  });
+
+  grid.querySelectorAll("[data-player-point]").forEach(btn => {
+    btn.onclick = async () => {
+      const slot = Number(btn.dataset.slot), action = btn.dataset.playerPoint;
+      const node = sharedAudio.playerNode(slot);
+      if (!node) return log(`Audio P${slot} · charge d'abord un son`);
+      const at = Number(node.el.currentTime) || 0;
+      const key = action === "in" ? "inPoint" : action === "loop-start" ? "loopStart" : action === "loop-end" ? "loopEnd" : "outPoint";
+      rackMeta(slot)[key] = at;
+      try { await sharedAudio.controlPlayer(slot, action, at); }
+      catch (e) { log(`Audio P${slot} · ${e?.message || e}`); }
+      autosave();
+      log(`Audio P${slot} · ${action.toUpperCase()} = ${at.toFixed(2)}s`);
+    };
+  });
+}
+
+$("#audioRackBtn")?.addEventListener("click", () => {
+  renderAudioRack();
+  $("#audioRackModal")?.classList.remove("hidden");
+  clearInterval(audioRackTicker);
+  audioRackTicker = setInterval(() => {
+    for (let slot=1; slot<=12; slot++) updateRackStatus(slot);
+  }, 250);
+});
+$("#audioRackClose")?.addEventListener("click", () => {
+  $("#audioRackModal")?.classList.add("hidden");
+  clearInterval(audioRackTicker);
+  audioRackTicker = null;
+});
+$("#audioRackModal")?.addEventListener("click", e => {
+  if (e.target.id === "audioRackModal") {
+    e.currentTarget.classList.add("hidden");
+    clearInterval(audioRackTicker);
+    audioRackTicker = null;
+  }
+});
+
 $("#controlsBtn")?.addEventListener("click", () => {
   renderControlSurface();
   $("#controlsModal")?.classList.remove("hidden");
@@ -2706,7 +2856,8 @@ function handleCompanionStudioMessage(msg) {
         syncPlayButton();
       },
       audioPlayerControl: (slot, action, value) => {
-        sharedAudio.controlPlayer(slot, action, value)
+        const normalizedValue = action === "pan" ? ((Number(value) || 0) * 2 - 1) : value;
+        sharedAudio.controlPlayer(slot, action, normalizedValue)
           .then(() => {
             remoteSession?.send?.({
               type: STUDIO_MSG.STATUS,
