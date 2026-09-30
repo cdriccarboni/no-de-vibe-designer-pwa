@@ -28,7 +28,8 @@
 <div id="app">
   <header class="topbar">
     <div class="brand"><div class="brandmark" title="No-de Vibe Designer">◒</div><div><b>No-de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v1.3.3</span>
+    <span class="badge">v1.3.4</span>
+    <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small>Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
     <div class="themes workspace-modes"><button id="modeBureau" class="active">Bureau</button><button id="modePlateau">Plateau</button></div>
     <button id="controlsBtn" class="btn">Controls</button>
@@ -76,7 +77,7 @@
       <section class="panel vibe resizable-y">
         <div class="panel-head">Vibe <span class="sub">Entrée = envoyer · Shift+Entrée = nouvelle ligne</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
         <div class="panel-body vibe-body">
-          <textarea id="vibeText" placeholder="Ex. : Rends la baleine fantomatique">Rends la baleine fantomatique et ajoute une traînée douce.</textarea>
+          <textarea id="vibeText" placeholder="Ex. : Fais réagir le rideau de fils à la souris">Fais réagir le rideau de fils à la souris et ajoute des ondes lumineuses.</textarea>
           <button id="applyVibe" class="generate">Envoyer ↵</button>
           <div id="vibePreview" class="vibe-preview hidden"></div>
         </div>
@@ -157,7 +158,8 @@
       <div data-pref-panel="general">
         <p class="hint">Langue d’interface : français. Démarrage : restaurer l’autosave si disponible.</p>
         <label>Restaurer l’autosave au lancement <input id="prefRestoreAutosave" type="checkbox" checked></label>
-        <label>Charger la baleine interactive si projet vide <input id="prefLoadDemo" type="checkbox" checked></label>
+        <label>Plug & Play · reconnecter automatiquement les périphériques déjà autorisés <input id="prefPlugAndPlay" type="checkbox" checked></label>
+        <label>Charger l’exemple WOW interactif si projet vide <input id="prefLoadDemo" type="checkbox" checked></label>
       </div>
       <div data-pref-panel="appearance" class="hidden">
         <label>Couleur dominante <input id="accentColor" type="color" value="#d7b86a"></label>
