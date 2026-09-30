@@ -285,20 +285,23 @@ jobs:
             play-signature-verification.txt
           if-no-files-found: error
 
-      - name: Refresh v1.4.0 Android release assets
+      - name: Refresh Android release assets
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
           APK_SRC="android/app/build/outputs/apk/debug/app-debug.apk"
           AAB_SRC="android/app/build/outputs/bundle/release/app-release.aab"
           APK="No-de-Vibe-Designer-${APP_VERSION}-Android-debug.apk"
+          APK_STABLE="No-de-Vibe-Designer-Android-debug.apk"
           AAB="No-de-Vibe-Designer-${APP_VERSION}-unsigned.aab"
           cp "$APK_SRC" "$APK"
+          cp "$APK_SRC" "$APK_STABLE"
           cp "$AAB_SRC" "$AAB"
-          sha256sum "$APK" "$AAB" > SHA256SUMS-Android.txt
-          gh release upload "v${APP_VERSION}" "$APK" "$AAB" SHA256SUMS-Android.txt --clobber
+          sha256sum "$APK" "$APK_STABLE" "$AAB" > SHA256SUMS-Android.txt
+          gh release upload "v${APP_VERSION}" "$APK" "$APK_STABLE" "$AAB" SHA256SUMS-Android.txt --clobber
 
       - name: Build summary
         if: always()
