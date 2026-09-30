@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - cursor/no-de-2.2-reprise-20260929
+      - main
+      - "cursor/**"
     paths:
       - "mobile/**"
       - "shared/**"
