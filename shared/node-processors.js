@@ -267,7 +267,8 @@ export function createNodeProcessors() {
       pointer:{
         x: inputs.get(0) ? readNum(inputs.get(0)) : Number(p.x ?? .5),
         y: inputs.get(1) ? readNum(inputs.get(1)) : Number(p.y ?? .5),
-        speed:Number(p.speed || 0)
+        speed:Number(p.speed || 0),
+        spread:Number(p.spread || 0)
       },
       energy: inputs.get(energyIndex) ? readNum(inputs.get(energyIndex)) : Number(fallbackEnergy)
     };
@@ -279,7 +280,8 @@ export function createNodeProcessors() {
       width:Math.min(ctx.width || 640, Number(node.params?.width ?? 480)),
       height:Math.min(ctx.height || 360, Number(node.params?.height ?? 270)),
       time:Number(ctx.time)||0,pointer,
-      strands:Number(node.params?.strands ?? 96),force:energy,wave:Number(node.params?.wave ?? .28)
+      strands:Number(node.params?.strands ?? 96),force:energy,wave:Number(node.params?.wave ?? .28),
+      spread:pointer.spread,lightWaves:Number(node.params?.lightWaves ?? .9),glow:Number(node.params?.glow ?? .78)
     })]]);
   });
 
