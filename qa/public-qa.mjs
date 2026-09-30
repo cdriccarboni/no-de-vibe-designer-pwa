@@ -15,9 +15,9 @@ function assert(condition, message) {
   console.log(`OK · ${message}`);
 }
 
-console.log("No-de Vibe Designer public QA 1.3.1");
+console.log(`No-de Vibe Designer public QA ${APP_VERSION}`);
 
-assert(APP_VERSION === "1.3.1", "runtime version is 1.3.1");
+assert(/^1\.3\.\d+$/.test(APP_VERSION), `runtime version is current 1.3.x (${APP_VERSION})`);
 assert(SURFACES.length === 5, "five switchable No-de surfaces are available");
 const surfaceMem = new Map();
 const surfaceStorage = {
@@ -98,4 +98,4 @@ assert(lightPage?.widgets.some(w => w.binding?.kind === "sacn" && w.binding?.uni
 
 console.log("PUBLIC QA OK");
 
-// QA trigger 1.3.1 · 2
+// QA follows shared/version.js; no hard-coded release number.
