@@ -73,6 +73,93 @@ function truthyTrigger(slot) {
   return false;
 }
 
+
+function textOut(value) {
+  return { kind: "text", value: value == null ? "" : String(value) };
+}
+
+function boolOut(value) {
+  return { kind: "boolean", value: !!value };
+}
+
+function readText(slot, fallback = "") {
+  const v = slot?.value !== undefined ? slot.value : slot;
+  if (typeof v === "string") return v;
+  if (v && typeof v.value === "string") return v.value;
+  return fallback;
+}
+
+function asyncWarn(result, ctx, label) {
+  if (result && typeof result.then === "function") {
+    result.catch(e => ctx.warnings?.push(`${label} : ${e?.message || e}`));
+  }
+}
+
+function firstNumeric(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (!value || typeof value !== "object") return null;
+  for (const v of Object.values(value)) {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+  }
+  return null;
+}
+
+function genericOscBridge(node, inputs, ctx, defaults = {}) {
+  const out = new Map();
+  const value = inputs.get(0) ? readNum(inputs.get(0)) : Number(node.params?.value ?? 0);
+  const host = node.params?.host || defaults.host || "127.0.0.1";
+  const port = Number(node.params?.port ?? defaults.port ?? 9000);
+  const address = node.params?.address || defaults.address || "/nvd/value";
+  const triggerConnected = inputs.has(1);
+  const triggerNow = truthyTrigger(inputs.get(1));
+  const memory = nodeMemory(ctx);
+  const key = `osc-bridge:${node.id}`;
+  const prev = memory.get(key) || {};
+  const signature = `${host}|${port}|${address}|${value}`;
+  const shouldSend = triggerConnected ? (triggerNow && !prev.trigger) : prev.signature !== signature;
+  let status = host === "bridge" ? "BRIDGE" : `UDP ${host}:${port}`;
+
+  if (shouldSend) {
+    try {
+      if (host !== "bridge" && typeof ctx.oscUdpSend === "function") {
+        asyncWarn(ctx.oscUdpSend({ host, port, address, args: [value] }), ctx, "OSC UDP");
+      } else if (typeof ctx.bridgeSend === "function") {
+        ctx.bridgeSend({ type: "osc", target: host, address, args: [value] });
+      } else {
+        status = "OFFLINE";
+        ctx.warnings?.push(`${node.title || node.type} : aucun transport OSC disponible`);
+      }
+    } catch (e) {
+      status = "ERROR";
+      ctx.warnings?.push(`${node.title || node.type} : ${e?.message || e}`);
+    }
+  }
+
+  memory.set(key, { signature, trigger: triggerNow });
+  out.set(2, textOut(status));
+  return out;
+}
+
+function serialCommandNode(node, inputs, ctx, fallbackCommand) {
+  const out = new Map();
+  const command = readText(inputs.get(0), node.params?.command || fallbackCommand || "");
+  const triggerConnected = inputs.has(1);
+  const triggerNow = truthyTrigger(inputs.get(1));
+  const memory = nodeMemory(ctx);
+  const key = `serial-node:${node.id}`;
+  const prev = memory.get(key) || {};
+  const shouldSend = triggerConnected ? (triggerNow && !prev.trigger) : command && prev.command !== command;
+  const state = ctx.deviceBus?.serialState || "offline";
+
+  if (shouldSend && state === "online" && typeof ctx.serialSend === "function") {
+    try { asyncWarn(ctx.serialSend(command), ctx, "Serial"); }
+    catch (e) { ctx.warnings?.push(`Serial : ${e?.message || e}`); }
+  }
+  memory.set(key, { command, trigger: triggerNow });
+  out.set(2, textOut(state === "online" ? "SERIAL ONLINE" : "SERIAL OFFLINE"));
+  return out;
+}
+
 export function createNodeProcessors() {
   const fns = new Map();
 
@@ -605,6 +692,108 @@ export function createNodeProcessors() {
     out.set(0, { kind: "number", value: n });
     out.set(1, { kind: "number", value: n ? (pts[0].x || 0) : 0 });
     out.set(2, { kind: "number", value: n });
+    return out;
+  });
+
+
+  fns.set("surface", (_node, inputs) => {
+    const out = new Map();
+    const value = inputs.get(0)?.value;
+    out.set(1, textOut("CONTROL READY"));
+    if (value !== undefined) out.set(2, value);
+    return out;
+  });
+
+  fns.set("inputmapper", (node, inputs) => {
+    const value = readNum(inputs.get(0));
+    const inMin = Number(node.params?.inMin ?? 0);
+    const inMax = Number(node.params?.inMax ?? 1);
+    const outMin = inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.outMin ?? 0);
+    const outMax = inputs.has(2) ? readNum(inputs.get(2)) : Number(node.params?.outMax ?? 1);
+    const span = Math.abs(inMax - inMin) < 1e-9 ? 1 : inMax - inMin;
+    const t = Math.max(0, Math.min(1, (value - inMin) / span));
+    return new Map([[3, numOut(outMin + (outMax - outMin) * t)]]);
+  });
+
+  fns.set("arduino", (node, inputs, ctx) => serialCommandNode(node, inputs, ctx, "PING"));
+  fns.set("esp", (node, inputs, ctx) => serialCommandNode(node, inputs, ctx, "PING"));
+
+  fns.set("servo", (node, inputs, ctx) => {
+    const channel = Math.max(0, Math.round(inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.channel ?? 0)));
+    const angle = Math.max(0, Math.min(180, inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.angle ?? 90)));
+    const speed = Math.max(0, inputs.has(2) ? readNum(inputs.get(2)) : Number(node.params?.speed ?? 1));
+    const command = node.params?.format
+      ? String(node.params.format).replace("{channel}", channel).replace("{angle}", angle).replace("{speed}", speed)
+      : `SERVO ${channel} ${angle} ${speed}`;
+    const memory = nodeMemory(ctx), key = `servo:${node.id}`, prev = memory.get(key);
+    const state = ctx.deviceBus?.serialState || "offline";
+    if (command !== prev && state === "online" && typeof ctx.serialSend === "function") {
+      asyncWarn(ctx.serialSend(command), ctx, "Servo Serial");
+      memory.set(key, command);
+    }
+    return new Map([[3, textOut(state === "online" ? "SERIAL ONLINE" : "SERIAL OFFLINE")]]);
+  });
+
+  fns.set("rfid", (node, _inputs, ctx) => {
+    const raw = String(ctx.deviceBus?.lastSerial || "");
+    const prefix = String(node.params?.prefix ?? "RFID:");
+    const tagged = raw.startsWith(prefix) ? raw.slice(prefix.length).trim() : raw;
+    const present = !!tagged;
+    return new Map([[0, textOut(tagged)], [1, boolOut(present)], [2, textOut(raw)]]);
+  });
+
+  fns.set("sensors", (node, inputs, ctx) => {
+    const key = readText(inputs.get(0), node.params?.sensor || "gyro");
+    const reading = ctx.sensorBus?.get?.(key);
+    if (!reading || reading.available === false) {
+      return new Map([[1, numOut(0)], [2, textOut("UNAVAILABLE")]]);
+    }
+    const value = firstNumeric(reading.value);
+    return new Map([[1, numOut(value ?? 0)], [2, textOut(value == null ? "WAITING" : "LIVE")]]);
+  });
+
+  const bridgeDefaults = {
+    twozero: { address: "/nvd/twozero", port: 9000 },
+    chataigne: { address: "/nvd/chataigne", port: 9000 },
+    millumin: { address: "/nvd/millumin", port: 5000 },
+    touchdesigner: { address: "/nvd/touchdesigner", port: 9000 },
+    isadorabridge: { address: "/nvd/isadora", port: 9000 },
+    max: { address: "/nvd/max", port: 9000 },
+    pd: { address: "/nvd/pd", port: 9000 },
+    supercollider: { address: "/nvd/supercollider", port: 57120 }
+  };
+  for (const [type, defaults] of Object.entries(bridgeDefaults)) {
+    fns.set(type, (node, inputs, ctx) => genericOscBridge(node, inputs, ctx, defaults));
+  }
+
+  fns.set("automation", (node, inputs, ctx) => {
+    const speed = inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.speed ?? 0.25);
+    const phase = inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.phase ?? 0);
+    const t = ((Number(ctx.time) || 0) * speed + phase) % 1;
+    const shape = node.params?.shape || "sine";
+    const value = shape === "saw" ? t
+      : shape === "triangle" ? 1 - Math.abs(t * 2 - 1)
+      : shape === "square" ? (t < 0.5 ? 0 : 1)
+      : 0.5 + 0.5 * Math.sin(t * Math.PI * 2);
+    return new Map([[2, numOut(value)]]);
+  });
+
+  fns.set("datalab", (node, inputs) => {
+    const value = readNum(inputs.get(0));
+    const scale = inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.scale ?? 1);
+    const bias = Number(node.params?.bias ?? 0);
+    return new Map([[2, numOut(value * scale + bias)]]);
+  });
+
+  fns.set("universal", (_node, inputs) => {
+    const value = inputs.get(0)?.value;
+    return value === undefined ? new Map() : new Map([[1, value]]);
+  });
+
+  fns.set("connectors", (_node, inputs) => {
+    const value = inputs.get(0)?.value;
+    const out = new Map([[1, textOut("LOCAL LINK")]]);
+    if (value !== undefined) out.set(2, value);
     return out;
   });
 
