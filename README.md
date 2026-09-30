@@ -3,7 +3,7 @@
 No-de Vibe Designer est une PWA multi-interface pour la régie et la création visuelle : Designer, Mobile, Régie, Plateau et Remote Camera.
 
 - PWA publique : https://cdriccarboni.github.io/no-de-vibe-designer-pwa/
-- Version : 1.4.1
+- Version : 2.2.0
 - Package Android : `fr.acousmatic.nodevibedesigner`
 - versionCode Android : calculé automatiquement depuis la version
 - Target Android : API 36
