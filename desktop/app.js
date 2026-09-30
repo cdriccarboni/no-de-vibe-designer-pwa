@@ -1229,6 +1229,46 @@ $("#exportTdBtn")?.addEventListener("click", () => runExport("td"));
 $("#exportPdBtn")?.addEventListener("click", () => runExport("pd"));
 $("#exportMilluminBtn")?.addEventListener("click", () => runExport("millumin"));
 
+function currentShowDiagnostic() {
+  const experimental = (project.nodes || []).filter(n => !isExecutable(n.type)).map(n => n.type);
+  return buildDiagnosticSnapshot({
+    platform: window.nvdDesktop?.runtime || undefined,
+    remote: { state: remoteSession?.online ? "CONNECTED" : "DISCONNECTED" },
+    remoteCamera: runtime.remoteCamera || { state: "WAITING" },
+    ws: { state: remoteSession?.online ? "CONNECTED" : "DISCONNECTED" },
+    midi: { state: deviceBus.lastMidi ? "ACTIVE" : "IDLE" },
+    serial: { state: deviceBus.serialState || "offline" },
+    osc: { state: typeof window.nvdDesktop?.sendOscUdp === "function" ? "AVAILABLE" : "BRIDGE-ONLY" },
+    artnet: { state: typeof window.nvdDesktop?.sendArtNetUdp === "function" ? "AVAILABLE" : "BRIDGE-ONLY" },
+    recentErrors: runtime.lastGraph?.errors || [],
+    session: {
+      project: project.name || "Sans nom",
+      nodes: project.nodes?.length || 0,
+      edges: project.edges?.length || 0,
+      experimentalNodes: [...new Set(experimental)],
+      externalOutputAutoArmed: (project.nodes || []).filter(n => n.params?.auto === true && ["arduino","esp","servo",...OSC_BRIDGE_TYPES].includes(n.type)).map(n => n.title || n.type)
+    }
+  });
+}
+
+function showDiagnostic({ copy = false } = {}) {
+  const snap = currentShowDiagnostic();
+  const out = $("#diagnosticOut");
+  if (out) {
+    out.style.display = "block";
+    out.textContent = formatDiagnosticText(snap);
+  }
+  if (copy) {
+    copyDiagnostic(snap).then(() => log("Diagnostic spectacle copié")).catch(e => log("Diagnostic · " + (e?.message || e)));
+  } else {
+    const exp = snap.session?.experimentalNodes?.length || 0;
+    log(`Diagnostic spectacle · ${snap.recentErrors?.length || 0} erreur(s) · ${exp} type(s) expérimental(aux) dans le projet`);
+  }
+  return snap;
+}
+$("#runDiagnosticBtn")?.addEventListener("click", () => showDiagnostic());
+$("#copyDiagnosticBtn")?.addEventListener("click", () => showDiagnostic({ copy: true }));
+
 $("#showHostCard")?.addEventListener("click", async () => {
   const out = $("#hostCardOut");
   if (!out) return;
