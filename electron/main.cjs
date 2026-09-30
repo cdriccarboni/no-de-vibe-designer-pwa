@@ -55,6 +55,7 @@ let httpPort = 0;
 let hostCard = null;
 let sendOscUdp = null;
 let sendArtNetUdp = null;
+let sendSacnUdp = null;
 let lanAnnouncer = null;
 
 function appRoot() {
@@ -161,6 +162,12 @@ async function loadNativeModules() {
     console.error("ARTNET_UDP_LOAD_FAILED", err?.message || err);
   }
   try {
+    const sacn = await import(pathToFileURL(path.join(__dirname, "..", "bridge", "sacn-udp.mjs")).href);
+    sendSacnUdp = sacn.sendSacnUdp;
+  } catch (err) {
+    console.error("SACN_UDP_LOAD_FAILED", err?.message || err);
+  }
+  try {
     const discovery = await import(pathToFileURL(path.join(__dirname, "..", "shared", "discovery", "host-card.js")).href);
     hostCard = discovery.createHostCard({
       name: APP_NAME,
@@ -190,6 +197,11 @@ ipcMain.handle("nvd:osc-udp", async (_event, message = {}) => {
 ipcMain.handle("nvd:artnet-udp", async (_event, message = {}) => {
   if (!sendArtNetUdp) throw new Error("Art-Net UDP indisponible dans cet hôte");
   return sendArtNetUdp(message);
+});
+
+ipcMain.handle("nvd:sacn-udp", async (_event, message = {}) => {
+  if (!sendSacnUdp) throw new Error("sACN UDP indisponible dans cet hôte");
+  return sendSacnUdp(message);
 });
 
 ipcMain.handle("nvd:host-card", async () => {
