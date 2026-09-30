@@ -10,6 +10,16 @@ import { rasterizeVideoValue } from "./graphics/frame-utils.js";
 import { renderWhale } from "./graphics/whale.js";
 import { renderBlob } from "./graphics/blob.js";
 import { ndiStatusMessage } from "./remote-camera/ndi.js";
+import { anaglyphFrame, bendFrame, creativeFxFrame, stormFrame, transmuteFrame } from "./graphics/stage-fx.js";
+import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT, renderDream, renderSketch } from "./graphics/sketch-engine.js";
+import {
+  renderThreadCurtain, renderFlowField, renderRibbonTrails, fluidWarpFrame, refractionFrame,
+  renderMetaballs, renderPointCloudDepth, renderInteractiveSand, renderSwarm, renderRippleField,
+  createReactionState, stepReaction, reactionFrame, depthMaskFrame, opticalFlowMagnitude,
+  sdfField, noiseValue, curlVector
+} from "./graphics/interactive-effects.js";
+import { showManifestSummary } from "./show-importer.js";
+import { analyzePresence, renderLivingShadow } from "./graphics/living-shadow.js";
 
 function videoVal(el, opacity = 1) {
   return { kind: "video", el, opacity };
@@ -70,6 +80,95 @@ function truthyTrigger(slot) {
   if (v === true || v === 1) return true;
   if (typeof v === "object" && (v.value === 1 || v.value === true || v.kind === "trigger" && v.value)) return true;
   return false;
+}
+
+
+function textOut(value) {
+  return { kind: "text", value: value == null ? "" : String(value) };
+}
+
+function boolOut(value) {
+  return { kind: "boolean", value: !!value };
+}
+
+function readText(slot, fallback = "") {
+  const v = slot?.value !== undefined ? slot.value : slot;
+  if (typeof v === "string") return v;
+  if (v && typeof v.value === "string") return v.value;
+  return fallback;
+}
+
+function asyncWarn(result, ctx, label) {
+  if (result && typeof result.then === "function") {
+    result.catch(e => ctx.warnings?.push(`${label} : ${e?.message || e}`));
+  }
+}
+
+function firstNumeric(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (!value || typeof value !== "object") return null;
+  for (const v of Object.values(value)) {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+  }
+  return null;
+}
+
+function genericOscBridge(node, inputs, ctx, defaults = {}) {
+  const out = new Map();
+  const value = inputs.get(0) ? readNum(inputs.get(0)) : Number(node.params?.value ?? 0);
+  const host = node.params?.host || defaults.host || "127.0.0.1";
+  const port = Number(node.params?.port ?? defaults.port ?? 9000);
+  const address = node.params?.address || defaults.address || "/nvd/value";
+  const triggerConnected = inputs.has(1);
+  const triggerNow = truthyTrigger(inputs.get(1));
+  const memory = nodeMemory(ctx);
+  const key = `osc-bridge:${node.id}`;
+  const prev = memory.get(key) || {};
+  const signature = `${host}|${port}|${address}|${value}`;
+  const autoSend = node.params?.auto === true;
+  const shouldSend = triggerConnected ? (triggerNow && !prev.trigger) : (autoSend && prev.signature !== signature);
+  let status = host === "bridge" ? "BRIDGE" : `UDP ${host}:${port}`;
+
+  if (shouldSend) {
+    try {
+      if (host !== "bridge" && typeof ctx.oscUdpSend === "function") {
+        asyncWarn(ctx.oscUdpSend({ host, port, address, args: [value] }), ctx, "OSC UDP");
+      } else if (typeof ctx.bridgeSend === "function") {
+        ctx.bridgeSend({ type: "osc", target: host, address, args: [value] });
+      } else {
+        status = "OFFLINE";
+        ctx.warnings?.push(`${node.title || node.type} : aucun transport OSC disponible`);
+      }
+    } catch (e) {
+      status = "ERROR";
+      ctx.warnings?.push(`${node.title || node.type} : ${e?.message || e}`);
+    }
+  }
+
+  memory.set(key, { signature, trigger: triggerNow });
+  out.set(2, textOut(status));
+  return out;
+}
+
+function serialCommandNode(node, inputs, ctx, fallbackCommand) {
+  const out = new Map();
+  const command = readText(inputs.get(0), node.params?.command || fallbackCommand || "");
+  const triggerConnected = inputs.has(1);
+  const triggerNow = truthyTrigger(inputs.get(1));
+  const memory = nodeMemory(ctx);
+  const key = `serial-node:${node.id}`;
+  const prev = memory.get(key) || {};
+  const autoSend = node.params?.auto === true;
+  const shouldSend = triggerConnected ? (triggerNow && !prev.trigger) : (autoSend && command && prev.command !== command);
+  const state = ctx.deviceBus?.serialState || "offline";
+
+  if (shouldSend && state === "online" && typeof ctx.serialSend === "function") {
+    try { asyncWarn(ctx.serialSend(command), ctx, "Serial"); }
+    catch (e) { ctx.warnings?.push(`Serial : ${e?.message || e}`); }
+  }
+  memory.set(key, { command, trigger: triggerNow });
+  out.set(2, textOut(state === "online" ? "SERIAL ONLINE" : "SERIAL OFFLINE"));
+  return out;
 }
 
 export function createNodeProcessors() {
@@ -160,6 +259,80 @@ export function createNodeProcessors() {
       showPoints: !!node.params?.showPoints
     });
     return new Map([[3, visual]]);
+  });
+
+  function pointerForInteractive(inputs, ctx, energyIndex = 2, fallbackEnergy = .65) {
+    const p = ctx.pointer || { x:.5, y:.5, speed:0 };
+    return {
+      pointer:{
+        x: inputs.get(0) ? readNum(inputs.get(0)) : Number(p.x ?? .5),
+        y: inputs.get(1) ? readNum(inputs.get(1)) : Number(p.y ?? .5),
+        speed:Number(p.speed || 0)
+      },
+      energy: inputs.get(energyIndex) ? readNum(inputs.get(energyIndex)) : Number(fallbackEnergy)
+    };
+  }
+
+  fns.set("threadcurtain", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.force ?? .85);
+    return new Map([[3, renderThreadCurtain({
+      width:Math.min(ctx.width || 640, Number(node.params?.width ?? 480)),
+      height:Math.min(ctx.height || 360, Number(node.params?.height ?? 270)),
+      time:Number(ctx.time)||0,pointer,
+      strands:Number(node.params?.strands ?? 96),force:energy,wave:Number(node.params?.wave ?? .28)
+    })]]);
+  });
+
+  fns.set("flowfield", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .65);
+    return new Map([[3, renderFlowField({
+      width:Number(node.params?.width ?? 420),height:Number(node.params?.height ?? 236),
+      time:Number(ctx.time)||0,pointer,count:Number(node.params?.count ?? 360),
+      energy,seed:Number(node.params?.seed ?? 1)
+    })]]);
+  });
+
+  fns.set("ribbontrail", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .7);
+    return new Map([[3, renderRibbonTrails({
+      width:Number(node.params?.width ?? 420),height:Number(node.params?.height ?? 236),
+      time:Number(ctx.time)||0,pointer,ribbons:Number(node.params?.ribbons ?? 9),energy
+    })]]);
+  });
+
+  fns.set("metaballs", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .65);
+    return new Map([[3, renderMetaballs({
+      width:Number(node.params?.width ?? 400),height:Number(node.params?.height ?? 225),
+      time:Number(ctx.time)||0,pointer,count:Number(node.params?.count ?? 7),
+      energy,seed:Number(node.params?.seed ?? 1)
+    })]]);
+  });
+
+  fns.set("sand", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .6);
+    return new Map([[3, renderInteractiveSand({
+      width:Number(node.params?.width ?? 420),height:Number(node.params?.height ?? 236),
+      time:Number(ctx.time)||0,pointer,grains:Number(node.params?.grains ?? 900),
+      energy,seed:Number(node.params?.seed ?? 1)
+    })]]);
+  });
+
+  fns.set("swarm", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .65);
+    return new Map([[3, renderSwarm({
+      width:Number(node.params?.width ?? 420),height:Number(node.params?.height ?? 236),
+      time:Number(ctx.time)||0,pointer,count:Number(node.params?.count ?? 220),
+      energy,seed:Number(node.params?.seed ?? 1)
+    })]]);
+  });
+
+  fns.set("ripple", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .7);
+    return new Map([[3, renderRippleField({
+      width:Number(node.params?.width ?? 420),height:Number(node.params?.height ?? 236),
+      time:Number(ctx.time)||0,pointer,energy,rings:Number(node.params?.rings ?? 12)
+    })]]);
   });
 
   fns.set("shader", (node, inputs, ctx) => {
@@ -391,6 +564,101 @@ export function createNodeProcessors() {
     });
   }
 
+
+  fns.set("presence", (node, inputs, ctx) => {
+    const raw = inputs.get(0)?.value;
+    const out = new Map();
+    if (!raw) {
+      out.set(1, numOut(.5));
+      out.set(2, numOut(.5));
+      out.set(3, numOut(0));
+      out.set(5, textOut(`${node.params?.person || node.title || "Présence"} · NO SIGNAL`));
+      return out;
+    }
+    const source = fxRaster(raw, node, ctx, "presence");
+    const analysis = analyzePresence(source, {
+      threshold: Number(node.params?.threshold ?? .45),
+      invert: !!node.params?.invert
+    });
+    out.set(1, numOut(analysis.x));
+    out.set(2, numOut(analysis.y));
+    out.set(3, numOut(analysis.activity));
+    out.set(4, source);
+    out.set(5, textOut(`${node.params?.person || node.title || "Présence"} · ${analysis.visible ? "LIVE" : "NO SILHOUETTE"}`));
+    return out;
+  });
+
+  fns.set("livingshadow", (node, inputs, ctx) => {
+    const raw = inputs.get(0)?.value;
+    const out = new Map();
+    if (!raw) {
+      out.set(4, textOut(`${node.params?.person || "Ombre"} · NO SIGNAL`));
+      return out;
+    }
+    const source = fxRaster(raw, node, ctx, "living-shadow");
+    const memory = nodeMemory(ctx);
+    const key = `living-shadow:${node.id}`;
+    const state = memory.get(key) || { detached:false, detachedFrame:null, trigger:false };
+
+    const trigger = truthyTrigger(inputs.get(1));
+    const rising = trigger && !state.trigger;
+    const detachNonce = Number(node.params?.detachNonce || 0);
+    const attachNonce = Number(node.params?.attachNonce || 0);
+    const detachRequested = rising || detachNonce > Number(state.detachNonce || 0);
+    const attachRequested = attachNonce > Number(state.attachNonce || 0);
+    const autonomy = inputs.has(2) ? readNum(inputs.get(2)) : Number(node.params?.autonomy ?? .58);
+    const baseMode = node.params?.mode || "mirror";
+
+    if (attachRequested) {
+      state.detached = false;
+      state.detachedFrame = null;
+      state.attachNonce = attachNonce;
+    }
+
+    // Capture the current silhouette exactly at the detach cue/button.
+    if (detachRequested && !state.detached) {
+      const capturePass = renderLivingShadow({
+        frame: source,
+        time: Number(ctx.time) || 0,
+        mode: "mirror",
+        sourceZone: node.params?.sourceZone || "jardin",
+        shadowZone: node.params?.shadowZone || "cour",
+        threshold: Number(node.params?.threshold ?? .45),
+        invert: !!node.params?.invert,
+        autonomy
+      });
+      if (capturePass.capture) {
+        state.detachedFrame = capturePass.capture;
+        state.detached = true;
+      }
+    } else if (rising && state.detached) {
+      state.detached = false;
+      state.detachedFrame = null;
+    }
+    if (detachRequested) state.detachNonce = detachNonce;
+
+    const runtimeMode = state.detached ? "autonomous" : baseMode;
+    const result = renderLivingShadow({
+      frame: source,
+      time: Number(ctx.time) || 0,
+      mode: runtimeMode,
+      sourceZone: node.params?.sourceZone || "jardin",
+      shadowZone: node.params?.shadowZone || "cour",
+      threshold: Number(node.params?.threshold ?? .45),
+      invert: !!node.params?.invert,
+      autonomy,
+      detachedFrame: state.detachedFrame
+    });
+
+    state.trigger = trigger;
+    state.lastState = result.state;
+    memory.set(key, state);
+
+    out.set(3, result.frame);
+    out.set(4, textOut(`${node.params?.person || "Ombre"} · ${result.state}`));
+    return out;
+  });
+
   fns.set("transform", (node, inputs, ctx) => {
     const visual = inputs.get(0)?.value;
     const scale = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.scale ?? 1);
@@ -436,6 +704,49 @@ export function createNodeProcessors() {
     return new Map([[2, frame]]);
   });
 
+  fns.set("depthmask", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"depthmask");
+    const threshold=inputs.get(1)?readNum(inputs.get(1)):Number(node.params?.threshold ?? .45);
+    return new Map([[2, depthMaskFrame(source,{threshold,invert:!!node.params?.invert})]]);
+  });
+
+  fns.set("opticalflow", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"opticalflow");
+    const memory=nodeMemory(ctx),key=`opticalflow:${node.id}`,prev=memory.get(key);
+    const motion=opticalFlowMagnitude(prev,source,{step:Number(node.params?.step ?? 8)});
+    memory.set(key,source);
+    return new Map([[1,numOut(motion)],[2,source]]);
+  });
+
+  fns.set("feedbackfx", (node, inputs, ctx) => {
+    let source=fxRaster(inputs.get(0)?.value,node,ctx,"feedbackfx");
+    const decay=inputs.get(1)?readNum(inputs.get(1)):Number(node.params?.decay ?? .88);
+    const memory=nodeMemory(ctx),key=`feedbackfx:${node.id}`,prev=memory.get(key);
+    source=shadowTrail(prev,source,{decay:Math.max(0,Math.min(.985,decay))});
+    const dx=Number(node.params?.dx ?? 2),dy=Number(node.params?.dy ?? 1);
+    if(dx||dy) source=offsetFrame(source,{dx,dy});
+    memory.set(key,source);
+    return new Map([[2,source]]);
+  });
+
+  fns.set("fluidwarp", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"fluidwarp");
+    const amount=inputs.get(1)?readNum(inputs.get(1)):Number(node.params?.amount ?? .45);
+    return new Map([[2,fluidWarpFrame(source,{pointer:ctx.pointer,amount,time:Number(ctx.time)||0})]]);
+  });
+
+  fns.set("refraction", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"refraction");
+    const amount=inputs.get(1)?readNum(inputs.get(1)):Number(node.params?.amount ?? .55);
+    return new Map([[2,refractionFrame(source,{pointer:ctx.pointer,amount})]]);
+  });
+
+  fns.set("pointcloud", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"pointcloud");
+    const depth=inputs.get(1)?readNum(inputs.get(1)):Number(node.params?.depth ?? .7);
+    return new Map([[2,renderPointCloudDepth(source,{step:Number(node.params?.step ?? 7),depth})]]);
+  });
+
   fns.set("mirror", (node, inputs, ctx) => {
     const frame = fxRaster(inputs.get(0)?.value, node, ctx, "mirror");
     return new Map([[1, mirrorFrame(frame, { axis: node.params?.axis || "x" })]]);
@@ -463,6 +774,79 @@ export function createNodeProcessors() {
   fns.set("bodyclone", (node, inputs, ctx) => {
     const cloneNode = { ...node, params: { mirror: false, dx: 64, dy: 0, trail: false, ...node.params } };
     return new Map([[2, silhouetteFx(cloneNode, inputs, ctx, "bodyclone")]]);
+  });
+
+
+  fns.set("videoreturn", (_node, inputs) => {
+    const source = inputs.get(0)?.value;
+    const out = new Map();
+    if (!source) {
+      out.set(1, { kind: "text", value: "NO SIGNAL" });
+      return out;
+    }
+    out.set(1, { kind: "text", value: "LIVE" });
+    out.set(2, source);
+    return out;
+  });
+
+  fns.set("stage-output", (node, inputs, ctx) => {
+    const source = inputs.get(0)?.value;
+    const out = new Map();
+    const surface = node.params?.surfaceName || node.params?.surface || node.title || "Sortie Scène";
+    if (!source) {
+      out.set(1, textOut(`${surface} · NO SIGNAL`));
+      return out;
+    }
+    ctx.stageOutput = { surface, nodeId: node.id, live: true };
+    out.set(1, textOut(`${surface} · READY`));
+    out.set(2, source);
+    return out;
+  });
+
+  fns.set("mapping", (node, inputs, ctx) => {
+    const visual = inputs.get(0)?.value;
+    const scale = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.scale ?? 1);
+    const raster = fxRaster(visual, node, ctx, "mapping");
+    let frame = transformRaster(raster, {
+      scale: Math.max(0.05, scale || 1),
+      rotation: Number(node.params?.rotation ?? 0),
+      opacity: Number(node.params?.opacity ?? 1)
+    });
+    const dx = Number(node.params?.dx ?? 0);
+    const dy = Number(node.params?.dy ?? 0);
+    if (dx || dy) frame = offsetFrame(frame, { dx, dy });
+    frame.source = "mapping";
+    return new Map([[2, frame]]);
+  });
+
+  fns.set("anaglyph", (node, inputs, ctx) => {
+    const source = fxRaster(inputs.get(0)?.value, node, ctx, "anaglyph");
+    const depth = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.depth ?? 0.035);
+    return new Map([[2, anaglyphFrame(source, { depth })]]);
+  });
+
+  fns.set("creativefx", (node, inputs, ctx) => {
+    const source = fxRaster(inputs.get(0)?.value, node, ctx, "creativefx");
+    const amount = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.amount ?? 0.55);
+    return new Map([[2, creativeFxFrame(source, { amount, time: Number(ctx.time) || 0 })]]);
+  });
+
+  fns.set("storm", (node, inputs, ctx) => {
+    const source = fxRaster(inputs.get(0)?.value, node, ctx, "storm");
+    const amount = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.amount ?? 0.6);
+    return new Map([[2, stormFrame(source, { amount, time: Number(ctx.time) || 0 })]]);
+  });
+
+  fns.set("bending", (node, inputs, ctx) => {
+    const source = fxRaster(inputs.get(0)?.value, node, ctx, "bending");
+    const amount = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.amount ?? 0.18);
+    return new Map([[2, bendFrame(source, { amount, time: Number(ctx.time) || 0 })]]);
+  });
+
+  fns.set("transmute", (node, inputs, ctx) => {
+    const source = fxRaster(inputs.get(0)?.value, node, ctx, "transmute");
+    const amount = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.amount ?? 0.5);
+    return new Map([[2, transmuteFrame(source, { amount })]]);
   });
 
   fns.set("videofile", (node, _inputs, ctx) => {
@@ -545,6 +929,242 @@ export function createNodeProcessors() {
     out.set(0, { kind: "number", value: n });
     out.set(1, { kind: "number", value: n ? (pts[0].x || 0) : 0 });
     out.set(2, { kind: "number", value: n });
+    return out;
+  });
+
+
+
+  fns.set("p5", (node, inputs, ctx) => {
+    const seed = inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.seed ?? 1);
+    const energy = Math.max(0, Math.min(1, inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.energy ?? 0.65)));
+    const frame = renderSketch({
+      width: Math.min(Number(ctx.width) || 640, Number(node.params?.renderWidth ?? 640)),
+      height: Math.min(Number(ctx.height) || 360, Number(node.params?.renderHeight ?? 360)),
+      time: (Number(ctx.time) || 0) * (0.35 + energy * 2),
+      pointer: ctx.pointer,
+      script: node.params?.script || DEFAULT_P5_SCRIPT,
+      seed
+    });
+    frame.source = "p5-subset";
+    return new Map([[2, frame]]);
+  });
+
+  fns.set("sketch", (node, inputs, ctx) => {
+    const seed = inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.seed ?? 1);
+    const energy = Math.max(0, Math.min(1, inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.energy ?? 0.5)));
+    const frame = renderSketch({
+      width: Math.min(Number(ctx.width) || 640, Number(node.params?.renderWidth ?? 640)),
+      height: Math.min(Number(ctx.height) || 360, Number(node.params?.renderHeight ?? 360)),
+      time: (Number(ctx.time) || 0) * (0.4 + energy * 1.8),
+      pointer: ctx.pointer,
+      script: node.params?.script || DEFAULT_SKETCH_SCRIPT,
+      seed
+    });
+    frame.source = "sketch";
+    return new Map([[2, frame]]);
+  });
+
+  fns.set("dream", (node, inputs, ctx) => {
+    const seed = inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.seed ?? 1);
+    const intensity = Math.max(0, Math.min(1, inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.intensity ?? 0.72)));
+    const frame = renderDream({
+      width: Math.min(Number(ctx.width) || 640, Number(node.params?.renderWidth ?? 640)),
+      height: Math.min(Number(ctx.height) || 360, Number(node.params?.renderHeight ?? 360)),
+      time: Number(ctx.time) || 0,
+      pointer: ctx.pointer,
+      seed,
+      intensity
+    });
+    return new Map([[2, frame]]);
+  });
+
+  fns.set("showimport", (node, inputs) => {
+    const raw = readText(inputs.get(0), node.params?.manifest || "");
+    if (!raw) return new Map([[1, numOut(0)], [2, textOut("NO MANIFEST")]]);
+    const summary = showManifestSummary(raw);
+    return new Map([
+      [1, numOut(summary.count || 0)],
+      [2, textOut(summary.ok ? `READY · ${summary.count} cue(s)` : `ERROR · ${summary.error || "manifest invalide"}`)]
+    ]);
+  });
+
+  fns.set("surface", (_node, inputs) => {
+    const out = new Map();
+    const value = inputs.get(0)?.value;
+    out.set(1, textOut("CONTROL READY"));
+    if (value !== undefined) out.set(2, value);
+    return out;
+  });
+
+  fns.set("inputmapper", (node, inputs) => {
+    const value = readNum(inputs.get(0));
+    const inMin = Number(node.params?.inMin ?? 0);
+    const inMax = Number(node.params?.inMax ?? 1);
+    const outMin = inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.outMin ?? 0);
+    const outMax = inputs.has(2) ? readNum(inputs.get(2)) : Number(node.params?.outMax ?? 1);
+    const span = Math.abs(inMax - inMin) < 1e-9 ? 1 : inMax - inMin;
+    const t = Math.max(0, Math.min(1, (value - inMin) / span));
+    return new Map([[3, numOut(outMin + (outMax - outMin) * t)]]);
+  });
+
+  fns.set("arduino", (node, inputs, ctx) => serialCommandNode(node, inputs, ctx, "PING"));
+  fns.set("esp", (node, inputs, ctx) => serialCommandNode(node, inputs, ctx, "PING"));
+
+  fns.set("servo", (node, inputs, ctx) => {
+    const channel = Math.max(0, Math.round(inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.channel ?? 0)));
+    const angle = Math.max(0, Math.min(180, inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.angle ?? 90)));
+    const speed = Math.max(0, inputs.has(2) ? readNum(inputs.get(2)) : Number(node.params?.speed ?? 1));
+    const triggerConnected = inputs.has(3);
+    const triggerNow = truthyTrigger(inputs.get(3));
+    const command = node.params?.format
+      ? String(node.params.format).replace("{channel}", channel).replace("{angle}", angle).replace("{speed}", speed)
+      : `SERVO ${channel} ${angle} ${speed}`;
+    const memory = nodeMemory(ctx), key = `servo:${node.id}`, prev = memory.get(key) || {};
+    const state = ctx.deviceBus?.serialState || "offline";
+    const shouldSend = triggerConnected
+      ? (triggerNow && !prev.trigger)
+      : (node.params?.auto === true && command !== prev.command);
+    if (shouldSend && state === "online" && typeof ctx.serialSend === "function") {
+      asyncWarn(ctx.serialSend(command), ctx, "Servo Serial");
+    }
+    memory.set(key, { command, trigger: triggerNow });
+    return new Map([[4, textOut(state === "online" ? "SERIAL ONLINE" : "SERIAL OFFLINE")]]);
+  });
+
+  fns.set("rfid", (node, _inputs, ctx) => {
+    const raw = String(ctx.deviceBus?.lastSerial || "");
+    const prefix = String(node.params?.prefix ?? "RFID:");
+    const tagged = raw.startsWith(prefix) ? raw.slice(prefix.length).trim() : raw;
+    const present = !!tagged;
+    return new Map([[0, textOut(tagged)], [1, boolOut(present)], [2, textOut(raw)]]);
+  });
+
+  fns.set("sensors", (node, inputs, ctx) => {
+    const key = readText(inputs.get(0), node.params?.sensor || "gyro");
+    const reading = ctx.sensorBus?.get?.(key);
+    if (!reading || reading.available === false) {
+      return new Map([[1, numOut(0)], [2, textOut("UNAVAILABLE")]]);
+    }
+    const value = firstNumeric(reading.value);
+    return new Map([[1, numOut(value ?? 0)], [2, textOut(value == null ? "WAITING" : "LIVE")]]);
+  });
+
+  const bridgeDefaults = {
+    twozero: { address: "/nvd/twozero", port: 9000 },
+    td: { address: "/nvd/td/tool", port: 9000 },
+    isadora: { address: "/nvd/isadora/tool", port: 9000 },
+    chataigne: { address: "/nvd/chataigne", port: 9000 },
+    millumin: { address: "/nvd/millumin", port: 5000 },
+    touchdesigner: { address: "/nvd/touchdesigner", port: 9000 },
+    isadorabridge: { address: "/nvd/isadora", port: 9000 },
+    max: { address: "/nvd/max", port: 9000 },
+    pd: { address: "/nvd/pd", port: 9000 },
+    supercollider: { address: "/nvd/supercollider", port: 57120 }
+  };
+  for (const [type, defaults] of Object.entries(bridgeDefaults)) {
+    fns.set(type, (node, inputs, ctx) => genericOscBridge(node, inputs, ctx, defaults));
+  }
+
+  fns.set("automation", (node, inputs, ctx) => {
+    const speed = inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.speed ?? 0.25);
+    const phase = inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.phase ?? 0);
+    const t = ((Number(ctx.time) || 0) * speed + phase) % 1;
+    const shape = node.params?.shape || "sine";
+    const value = shape === "saw" ? t
+      : shape === "triangle" ? 1 - Math.abs(t * 2 - 1)
+      : shape === "square" ? (t < 0.5 ? 0 : 1)
+      : 0.5 + 0.5 * Math.sin(t * Math.PI * 2);
+    return new Map([[2, numOut(value)]]);
+  });
+
+  fns.set("force", (node, inputs) => {
+    const value=readNum(inputs.get(0));
+    const strength=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.strength ?? 1);
+    return new Map([[2,numOut(value*strength)]]);
+  });
+
+  fns.set("noise", (node, inputs, ctx) => {
+    const speed=inputs.has(0)?readNum(inputs.get(0)):Number(node.params?.speed ?? 1);
+    const seed=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.seed ?? 1);
+    return new Map([[2,numOut(noiseValue(Number(ctx.time)||0,seed,speed))]]);
+  });
+
+  fns.set("curlfield", (node, inputs, ctx) => {
+    const x=inputs.has(0)?readNum(inputs.get(0)):Number(node.params?.x ?? .5);
+    const y=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.y ?? .5);
+    const strength=inputs.has(2)?readNum(inputs.get(2)):Number(node.params?.strength ?? 1);
+    const v=curlVector(x,y,Number(ctx.time)||0,strength);
+    return new Map([[3,numOut(v.x)],[4,numOut(v.y)]]);
+  });
+
+  fns.set("particle", (node, inputs, ctx) => {
+    const p=ctx.pointer||{x:.5,y:.5};
+    const x=inputs.has(0)?readNum(inputs.get(0)):Number(node.params?.x ?? p.x);
+    const y=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.y ?? p.y);
+    const size=inputs.has(2)?readNum(inputs.get(2)):Number(node.params?.size ?? .12);
+    return new Map([[3,sdfField({
+      width:Number(node.params?.width ?? 320),height:Number(node.params?.height ?? 180),
+      time:Number(ctx.time)||0,pointer:{x,y},radius:Math.max(.01,Math.min(.5,size))
+    })]]);
+  });
+
+  fns.set("trail", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"trail");
+    const decay=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.decay ?? .86);
+    const memory=nodeMemory(ctx),key=`trail:${node.id}`,prev=memory.get(key);
+    const out=shadowTrail(prev,source,{decay:Math.max(0,Math.min(.985,decay))});
+    memory.set(key,out);return new Map([[2,out]]);
+  });
+
+  fns.set("spring", (node, inputs, ctx) => {
+    const target=readNum(inputs.get(0));
+    const stiffness=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.stiffness ?? .14);
+    const damping=inputs.has(2)?readNum(inputs.get(2)):Number(node.params?.damping ?? .72);
+    const memory=nodeMemory(ctx),key=`spring:${node.id}`,st=memory.get(key)||{x:target,v:0};
+    st.v+=(target-st.x)*Math.max(0,Math.min(1,stiffness));
+    st.v*=Math.max(0,Math.min(.999,damping));
+    st.x+=st.v;memory.set(key,st);
+    return new Map([[3,numOut(st.x)]]);
+  });
+
+  fns.set("sdf", (node, inputs, ctx) => {
+    const p=ctx.pointer||{x:.5,y:.5};
+    const x=inputs.has(0)?readNum(inputs.get(0)):Number(node.params?.x ?? p.x);
+    const y=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.y ?? p.y);
+    const radius=inputs.has(2)?readNum(inputs.get(2)):Number(node.params?.radius ?? .22);
+    return new Map([[3,sdfField({
+      width:Number(node.params?.width ?? 320),height:Number(node.params?.height ?? 180),
+      time:Number(ctx.time)||0,pointer:{x,y},radius
+    })]]);
+  });
+
+  fns.set("reactiondiffusion", (node, _inputs, ctx) => {
+    const memory=nodeMemory(ctx),key=`reaction:${node.id}`;
+    let state=memory.get(key);
+    if(!state) state=createReactionState(Number(node.params?.width ?? 128),Number(node.params?.height ?? 72),Number(node.params?.seed ?? 1));
+    stepReaction(state,{
+      feed:Number(node.params?.feed ?? .036),kill:Number(node.params?.kill ?? .061),
+      steps:Number(node.params?.steps ?? 1),pointer:ctx.pointer
+    });
+    memory.set(key,state);return new Map([[0,reactionFrame(state)]]);
+  });
+
+  fns.set("datalab", (node, inputs) => {
+    const value = readNum(inputs.get(0));
+    const scale = inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.scale ?? 1);
+    const bias = Number(node.params?.bias ?? 0);
+    return new Map([[2, numOut(value * scale + bias)]]);
+  });
+
+  fns.set("universal", (_node, inputs) => {
+    const value = inputs.get(0)?.value;
+    return value === undefined ? new Map() : new Map([[1, value]]);
+  });
+
+  fns.set("connectors", (_node, inputs) => {
+    const value = inputs.get(0)?.value;
+    const out = new Map([[1, textOut("LOCAL LINK")]]);
+    if (value !== undefined) out.set(2, value);
     return out;
   });
 
