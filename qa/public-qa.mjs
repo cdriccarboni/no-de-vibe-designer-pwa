@@ -41,6 +41,26 @@ navigateSurface("mobile", {
   root: new URL("https://localhost/")
 });
 assert(navCalls[0] === "/mobile/index.html", "Android surface navigation stays inside the app");
+const fileNavCalls = [];
+navigateSurface("regie", {
+  locationObj: {
+    href: "file:///Applications/No-de/resources/app.asar/desktop/index.html",
+    protocol: "file:",
+    assign: value => fileNavCalls.push(value)
+  },
+  root: new URL("file:///Applications/No-de/resources/app.asar/")
+});
+assert(fileNavCalls[0].startsWith("file:///") && /studio\/index\.html\?surface=regie/.test(fileNavCalls[0]), "native file navigation preserves file://");
+const autoFileCalls = [];
+navigateSurface("auto", {
+  locationObj: {
+    href: "file:///Applications/No-de/resources/app.asar/desktop/index.html",
+    protocol: "file:",
+    assign: value => autoFileCalls.push(value)
+  },
+  root: new URL("file:///Applications/No-de/resources/app.asar/")
+});
+assert(/index\.html\?auto=1$/.test(autoFileCalls[0]), "native Auto routes through root index.html");
 
 const libraryTypes = new Set();
 for (const [, items] of NODE_GROUPS) for (const [, type] of items) libraryTypes.add(type);
