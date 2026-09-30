@@ -1,7 +1,22 @@
-name: Android 1.3.1
+name: Android / Google Play
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_to_play:
+        description: "Publier l'AAB signé sur Google Play"
+        required: true
+        type: boolean
+        default: false
+      track:
+        description: "Canal Google Play"
+        required: true
+        type: choice
+        default: internal
+        options:
+          - internal
+          - alpha
+          - beta
   push:
     branches: [main]
     paths:
@@ -10,6 +25,7 @@ on:
       - "mobile/**"
       - "studio/**"
       - "companion/**"
+      - "privacy/**"
       - "manifest.webmanifest"
       - "shared/**"
       - "icons/**"
@@ -17,9 +33,21 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: android-play-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android:
     runs-on: ubuntu-latest
+    env:
+      PACKAGE_NAME: "fr.acousmatic.nodevibedesigner"
+      PLAY_UPLOAD_KEYSTORE_B64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_B64 }}
+      PLAY_UPLOAD_STORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_STORE_PASSWORD }}
+      PLAY_UPLOAD_KEY_ALIAS: ${{ secrets.PLAY_UPLOAD_KEY_ALIAS }}
+      PLAY_UPLOAD_KEY_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEY_PASSWORD }}
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +60,23 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Resolve app version
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_VERSION="$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' shared/version.js | head -1)"
+          if [ -z "$APP_VERSION" ]; then
+            echo "::error::Impossible de lire APP_VERSION dans shared/version.js"
+            exit 1
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<EOF
+          $APP_VERSION
+          EOF
+          VERSION_CODE=$((10#$MAJOR * 10000 + 10#$MINOR * 100 + 10#$PATCH))
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "Resolved No-de $APP_VERSION -> versionCode $VERSION_CODE"
+
       - name: Prepare Capacitor builder
         shell: bash
         run: |
@@ -41,7 +86,16 @@ jobs:
           rm -rf www android
           mkdir -p www
 
-          rsync -a ./ www/             --exclude ".git"             --exclude ".github"             --exclude "node_modules"             --exclude "www"             --exclude "android"             --exclude "downloads"             --exclude "package.json"             --exclude "package-lock.json"
+          rsync -a ./ www/ \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude "node_modules" \
+            --exclude "www" \
+            --exclude "android" \
+            --exclude "downloads" \
+            --exclude "play" \
+            --exclude "package.json" \
+            --exclude "package-lock.json"
 
           cat > capacitor.config.json <<'EOF'
           {
@@ -64,60 +118,215 @@ jobs:
       - name: Align Android version
         shell: bash
         run: |
-          sed -i 's/versionCode [0-9][0-9]*/versionCode 131/' android/app/build.gradle
-          sed -i 's/versionName "[^"]*"/versionName "1.3.1"/' android/app/build.gradle
-          grep -nE 'applicationId|versionCode|versionName' android/app/build.gradle
+          sed -i "s/versionCode [0-9][0-9]*/versionCode ${VERSION_CODE}/" android/app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"${APP_VERSION}\"/" android/app/build.gradle
+          grep -nE 'applicationId|versionCode|versionName|compileSdk|targetSdk' android/app/build.gradle
 
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Verify APK metadata and signature
+      - name: Verify debug APK metadata and signature
         shell: bash
         run: |
           APK="android/app/build/outputs/apk/debug/app-debug.apk"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
           {
-            echo "No-de Vibe Designer 1.3.1"
+            echo "No-de Vibe Designer ${APP_VERSION}"
             echo
             "$AAPT" dump badging "$APK" | grep -E '^package:|^application-label:|^sdkVersion:|^targetSdkVersion:' || true
             echo
             "$APKSIGNER" verify --verbose --print-certs "$APK"
           } | tee android-verification.txt
 
-      - name: Build unsigned release AAB
+      - name: Build release AAB
         working-directory: android
         run: ./gradlew bundleRelease --no-daemon
 
+      - name: Detect Play signing configuration
+        id: signing
+        shell: bash
+        run: |
+          ready=true
+          for name in PLAY_UPLOAD_KEYSTORE_B64 PLAY_UPLOAD_STORE_PASSWORD PLAY_UPLOAD_KEY_ALIAS PLAY_UPLOAD_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              ready=false
+            fi
+          done
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+          if [ "$ready" = true ]; then
+            echo "Play upload key: configured"
+          else
+            echo "Play upload key: not configured (unsigned AAB still produced)"
+          fi
+
+      - name: Sign release AAB for Google Play
+        if: steps.signing.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/no-de-play-upload.jks"
+          printf '%s' "$PLAY_UPLOAD_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
+          cp android/app/build/outputs/bundle/release/app-release.aab android/app/build/outputs/bundle/release/No-de-Vibe-Designer-${APP_VERSION}-play.aab
+
+          jarsigner \
+            -keystore "$KEYSTORE" \
+            -storepass "$PLAY_UPLOAD_STORE_PASSWORD" \
+            -keypass "$PLAY_UPLOAD_KEY_PASSWORD" \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            android/app/build/outputs/bundle/release/No-de-Vibe-Designer-${APP_VERSION}-play.aab \
+            "$PLAY_UPLOAD_KEY_ALIAS"
+
+          {
+            echo "No-de Vibe Designer ${APP_VERSION} — Play AAB"
+            echo
+            jarsigner -verify -strict -verbose -certs android/app/build/outputs/bundle/release/No-de-Vibe-Designer-${APP_VERSION}-play.aab
+            echo
+            keytool -list -v -keystore "$KEYSTORE" -storepass "$PLAY_UPLOAD_STORE_PASSWORD" -alias "$PLAY_UPLOAD_KEY_ALIAS" \
+              | grep -E 'Alias name:|Entry type:|SHA256:|Valid from:' || true
+          } | tee play-signature-verification.txt
+
+          rm -f "$KEYSTORE"
+
+      - name: Require signing and Play credentials when publishing
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_to_play }}
+        shell: bash
+        run: |
+          if [ "${{ steps.signing.outputs.ready }}" != "true" ]; then
+            echo "::error::Clé d'upload Play absente. Configure PLAY_UPLOAD_KEYSTORE_B64, PLAY_UPLOAD_STORE_PASSWORD, PLAY_UPLOAD_KEY_ALIAS et PLAY_UPLOAD_KEY_PASSWORD."
+            exit 1
+          fi
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON absent. La publication Google Play ne peut pas être authentifiée."
+            exit 1
+          fi
+
+      - name: Publish signed AAB to Google Play
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_to_play }}
+        env:
+          PLAY_TRACK: ${{ inputs.track }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --quiet google-api-python-client google-auth
+          CREDENTIALS="$RUNNER_TEMP/google-play-service-account.json"
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > "$CREDENTIALS"
+
+          python - <<'PY'
+          import os
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          package_name = os.environ["PACKAGE_NAME"]
+          track = os.environ["PLAY_TRACK"]
+          app_version = os.environ["APP_VERSION"]
+          bundle_path = f"android/app/build/outputs/bundle/release/No-de-Vibe-Designer-{app_version}-play.aab"
+          credentials_path = os.path.join(os.environ["RUNNER_TEMP"], "google-play-service-account.json")
+
+          credentials = service_account.Credentials.from_service_account_file(
+              credentials_path,
+              scopes=["https://www.googleapis.com/auth/androidpublisher"],
+          )
+          service = build("androidpublisher", "v3", credentials=credentials, cache_discovery=False)
+
+          edit = service.edits().insert(packageName=package_name, body={}).execute()
+          edit_id = edit["id"]
+
+          media = MediaFileUpload(bundle_path, mimetype="application/octet-stream", resumable=True)
+          bundle = service.edits().bundles().upload(
+              packageName=package_name,
+              editId=edit_id,
+              media_body=media,
+          ).execute()
+
+          version_code = str(bundle["versionCode"])
+          service.edits().tracks().update(
+              packageName=package_name,
+              editId=edit_id,
+              track=track,
+              body={
+                  "track": track,
+                  "releases": [{
+                      "name": f"No-de Vibe Designer {app_version}",
+                      "versionCodes": [version_code],
+                      "status": "completed",
+                  }],
+              },
+          ).execute()
+
+          service.edits().commit(packageName=package_name, editId=edit_id).execute()
+          print(f"Published {package_name} versionCode={version_code} to track={track}")
+          PY
+
+          rm -f "$CREDENTIALS"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: No-de-Vibe-Designer-1.3.1-android-debug-apk
+          name: No-de-Vibe-Designer-${{ env.APP_VERSION }}-android-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
         with:
-          name: No-de-Vibe-Designer-1.3.1-android-unsigned-aab
+          name: No-de-Vibe-Designer-${{ env.APP_VERSION }}-android-unsigned-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@v4
+        if: steps.signing.outputs.ready == 'true'
+        with:
+          name: No-de-Vibe-Designer-${{ env.APP_VERSION }}-google-play-aab
+          path: |
+            android/app/build/outputs/bundle/release/No-de-Vibe-Designer-${{ env.APP_VERSION }}-play.aab
+            play-signature-verification.txt
+          if-no-files-found: error
 
-      - name: Publish downloadable binaries
-        if: ${{ success() }}
+      - name: Publish downloadable test APK
+        if: ${{ success() || steps.signing.outputs.ready == 'false' }}
         shell: bash
         run: |
           mkdir -p downloads
-          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/No-de-Vibe-Designer-1.3.1-debug.apk
-          cp android/app/build/outputs/bundle/release/app-release.aab downloads/No-de-Vibe-Designer-1.3.1-unsigned.aab
+          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/No-de-Vibe-Designer-${APP_VERSION}-debug.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/No-de-Vibe-Designer-latest-debug.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab downloads/No-de-Vibe-Designer-${APP_VERSION}-unsigned.aab
           cp android-verification.txt downloads/android-verification.txt
-          printf '%s\n' '# Android downloads' ''             '- APK test: No-de-Vibe-Designer-1.3.1-debug.apk'             '- AAB release: No-de-Vibe-Designer-1.3.1-unsigned.aab (non signé, non publiable sur Play tel quel)'             > downloads/README.md
+          printf '%s\n' '# Android downloads' '' \
+            "- APK test: No-de-Vibe-Designer-${APP_VERSION}-debug.apk" \
+            "- AAB de contrôle: No-de-Vibe-Designer-${APP_VERSION}-unsigned.aab (non publiable tel quel)" \
+            "- AAB Play signé: produit uniquement par la CI avec la clé d'upload sécurisée; il n'est pas commité dans le dépôt." \
+            > downloads/README.md
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add downloads
           if ! git diff --cached --quiet; then
-            git commit -m "build(android): publish No-de 1.3.1 binaries"
+            git commit -m "build(android): publish No-de ${APP_VERSION} test binaries"
             git fetch origin main
             git rebase origin/main
             git push origin HEAD:main
           fi
+
+      - name: Build summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## No-de Vibe Designer ${APP_VERSION}"
+            echo
+            echo "- package: \`${PACKAGE_NAME}\`"
+            echo "- versionCode: \`${VERSION_CODE}\`"
+            echo "- target: Android 16 / API 36"
+            echo "- debug APK: built"
+            echo "- unsigned AAB: built"
+            if [ "${{ steps.signing.outputs.ready }}" = "true" ]; then
+              echo "- Play-signed AAB: built + verified"
+            else
+              echo "- Play-signed AAB: waiting for GitHub signing secrets"
+            fi
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.publish_to_play }}" = "true" ]; then
+              echo "- Google Play track: \`${{ inputs.track }}\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
