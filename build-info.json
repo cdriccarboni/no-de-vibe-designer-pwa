@@ -11,5 +11,11 @@
     "camera"
   ],
   "sourceCommit": "2eadc451c8b46d620b53fd851d03bc8781a5459a",
-  "cacheRevision": "2eadc451"
+  "cacheRevision": "2eadc451",
+  "rolesFlexible": true,
+  "defaultRouting": {
+    "desktop": "designer",
+    "mobile": "mobile",
+    "manualOverride": true
+  }
 }
