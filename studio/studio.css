@@ -228,3 +228,36 @@ body.mode-PLATEAU .cs-grid{min-height:calc(100dvh - 94px);align-content:stretch}
 body.mode-PLATEAU .cs-widget{font-size:clamp(13px,2.2vw,20px)}
 body.mode-PLATEAU .cs-head{padding-bottom:6px}
 body.mode-PLATEAU .cs-head>div:first-child{display:none}
+
+.preset-zone{display:grid;gap:8px}
+.preset-zone-head{display:flex;align-items:end;justify-content:space-between;gap:10px}
+.preset-zone-head>div{display:flex;align-items:baseline;gap:8px}
+.preset-zone-head b{font-size:13px}
+.preset-zone-head span{font-size:11px;color:var(--muted)}
+.preset-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  gap:7px;
+}
+.preset-card{
+  min-height:72px;
+  padding:9px 10px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:#11161b;
+  color:var(--text);
+  text-align:left;
+  display:grid;
+  gap:5px;
+}
+.preset-card:hover,.preset-card:focus-visible{border-color:var(--accent);background:#161a1d}
+.preset-card>span{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.preset-card b{font-size:12px}
+.preset-card small{
+  color:var(--accent);
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-weight:700;
+}
+.preset-card em{font-style:normal;font-size:10px;line-height:1.3;color:var(--muted)}
