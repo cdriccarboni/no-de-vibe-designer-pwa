@@ -602,11 +602,21 @@ export function createNodeProcessors() {
 
     const trigger = truthyTrigger(inputs.get(1));
     const rising = trigger && !state.trigger;
+    const detachNonce = Number(node.params?.detachNonce || 0);
+    const attachNonce = Number(node.params?.attachNonce || 0);
+    const detachRequested = rising || detachNonce > Number(state.detachNonce || 0);
+    const attachRequested = attachNonce > Number(state.attachNonce || 0);
     const autonomy = inputs.has(2) ? readNum(inputs.get(2)) : Number(node.params?.autonomy ?? .58);
     const baseMode = node.params?.mode || "mirror";
 
-    // Capture the current silhouette exactly at the detach cue.
-    if (rising && !state.detached) {
+    if (attachRequested) {
+      state.detached = false;
+      state.detachedFrame = null;
+      state.attachNonce = attachNonce;
+    }
+
+    // Capture the current silhouette exactly at the detach cue/button.
+    if (detachRequested && !state.detached) {
       const capturePass = renderLivingShadow({
         frame: source,
         time: Number(ctx.time) || 0,
@@ -625,6 +635,7 @@ export function createNodeProcessors() {
       state.detached = false;
       state.detachedFrame = null;
     }
+    if (detachRequested) state.detachNonce = detachNonce;
 
     const runtimeMode = state.detached ? "autonomous" : baseMode;
     const result = renderLivingShadow({
