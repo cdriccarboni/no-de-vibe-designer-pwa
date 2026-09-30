@@ -855,6 +855,52 @@ const pingFb = applyCompanionBinding({
 assert(pingFb.type === STUDIO_MSG.FEEDBACK && pingFb.ok === true, "bidirectional ping feedback");
 assert(typeof pingFb.rttMs === "number" && pingFb.rttMs >= 0, "feedback rtt measured (not faked absent)");
 
+const stageProject = newProject();
+stageProject.timeline = [{ id: "cue1", kind: "cue", label: "TOP", start: 4, duration: 1, actions: [] }];
+const stageRuntime = { time: 0, playing: false, setProject: () => {}, play(){ this.playing = true; } };
+const { applyCue: companionApplyCue, listCues: companionListCues } = await import("../shared/stage/cues.js");
+const stageFb = applyCompanionBinding({
+  widget: { id: "w-stage", binding: { kind: "stage", action: "go" } },
+  value: true,
+  project: stageProject,
+  runtime: stageRuntime,
+  applyCue: companionApplyCue,
+  listCues: companionListCues
+});
+assert(stageFb.ok === true && stageProject.meta?.activeCueId === "cue1" && stageRuntime.time === 4 && stageRuntime.playing, "companion Stage GO mutates host project/runtime");
+
+const ioSeen = { osc: null, serial: null, midi: null, camera: null, video: null };
+const oscFb = applyCompanionBinding({
+  widget: { id: "w-osc", binding: { kind: "osc", oscAddress: "/test", oscHost: "127.0.0.1", oscPort: 9001 } },
+  value: 0.5, project: newProject(),
+  sendOsc: msg => { ioSeen.osc = msg; }
+});
+assert(oscFb.ok && ioSeen.osc?.address === "/test" && ioSeen.osc?.port === 9001, "companion OSC binding real callback");
+const serialFb = applyCompanionBinding({
+  widget: { id: "w-serial", binding: { kind: "serial", serialText: "LED {value}" } },
+  value: 1, project: newProject(),
+  sendSerial: text => { ioSeen.serial = text; }
+});
+assert(serialFb.ok && ioSeen.serial === "LED 1", "companion Serial binding real callback");
+const midiFb = applyCompanionBinding({
+  widget: { id: "w-midi", binding: { kind: "midi", midiData: [176, 7, -1] } },
+  value: 0.5, project: newProject(),
+  sendMidi: (_id, data) => { ioSeen.midi = data; }
+});
+assert(midiFb.ok && ioSeen.midi?.[2] === 64, "companion MIDI binding maps value");
+const camFb = applyCompanionBinding({
+  widget: { id: "w-cam", binding: { kind: "camera", cameraAction: "off" } },
+  value: false, project: newProject(),
+  cameraControl: action => { ioSeen.camera = action; }
+});
+const videoFb = applyCompanionBinding({
+  widget: { id: "w-video", binding: { kind: "video", videoAction: "pause" } },
+  value: true, project: newProject(),
+  videoControl: action => { ioSeen.video = action; }
+});
+assert(camFb.ok && ioSeen.camera === "off" && videoFb.ok && ioSeen.video === "pause", "companion camera/video bindings real callbacks");
+assert(STUDIO_MSG.MONITOR_START && STUDIO_MSG.MONITOR_FRAME && STUDIO_MSG.MONITOR_STOP, "companion monitor protocol types");
+
 const action = makeStudioAction({ widgetId: "w1", action: "press", value: true });
 assert(action.type === STUDIO_MSG.ACTION && action.widgetId === "w1", "studio action message");
 const fb = makeStudioFeedback({ widgetId: "w1", value: true, ok: true, detail: "ok", rttMs: 4 });
