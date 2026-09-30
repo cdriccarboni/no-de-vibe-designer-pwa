@@ -209,116 +209,159 @@ export function localVibeParse(text, project) {
     ops.push({ op: "connect", fromType: "camera", fromPort: 0, toType: "shader", toPort: 0 });
   }
 
-  return { engine: "local", ops, note: "Moteur local (règles). Pas d'appel IA." };
+  return { engine: "local-rules", ops, note: "Moteur local déterministe (règles)." };
+}
+
+function buildVibePrompt(text, project) {
+  const executable = project?.nodes?.map(n => n.type) || [];
+  return `Tu es le moteur Vibe de ${APP_NAME} ${APP_VERSION}.
+Réponds UNIQUEMENT en JSON strict :
+{"ops":[{"op":"addNode","type":"...","x":0,"y":0},{"op":"connect","fromType":"...","fromPort":0,"toType":"...","toPort":0},{"op":"setParam","type":"...","key":"...","value":0},{"op":"addClip","track":0,"start":0,"duration":1,"label":"...","kind":"effect|points|cue|shader"}],"summary":"..."}.
+Utilise uniquement des nodes exécutables de No-de. N'active jamais automatiquement caméra, micro, Serial, OSC, Art-Net, Servo ou sortie externe. Toute action externe doit rester désarmée ou passer par un Trigger explicite.
+Projet actuel nodes: ${JSON.stringify(project.nodes.map(n => ({ id:n.id, type:n.type })))}
+Edges: ${JSON.stringify(project.edges || [])}
+Instruction utilisateur: ${text}
+Nodes déjà présents: ${JSON.stringify(executable)}`;
+}
+
+function parseAiOps(content, label = "IA") {
+  let parsed = content;
+  if (typeof parsed === "string") {
+    try { parsed = JSON.parse(parsed); }
+    catch { return { ok:false, unavailable:true, error:`${label} : JSON invalide` }; }
+  }
+  if (!parsed?.ops || !Array.isArray(parsed.ops)) {
+    return { ok:false, unavailable:true, error:`${label} : réponse sans tableau ops` };
+  }
+  return { ok:true, ops:parsed.ops, summary:parsed.summary || "" };
+}
+
+async function callLocalAi(text, project, cfg) {
+  const client = globalThis?.nvdDesktop?.localAiChat;
+  if (typeof client !== "function") {
+    return { ok:false, unavailable:true, error:"IA locale générative disponible uniquement dans l’hôte Desktop Electron pour le moment." };
+  }
+  const model = String(cfg.localModel || "qwen2.5-coder:7b").trim();
+  const baseUrl = String(cfg.localBaseUrl || "http://127.0.0.1:11434").trim();
+  try {
+    const result = await client({
+      baseUrl,
+      model,
+      temperature: 0.15,
+      timeoutMs: 60000,
+      messages: [
+        { role:"system", content:"Tu génères des opérations JSON sûres et minimales pour un patch de spectacle vivant No-de Vibe Designer. Réponds uniquement en JSON." },
+        { role:"user", content:buildVibePrompt(text, project) }
+      ]
+    });
+    const parsed = parseAiOps(result?.content, "IA locale");
+    if (!parsed.ok) return parsed;
+    return {
+      ok:true,
+      engine:"local-ai",
+      ops:parsed.ops,
+      summary:parsed.summary,
+      note:`IA locale · ${result?.model || model}`,
+      localModel:result?.model || model
+    };
+  } catch (e) {
+    return { ok:false, unavailable:true, error:`IA locale injoignable : ${e?.message || e}` };
+  }
 }
 
 async function callRemoteAi(text, project, cfg) {
   const endpoint = (cfg.endpoint || "").trim();
   const apiKey = (cfg.apiKey || "").trim();
   const model = (cfg.model || "gpt-4o-mini").trim();
-  if (!endpoint) {
-    return { ok: false, unavailable: true, error: "Aucun endpoint IA configuré dans Préférences → IA / Vibe coding." };
-  }
+  if (!endpoint) return { ok:false, unavailable:true, error:"Aucun endpoint IA distant configuré." };
   const allowed = assertAiProviderAllowed({ endpoint, model });
-  if (!allowed.ok) {
-    return { ok: false, unavailable: true, error: allowed.error };
-  }
+  if (!allowed.ok) return { ok:false, unavailable:true, error:allowed.error };
 
-  const schemaHint = `Tu es le moteur Vibe de ${APP_NAME} ${APP_VERSION}.
-Réponds UNIQUEMENT en JSON: {"ops":[{"op":"addNode","type":"camera|pointer|whale|blob|threshold|ghost|mirror|bodyclone|transform|shader|midi|osc|tracking","x":n,"y":n},{"op":"connect","fromType":"...","fromPort":0,"toType":"...","toPort":0},{"op":"setParam","type":"...","key":"...","value":...},{"op":"addClip","track":0,"start":0,"duration":1,"label":"...","kind":"effect|points|cue|shader"}],"summary":"..."}
-Nodes exécutables prioritaires: camera, pointer, whale, blob, threshold, ghost, mirror, bodyclone, shadow, transform, composite, shader, midi, osc, tracking, stageio. La caméra n'est jamais activée par l'IA : seul l'utilisateur peut demander la permission.
-Projet actuel nodes: ${JSON.stringify(project.nodes.map(n => ({ id: n.id, type: n.type })))}
-edges: ${JSON.stringify(project.edges || [])}
-Instruction: ${text}`;
-
-  const headers = { "Content-Type": "application/json" };
+  const headers = { "Content-Type":"application/json" };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-
   let res;
   try {
     res = await fetch(endpoint, {
-      method: "POST",
+      method:"POST",
       headers,
-      body: JSON.stringify({
+      body:JSON.stringify({
         model,
-        temperature: 0.2,
-        messages: [
-          { role: "system", content: "Tu génères des opérations de patch JSON pour No-de Vibe Designer." },
-          { role: "user", content: schemaHint }
+        temperature:0.2,
+        messages:[
+          { role:"system", content:"Tu génères des opérations de patch JSON sûres pour No-de Vibe Designer." },
+          { role:"user", content:buildVibePrompt(text, project) }
         ],
-        response_format: { type: "json_object" }
+        response_format:{ type:"json_object" }
       })
     });
   } catch (e) {
-    return { ok: false, unavailable: true, error: `Moteur IA injoignable : ${e.message || e}` };
+    return { ok:false, unavailable:true, error:`Moteur IA distant injoignable : ${e?.message || e}` };
   }
-
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    return { ok: false, unavailable: true, error: `Moteur IA HTTP ${res.status} : ${body.slice(0, 200)}` };
+    return { ok:false, unavailable:true, error:`Moteur IA HTTP ${res.status} : ${body.slice(0,200)}` };
   }
-
   let data;
-  try {
-    data = await res.json();
-  } catch {
-    return { ok: false, unavailable: true, error: "Réponse IA non JSON" };
-  }
+  try { data = await res.json(); }
+  catch { return { ok:false, unavailable:true, error:"Réponse IA distante non JSON" }; }
 
-  let content = data.choices?.[0]?.message?.content;
-  if (content == null && data.ops) content = data;
-  if (typeof content === "string") {
-    try { content = JSON.parse(content); } catch {
-      return { ok: false, unavailable: true, error: "JSON IA invalide" };
-    }
+  const parsed = parseAiOps(data.choices?.[0]?.message?.content ?? data, "IA distante");
+  if (!parsed.ok) return parsed;
+  return { ok:true, engine:"ai", ops:parsed.ops, summary:parsed.summary, note:`IA distante · ${model}` };
+}
+
+export async function probeLocalAi(cfg = readAiConfig()) {
+  const probe = globalThis?.nvdDesktop?.probeLocalAi;
+  if (typeof probe !== "function") return { ok:false, available:false, error:"Hôte Desktop Electron requis" };
+  try {
+    const result = await probe({
+      baseUrl:cfg.localBaseUrl || "http://127.0.0.1:11434",
+      model:cfg.localModel || "qwen2.5-coder:7b"
+    });
+    return { ...result, available:true };
+  } catch (e) {
+    return { ok:false, available:false, error:e?.message || String(e) };
   }
-  if (!content?.ops || !Array.isArray(content.ops)) {
-    return { ok: false, unavailable: true, error: "Réponse IA sans tableau ops" };
-  }
-  return { ok: true, engine: "ai", ops: content.ops, summary: content.summary || "", note: `IA · ${model}` };
 }
 
 export async function runVibe(text, project, { forceLocal = false } = {}) {
   const cfg = readAiConfig();
-  const blocked = assertAiProviderAllowed(cfg);
-  if (!blocked.ok && cfg.endpoint && !forceLocal) {
-    const local = localVibeParse(text, project);
+  const localGenerativeEnabled = cfg.localEnabled !== false;
+
+  if (!forceLocal && localGenerativeEnabled) {
+    const localAi = await callLocalAi(text, project, cfg);
+    if (localAi.ok) return localAi;
+
+    if (cfg.enabled !== false && cfg.endpoint) {
+      const remote = await callRemoteAi(text, project, cfg);
+      if (remote.ok) return { ...remote, localAiError:localAi.error };
+    }
+
+    const rules = localVibeParse(text, project);
     return {
-      ok: local.ops.length > 0,
-      engine: "local-fallback",
-      ops: local.ops,
-      aiError: blocked.error,
-      note: `IA refusée — ${blocked.error} · moteur local uniquement`,
-      aiUnavailable: true
+      ok:rules.ops.length > 0,
+      engine:"local-rules-fallback",
+      ops:rules.ops,
+      summary:rules.note,
+      aiError:localAi.error,
+      note:`IA locale indisponible — ${localAi.error} · repli moteur de règles`,
+      aiUnavailable:true
     };
   }
-  const preferAi = cfg.enabled !== false && cfg.endpoint && !forceLocal;
 
-  if (preferAi) {
+  if (!forceLocal && cfg.enabled !== false && cfg.endpoint) {
     const remote = await callRemoteAi(text, project, cfg);
     if (remote.ok) return remote;
-    const local = localVibeParse(text, project);
-    return {
-      ok: local.ops.length > 0,
-      engine: "local-fallback",
-      ops: local.ops,
-      summary: local.note,
-      aiError: remote.error,
-      note: `IA indisponible — ${remote.error} · repli moteur local`
-    };
   }
 
   const local = localVibeParse(text, project);
-  const cfgMissing = !cfg.endpoint;
   return {
-    ok: local.ops.length > 0,
-    engine: "local",
-    ops: local.ops,
-    summary: local.note,
-    note: cfgMissing
-      ? "Moteur local (règles). Configure un endpoint IA dans Préférences pour un appel réel."
-      : "Moteur local (IA désactivée dans Préférences).",
-    aiUnavailable: cfgMissing || cfg.enabled === false
+    ok:local.ops.length > 0,
+    engine:"local-rules",
+    ops:local.ops,
+    summary:local.note,
+    note:"Moteur local déterministe (règles).",
+    aiUnavailable:true
   };
 }
 
