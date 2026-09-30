@@ -107,6 +107,17 @@ export const EXECUTABLE_PORTS = {
     { name: "address", dir: "in", data: "text" },
     { name: "value", dir: "in", data: "number" }
   ],
+  surface: [
+    { name: "in", dir: "in", data: "any" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "out", dir: "out", data: "any" }
+  ],
+  inputmapper: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "out min", dir: "in", data: "number" },
+    { name: "out max", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "number" }
+  ],
   stageio: [
     { name: "in", dir: "in", data: "any" },
     { name: "route", dir: "in", data: "text" },
@@ -260,6 +271,91 @@ export const EXECUTABLE_PORTS = {
     { name: "universe", dir: "in", data: "number" },
     { name: "address", dir: "in", data: "number" },
     { name: "value", dir: "in", data: "number" }
+  ],
+  arduino: [
+    { name: "command", dir: "in", data: "text" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  esp: [
+    { name: "command", dir: "in", data: "text" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  servo: [
+    { name: "channel", dir: "in", data: "number" },
+    { name: "angle", dir: "in", data: "number" },
+    { name: "speed", dir: "in", data: "number" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  rfid: [
+    { name: "tag", dir: "out", data: "text" },
+    { name: "present", dir: "out", data: "boolean" },
+    { name: "raw", dir: "out", data: "text" }
+  ],
+  sensors: [
+    { name: "sensor", dir: "in", data: "text" },
+    { name: "value", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  twozero: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  chataigne: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  millumin: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  touchdesigner: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  isadorabridge: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  max: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  pd: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  supercollider: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  automation: [
+    { name: "speed", dir: "in", data: "number" },
+    { name: "phase", dir: "in", data: "number" },
+    { name: "value", dir: "out", data: "number" }
+  ],
+  datalab: [
+    { name: "value", dir: "in", data: "number" },
+    { name: "scale", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "number" }
+  ],
+  universal: [
+    { name: "in", dir: "in", data: "any" },
+    { name: "out", dir: "out", data: "any" }
+  ],
+  connectors: [
+    { name: "in", dir: "in", data: "any" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "out", dir: "out", data: "any" }
   ],
   "phone-mic": [
     { name: "audio", dir: "out", data: "number" },
