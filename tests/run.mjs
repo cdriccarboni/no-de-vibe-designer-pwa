@@ -3,7 +3,7 @@
  * Usage: node tests/run.mjs
  */
 import { validateProject, exportProject, createDemoProject, newProject } from "../shared/ir.js";
-import { typesCompatible, portDataType, portDirection, isExecutable } from "../shared/ports.js";
+import { typesCompatible, portDataType, portDirection, isExecutable, EXECUTABLE_TYPES } from "../shared/ports.js";
 import { validateEdge, findCycleEdgeIds, topoOrder, evaluateGraph, findVideoOutput } from "../shared/graph-engine.js";
 import { localVibeParse, applyVibeOps, isForbiddenAiProvider, assertAiProviderAllowed, runVibe, probeLocalAi } from "../shared/vibe.js";
 import { APP_VERSION } from "../shared/version.js";
@@ -23,6 +23,7 @@ import { detectGraphicsCapabilities } from "../shared/graphics/engine-v3.js";
 import { analyzeImagePixels, autoImageVibeTarget, imageVibeOps, imageVibePrompt } from "../shared/image-vibe.js";
 import { encodeOscMessage, decodeOscMessage } from "../shared/protocols/osc.js";
 import { createNodeProcessors } from "../shared/node-processors.js";
+import { NODE_GROUPS } from "../shared/node-specs.js";
 import { planManualSave, planManualOpen, saveStatusMessage, isStandaloneWebKit } from "../shared/save-fallback.js";
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
 import { nestedBoxSelfTest } from "../shared/self-test.js";
@@ -59,6 +60,14 @@ assert(portDirection("osc", 2, 3) === "in", "osc value in (sink)");
 assert(isExecutable("camera") && isExecutable("shader"), "camera+shader executable");
 assert(isExecutable("audio") && isExecutable("subpatch"), "audio+subpatch executable");
 assert(isExecutable("millumin"), "millumin bridge executable");
+const libraryTypes = [...new Set(NODE_GROUPS.flatMap(([, items]) => items.map(([, type]) => type)))];
+assert(libraryTypes.length >= 105, `Library has at least 105 nodes (${libraryTypes.length})`);
+assert(libraryTypes.every(type => EXECUTABLE_TYPES.has(type)), "every Library node has executable ports");
+const processorMap = createNodeProcessors();
+const bridgeBacked = new Set(["twozero","td","isadora","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
+const missingProcessors = libraryTypes.filter(type => !processorMap.has(type) && !bridgeBacked.has(type));
+assert(missingProcessors.length === 0, `every executable Library node has a processor or bridge: ${missingProcessors.join(", ") || "none"}`);
+assert(processorMap.has("ml5-hand") && processorMap.has("ml5-body") && processorMap.has("brain-map"), "ML nodes have real processors");
 
 // --- ir / demo ---
 console.log("ir");
@@ -838,7 +847,7 @@ assert(oscBad, "unsupported osc type throws");
 
 console.log("project-format");
 const pFresh = newProject();
-assert(pFresh.version === 2 && APP_VERSION === "3.0.2", "project format 2 / app 3.0.2");
+assert(pFresh.version === 2 && APP_VERSION === "3.0.3", "project format 2 / app 3.0.3");
 const old = validateProject({ schema: "cvd.graph", version: 1, name: "old", nodes: [], edges: [] });
 assert(old.version === 2, "v1 projects migrate to format 2");
 let futureFail = false;

@@ -1,6 +1,6 @@
 # No-de Vibe Designer
 
-**Source canonique : `main` · No-de Vibe Designer V3.0.2.**  
+**Source canonique : `main` · No-de Vibe Designer V3.0.3.**  
 Production readiness : `docs/PRODUCTION_READINESS.md`.  
 La Library est à **105/105 nodes exécutables** ; les limites matérielles ou logicielles externes restent explicitement signalées.
 
