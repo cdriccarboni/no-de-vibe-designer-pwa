@@ -79,11 +79,7 @@ jobs:
               "mac": {
                 "category": "public.app-category.graphics-design",
                 "identity": null,
-                "target": [
-                  {"target":"zip","arch":["arm64"]},
-                  {"target":"dmg","arch":["arm64"]}
-                ],
-                "artifactName": "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.\${ext}"
+                "target": [{"target":"dir","arch":["arm64"]}]
               }
             }
           }
@@ -203,21 +199,73 @@ jobs:
 
           npm install --no-audit --no-fund
 
-      - name: Build Apple Silicon app
-        run: npx electron-builder --mac --arm64 --publish never
+      - name: Build unpacked Apple Silicon app
+        run: npx electron-builder --mac dir --arm64 --publish never
 
-      - name: Validate packaged desktop app
+      - name: Ad-hoc sign complete ARM64 bundle
         shell: bash
         run: |
           set -euo pipefail
           APP_DIR="dist/mac-arm64/No-de Vibe Designer.app"
+
           test -d "$APP_DIR"
-          test -f "$APP_DIR/Contents/Info.plist"
-          test -x "$APP_DIR/Contents/MacOS/No-de Vibe Designer"
-          test -f "$APP_DIR/Contents/Resources/app.asar"
-          test -f "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"
-          test -f "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"
+          xattr -cr "$APP_DIR" || true
+
+          codesign --force --deep --sign - --timestamp=none "$APP_DIR"
+          codesign --verify --deep --strict --verbose=2 "$APP_DIR"
+
+          MAIN_BIN="$APP_DIR/Contents/MacOS/No-de Vibe Designer"
+          file "$MAIN_BIN" | tee macos-architecture.txt
+          file "$MAIN_BIN" | grep -qi "arm64"
+
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_DIR/Contents/Info.plist" | grep -qx "fr.acousmatic.nodevibedesigner"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_DIR/Contents/Info.plist" | grep -qx "$APP_VERSION"
+
+      - name: Package signed ZIP and DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_DIR="dist/mac-arm64/No-de Vibe Designer.app"
+          ZIP="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"
+          DMG="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"
+          STAGE="$RUNNER_TEMP/no-de-dmg"
+
+          rm -rf "$STAGE" "$ZIP" "$DMG"
+          mkdir -p "$STAGE"
+
+          ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ZIP"
+          ditto "$APP_DIR" "$STAGE/No-de Vibe Designer.app"
+          ln -s /Applications "$STAGE/Applications"
+
+          hdiutil create             -volname "No-de Vibe Designer"             -srcfolder "$STAGE"             -ov             -format UDZO             "$DMG"
+
+          test -s "$ZIP"
+          test -s "$DMG"
+
+      - name: Verify packaged artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TMP_ZIP="$RUNNER_TEMP/no-de-zip-check"
+          TMP_DMG="$RUNNER_TEMP/no-de-dmg-check"
+          ZIP="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"
+          DMG="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"
+
+          rm -rf "$TMP_ZIP" "$TMP_DMG"
+          mkdir -p "$TMP_ZIP" "$TMP_DMG"
+
+          ditto -x -k "$ZIP" "$TMP_ZIP"
+          ZIP_APP="$TMP_ZIP/No-de Vibe Designer.app"
+          codesign --verify --deep --strict --verbose=2 "$ZIP_APP"
+          file "$ZIP_APP/Contents/MacOS/No-de Vibe Designer" | grep -qi "arm64"
+
+          MOUNT_POINT="$(hdiutil attach "$DMG" -readonly -nobrowse | tail -1 | awk '{for(i=3;i<=NF;i++) printf "%s%s",$i,(i<NF?OFS:"") }')"
+          test -d "$MOUNT_POINT/No-de Vibe Designer.app"
+          codesign --verify --deep --strict --verbose=2 "$MOUNT_POINT/No-de Vibe Designer.app"
+          file "$MOUNT_POINT/No-de Vibe Designer.app/Contents/MacOS/No-de Vibe Designer" | grep -qi "arm64"
+          hdiutil detach "$MOUNT_POINT"
 
       - name: Prepare stable aliases and checksums
         shell: bash
@@ -225,13 +273,9 @@ jobs:
           set -euo pipefail
           cp "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip" "dist/No-de-Vibe-Designer-macOS-arm64.zip"
           cp "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg" "dist/No-de-Vibe-Designer-macOS-arm64.dmg"
+
           cd dist
-          shasum -a 256 \
-            "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip" \
-            "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg" \
-            "No-de-Vibe-Designer-macOS-arm64.zip" \
-            "No-de-Vibe-Designer-macOS-arm64.dmg" \
-            > SHA256SUMS-macOS.txt
+          shasum -a 256             "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"             "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"             "No-de-Vibe-Designer-macOS-arm64.zip"             "No-de-Vibe-Designer-macOS-arm64.dmg"             > SHA256SUMS-macOS.txt
 
       - uses: actions/upload-artifact@v4
         with:
@@ -242,19 +286,19 @@ jobs:
             dist/No-de-Vibe-Designer-macOS-arm64.zip
             dist/No-de-Vibe-Designer-macOS-arm64.dmg
             dist/SHA256SUMS-macOS.txt
+            macos-architecture.txt
           if-no-files-found: error
 
-      - name: Refresh GitHub release assets
+      - name: Create or refresh GitHub release assets
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           TAG="v$APP_VERSION"
-          gh release upload "$TAG" \
-            "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip" \
-            "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg" \
-            "dist/No-de-Vibe-Designer-macOS-arm64.zip" \
-            "dist/No-de-Vibe-Designer-macOS-arm64.dmg" \
-            "dist/SHA256SUMS-macOS.txt" \
-            --clobber
+
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG"               --target "$GITHUB_SHA"               --title "No-de Vibe Designer $APP_VERSION"               --notes "Build de distribution No-de Vibe Designer $APP_VERSION."               || gh release view "$TAG" >/dev/null
+          fi
+
+          gh release upload "$TAG"             "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"             "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"             "dist/No-de-Vibe-Designer-macOS-arm64.zip"             "dist/No-de-Vibe-Designer-macOS-arm64.dmg"             "dist/SHA256SUMS-macOS.txt"             --clobber
