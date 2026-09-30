@@ -15,7 +15,7 @@ export function normalizeLocalAiConfig(raw = {}) {
   const legacyEndpoint = typeof cfg.localEndpoint === "string" ? cfg.localEndpoint : "";
   return {
     enabled: cfg.localEnabled !== false,
-    baseUrl: String(cfg.localBaseUrl || legacyEndpoint || LOCAL_AI_DEFAULTS.baseUrl).replace(/\\+$/, ""),
+    baseUrl: String(cfg.localBaseUrl || legacyEndpoint || LOCAL_AI_DEFAULTS.baseUrl).replace(/\/+$/, ""),
     model: String(cfg.localModel || LOCAL_AI_DEFAULTS.model).trim() || LOCAL_AI_DEFAULTS.model,
     temperature: Math.max(0, Math.min(1, Number(cfg.localTemperature ?? LOCAL_AI_DEFAULTS.temperature))),
     maxOps: Math.max(1, Math.min(128, Number(cfg.localMaxOps ?? LOCAL_AI_DEFAULTS.maxOps) || LOCAL_AI_DEFAULTS.maxOps)),
@@ -49,7 +49,7 @@ export function selectLocalModel(names = [], preferred = LOCAL_AI_DEFAULTS.model
     let score = 0;
     if (n.includes("qwen")) score += 50;
     if (n.includes("coder")) score += 25;
-    if (/(:|\\b)(0\\.5|0\\.6|1\\.5|1\\.7|3|4|7)b\\b/.test(n)) score += 10;
+    if (/(:|\b)(0\.5|0\.6|1\.5|1\.7|3|4|7)b\b/.test(n)) score += 10;
     if (n.includes("embedding")) score -= 100;
     if (n.includes("vision")) score -= 15;
     return { name, score };
@@ -95,7 +95,7 @@ export function buildLocalAiPrompt(text, project = {}) {
       "Tu peux préparer ces nodes, mais les permissions et sorties externes restent explicitement déclenchées par l'humain.",
       "N'invente aucun type de node hors catalogue.",
       "Ne produis jamais de code shell, de commande système, de chemin privé, de clé ni de secret."
-    ].join("\\n"),
+    ].join("\n"),
     user: JSON.stringify({
       task: String(text || "").slice(0, 6000),
       outputSchema: {
@@ -115,7 +115,7 @@ export function buildLocalAiPrompt(text, project = {}) {
 
 function parseMaybeJson(value) {
   if (value && typeof value === "object") return value;
-  const text = String(value || "").trim().replace(/^\`\`\`(?:json)?\\s*/i, "").replace(/\\s*\`\`\`$/, "");
+  const text = String(value || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   if (!text) return null;
   return JSON.parse(text);
 }
@@ -186,7 +186,7 @@ export function sanitizeLocalAiResponse(raw, { maxOps = LOCAL_AI_DEFAULTS.maxOps
 
 export async function directOllamaProbe(baseUrl = LOCAL_AI_DEFAULTS.baseUrl) {
   if (!isLoopbackLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige une adresse loopback");
-  const res = await fetch(String(baseUrl).replace(/\\+$/, "") + "/api/tags", { method: "GET" });
+  const res = await fetch(String(baseUrl).replace(/\/+$/, "") + "/api/tags", { method: "GET" });
   if (!res.ok) throw new Error("Ollama HTTP " + res.status);
   const data = await res.json();
   return { ok: true, models: modelNamesFromTags(data) };
@@ -194,7 +194,7 @@ export async function directOllamaProbe(baseUrl = LOCAL_AI_DEFAULTS.baseUrl) {
 
 export async function directOllamaChat({ baseUrl, model, system, user, temperature = .15 } = {}) {
   if (!isLoopbackLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige une adresse loopback");
-  const res = await fetch(String(baseUrl).replace(/\\+$/, "") + "/api/chat", {
+  const res = await fetch(String(baseUrl).replace(/\/+$/, "") + "/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
