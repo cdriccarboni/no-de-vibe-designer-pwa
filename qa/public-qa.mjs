@@ -8,6 +8,7 @@ import { renderThreadCurtain } from "../shared/graphics/interactive-effects.js";
 import { encodeSacnChannel, sacnMulticastAddress } from "../shared/protocols/sacn.js";
 import { createRegiePreset, REGIE_PRESETS } from "../shared/companion-studio/regie-presets.js";
 import { APP_VERSION } from "../shared/version.js";
+import { listCues, standingByCue, advanceCuePlayhead, buildCueState } from "../shared/stage/cues.js";
 import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl, navigateSurface } from "../shared/surface-switcher.js";
 import fs from "node:fs";
 
@@ -18,7 +19,7 @@ function assert(condition, message) {
 
 console.log(`No-de Vibe Designer public QA ${APP_VERSION}`);
 
-assert(/^1\.4\.\d+$/.test(APP_VERSION), `runtime version is current 1.4.x (${APP_VERSION})`);
+assert(/^2\.2\.\d+$/.test(APP_VERSION), `runtime version is current 2.2.x (${APP_VERSION})`);
 assert(SURFACES.length === 5, "five switchable No-de surfaces are available");
 const surfaceMem = new Map();
 const surfaceStorage = {
@@ -92,7 +93,7 @@ assert(mirror.frame.pixels.some(v => v > 0), "Living Shadow mirror produces visi
 const autonomous = renderLivingShadow({ frame, time: 2.5, mode: "autonomous", sourceZone: "jardin", shadowZone: "cour", threshold: .3, autonomy: .8, detachedFrame: mirror.capture });
 assert(autonomous.state === "AUTONOMOUS" && autonomous.frame.pixels.some(v => v > 0), "detached Living Shadow stays visible autonomously");
 
-const curtain = renderThreadCurtain({ width: 96, height: 54, time: 1.2, pointer: { x: .42, y: .55, speed: .3 }, strands: 32, force: .8 });
+const curtain = renderThreadCurtain({ width: 96, height: 54, time: 1.2, pointer: { x: .42, y: .55, speed: .3, spread:.7 }, strands: 32, force: .8, lightWaves:.95 });
 assert(curtain.kind === "video" && curtain.source === "thread-curtain", "Thread Curtain returns a video frame");
 assert(curtain.pixels.some(v => v > 0), "Thread Curtain renders interactive strands");
 
@@ -116,7 +117,7 @@ assert(!secured.ops.some(o => o.type === "camera" && o.key === "permission" && o
 assert(secured.ops.some(o => o.type === "servo" && o.key === "speed" && o.value === 10), "Safety Engine clamps speed");
 assert(secured.security.dropped.some(x => /Connexion incompatible/.test(x)), "Safety Engine rejects incompatible connection");
 
-assert(REGIE_PRESETS.length === 5, "Companion ships exactly 5 practical presets");
+assert(REGIE_PRESETS.length >= 6, "Companion ships theatre presets including 12 Players");
 for (const preset of REGIE_PRESETS) {
   const doc = createRegiePreset(preset.id);
   assert(doc.pages.length > 0 && doc.meta?.quickReady === true, `Companion preset ${preset.id} is valid`);
@@ -125,6 +126,25 @@ const light = createRegiePreset("lumiere");
 const lightPage = light.pages.find(p => p.role === "lighting");
 assert(lightPage?.widgets.filter(w => w.type === "fader").length >= 4, "Lumière preset has compact faders");
 assert(lightPage?.widgets.some(w => w.binding?.kind === "sacn" && w.binding?.universe === 1), "Lumière preset has real sACN binding");
+const players = createRegiePreset("lecteurs12");
+const playerSlots = new Set(players.pages.flatMap(p => p.widgets || []).filter(w => w.binding?.kind === "audioplayer").map(w => w.binding?.playerSlot));
+assert(playerSlots.size === 12, "Companion 12 Players preset exposes all 12 stereo players");
+assert(players.pages.filter(p => p.role === "audio-players").length === 3, "12 Players are distributed across three compact Companion pages");
+
+const cueProject = {
+  name:"QA Show",
+  timeline:[
+    {id:"c1",kind:"cue",label:"Ouverture",start:0,duration:2},
+    {id:"c2",kind:"cue",label:"Entrée",start:5,duration:1}
+  ],
+  meta:{}
+};
+const qaCues = listCues(cueProject);
+assert(standingByCue(cueProject, qaCues)?.id === "c1", "Cue engine initially stands by first cue");
+advanceCuePlayhead(cueProject, "c1");
+assert(standingByCue(cueProject, qaCues)?.id === "c2", "GO playhead advances to following cue");
+const cueState = buildCueState(cueProject);
+assert(cueState.playheadId === "c2" && cueState.cues.length === 2, "Companion cue-state mirrors playhead and cue list");
 
 const desktopHtml = fs.readFileSync(new URL("../desktop/index.html", import.meta.url), "utf8");
 const desktopJs = fs.readFileSync(new URL("../desktop/app.js", import.meta.url), "utf8");
