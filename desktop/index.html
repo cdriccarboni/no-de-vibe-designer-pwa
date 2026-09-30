@@ -167,12 +167,21 @@
         <label>Zoom par défaut <input id="prefDefaultZoom" type="range" min="50" max="150" value="100"></label>
       </div>
       <div data-pref-panel="ai" class="hidden">
-        <p class="hint">Sans endpoint, le moteur <b>local</b> (règles) s’applique. Aucune réussite IA n’est simulée.</p>
+        <p class="hint"><b>IA locale prioritaire</b> : No-de utilise d’abord Ollama sur cette machine pour générer des opérations de patch JSON. Si elle est indisponible, repli automatique sur le moteur local déterministe.</p>
+        <label>Activer l’IA générative locale <input id="aiLocalEnabled" type="checkbox" checked></label>
+        <label class="stack">Serveur local<input id="aiLocalBase" type="url" value="http://127.0.0.1:11434"></label>
+        <label class="stack">Modèle local<input id="aiLocalModel" type="text" value="qwen2.5-coder:7b"></label>
+        <div class="preferences-actions">
+          <button id="aiLocalProbe" class="smallbtn" type="button">Tester l’IA locale</button>
+          <span id="aiLocalStatus" class="hint">Non testée</span>
+        </div>
+        <hr>
+        <p class="hint">Cloud optionnel : utilisé seulement si l’IA locale échoue et qu’un endpoint distant est activé.</p>
         <p class="hint bad">Grok / xAI est exclu et sera refusé.</p>
-        <label>Activer l’appel IA distant <input id="aiEnabled" type="checkbox" checked></label>
+        <label>Autoriser le secours IA distant <input id="aiEnabled" type="checkbox"></label>
         <label class="stack">Endpoint (OpenAI-compatible)<input id="aiEndpoint" type="url" placeholder="https://api.openai.com/v1/chat/completions"></label>
         <label class="stack">Clé API<input id="aiKey" type="password" placeholder="sk-… (stockée localement)"></label>
-        <label class="stack">Modèle<input id="aiModel" type="text" value="gpt-4o-mini"></label>
+        <label class="stack">Modèle distant<input id="aiModel" type="text" value="gpt-4o-mini"></label>
         <div class="preferences-actions"><button id="aiSave" class="smallbtn" type="button">Enregistrer IA</button></div>
       </div>
       <div data-pref-panel="io" class="hidden">
