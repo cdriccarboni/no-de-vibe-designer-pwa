@@ -38,6 +38,14 @@ export function surfaceUrl(id,{root=pwaRootUrl()}={}){
   return new URL(s.path,root).href;
 }
 
+export function navigateSurface(id,{locationObj=globalThis.location}={}){
+  const target=new URL(surfaceUrl(id),locationObj?.href||pwaRootUrl());
+  const localTarget=target.pathname+target.search+target.hash;
+  if(typeof locationObj?.assign==="function") locationObj.assign(localTarget);
+  else if(locationObj) locationObj.href=localTarget;
+  return localTarget;
+}
+
 function injectStyle(){
   if(document.getElementById("nvdSurfaceSwitcherStyle")) return;
   const style=document.createElement("style");
@@ -78,14 +86,14 @@ export function installSurfaceSwitcher({current="designer",label="Interface"}={}
     b.innerHTML=`<b>${s.label}</b><small>${s.detail}</small>`;
     b.onclick=()=>{
       setPreferredSurface(s.id);
-      location.href=surfaceUrl(s.id);
+      navigateSurface(s.id);
     };
     menu.appendChild(b);
   }
   const sep=document.createElement("div");sep.className="nvd-surface-sep";menu.appendChild(sep);
   const auto=document.createElement("button");
   auto.type="button";auto.innerHTML="<b>Auto</b><small>Ordinateur → Designer · mobile/tablette → Mobile</small>";
-  auto.onclick=()=>{setPreferredSurface("auto");location.href=surfaceUrl("auto");};
+  auto.onclick=()=>{setPreferredSurface("auto");navigateSurface("auto");};
   menu.appendChild(auto);
 
   const toggle=wrap.querySelector(".nvd-surface-toggle");

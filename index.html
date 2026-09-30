@@ -49,8 +49,26 @@ if(!valid.includes(preferred))preferred="";
 let surface=valid.includes(forced)?forced:preferred||(mobileDevice?"mobile":"designer");
 const routes={designer:"./desktop/?surface=designer",mobile:"./mobile/?surface=mobile",regie:"./studio/?surface=regie",plateau:"./studio/?surface=plateau",camera:"./companion/?surface=camera"};
 document.querySelector("#status").textContent=preferred&&!forced?`Préférence mémorisée · ${surface}`:`Interface proposée · ${surface}`;
-document.querySelectorAll("[data-surface]").forEach(a=>a.addEventListener("click",()=>{try{localStorage.setItem(KEY,a.dataset.surface)}catch{}}));
-if(!chooser) requestAnimationFrame(()=>location.replace(routes[surface]||routes.designer));
+function openInternalRoute(target,{replace=false}={}){
+  const url=new URL(target,location.href);
+  const localTarget=url.pathname+url.search+url.hash;
+  if(replace) location.replace(localTarget);
+  else location.assign(localTarget);
+}
+document.querySelectorAll("[data-surface]").forEach(a=>a.addEventListener("click",event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  const id=a.dataset.surface;
+  try{localStorage.setItem(KEY,id)}catch{}
+  openInternalRoute(routes[id]||routes.designer);
+}));
+document.querySelector("#autoLink")?.addEventListener("click",event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  try{localStorage.removeItem(KEY)}catch{}
+  openInternalRoute("./?auto=1&chooser=1");
+});
+if(!chooser) requestAnimationFrame(()=>openInternalRoute(routes[surface]||routes.designer,{replace:true}));
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js",{scope:"./"}).catch(()=>{});
 </script>
 </body>

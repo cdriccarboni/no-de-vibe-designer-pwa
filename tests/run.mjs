@@ -24,7 +24,7 @@ import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } 
 import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { WebSocketBridge } from "../shared/adapters/websocket-bridge.js";
 import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "../shared/pwa-update.js";
-import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl } from "../shared/surface-switcher.js";
+import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl, navigateSurface } from "../shared/surface-switcher.js";
 import { createMemoryProjectStore } from "../shared/project-store.js";
 import { applyRemoteMessage, initialRemoteState } from "../shared/remote-protocol.js";
 import { startRemoteServer } from "../bridge/remote-server.mjs";
@@ -752,7 +752,7 @@ assert(oscBad, "unsupported osc type throws");
 
 console.log("project-format");
 const pFresh = newProject();
-assert(pFresh.version === 2 && APP_VERSION === "1.3.4", "project format 2 / app 1.3.4");
+assert(pFresh.version === 2 && APP_VERSION === "1.3.5", "project format 2 / app 1.3.5");
 const old = validateProject({ schema: "cvd.graph", version: 1, name: "old", nodes: [], edges: [] });
 assert(old.version === 2, "v1 projects migrate to format 2");
 let futureFail = false;
