@@ -2,9 +2,22 @@ name: Build macOS Test App from Public PWA
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "desktop/**"
+      - "mobile/**"
+      - "studio/**"
+      - "companion/**"
+      - "manifest.webmanifest"
+      - "sw.js"
+      - "build-info.json"
+      - "shared/**"
+      - ".github/workflows/macos-public-build.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   macos-arm64:
@@ -52,7 +65,7 @@ jobs:
                 "category": "public.app-category.graphics-design",
                 "identity": null,
                 "target": [{"target":"zip","arch":["arm64"]}],
-                "artifactName": "No-de-Vibe-Designer-1.4.0-arm64-mac.zip"
+                "artifactName": "No-de-Vibe-Designer-1.4.0-macOS-arm64.zip"
               }
             }
           }
@@ -100,3 +113,12 @@ jobs:
           name: No-de-Vibe-Designer-1.4.0-macOS-arm64
           path: dist/*.zip
           if-no-files-found: error
+
+      - name: Refresh v1.4.0 release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          ZIP="dist/No-de-Vibe-Designer-1.4.0-macOS-arm64.zip"
+          shasum -a 256 "$ZIP" > SHA256SUMS-macOS.txt
+          gh release upload v1.4.0 "$ZIP" SHA256SUMS-macOS.txt --clobber
