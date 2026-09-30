@@ -1,3 +1,4 @@
+import { installSurfaceSwitcher } from "../shared/surface-switcher.js";
 import { newProject, validateProject, exportProject, createDemoProject, openProject } from "../shared/ir.js";
 import { Runtime } from "../shared/runtime.js";
 import { DESTINATIONS, ROUTE_MODES, ensureRouting, effectiveRoute } from "../shared/routing.js";
@@ -42,6 +43,8 @@ import { validateCompanionDocument } from "../shared/companion-studio/schema.js"
 import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref } from "../shared/companion-studio/detect.js";
 import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT } from "../shared/graphics/sketch-engine.js";
 import { applyShowManifest, showManifestSummary } from "../shared/show-importer.js";
+
+installSurfaceSwitcher({ current:"designer" });
 
 const $ = s => document.querySelector(s);
 const qall = s => [...document.querySelectorAll(s)];
