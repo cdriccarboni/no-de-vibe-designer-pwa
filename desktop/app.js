@@ -163,6 +163,9 @@ function buildLibrary() {
   qall("[data-add]").forEach(x => x.onclick = () => addNode(x.dataset.add));
   const q = $("#search")?.value?.toLowerCase?.() || "";
   if (q) qall(".lib-item").forEach(x => { x.style.display = x.textContent.toLowerCase().includes(q) ? "flex" : "none"; });
+  const expCount = LIB.flatMap(([, items]) => items).filter(([, t]) => !isExecutable(t)).length;
+  const mode = document.querySelector(".library-mode");
+  if (mode) mode.style.display = expCount ? "flex" : "none";
 }
 
 function activeGraph() {
