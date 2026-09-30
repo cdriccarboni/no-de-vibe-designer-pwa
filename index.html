@@ -51,9 +51,11 @@ const routes={designer:"./desktop/index.html?surface=designer",mobile:"./mobile/
 document.querySelector("#status").textContent=preferred&&!forced?`Préférence mémorisée · ${surface}`:`Interface proposée · ${surface}`;
 function openInternalRoute(target,{replace=false}={}){
   const url=new URL(target,location.href);
-  const localTarget=url.pathname+url.search+url.hash;
-  if(replace) location.replace(localTarget);
-  else location.assign(localTarget);
+  const destination=location.protocol==="file:"||url.protocol==="file:"
+    ? url.href
+    : url.pathname+url.search+url.hash;
+  if(replace) location.replace(destination);
+  else location.assign(destination);
 }
 document.querySelectorAll("[data-surface]").forEach(a=>a.addEventListener("click",event=>{
   event.preventDefault();
@@ -66,7 +68,7 @@ document.querySelector("#autoLink")?.addEventListener("click",event=>{
   event.preventDefault();
   event.stopPropagation();
   try{localStorage.removeItem(KEY)}catch{}
-  openInternalRoute("./?auto=1&chooser=1");
+  openInternalRoute("./index.html?auto=1&chooser=1");
 });
 if(!chooser) requestAnimationFrame(()=>openInternalRoute(routes[surface]||routes.designer,{replace:true}));
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js",{scope:"./"}).catch(()=>{});
