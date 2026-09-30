@@ -6,8 +6,10 @@ on:
     branches: [main]
     paths:
       - "index.html"
-      - "mobile.js"
-      - "mobile.css"
+      - "desktop/**"
+      - "mobile/**"
+      - "studio/**"
+      - "companion/**"
       - "manifest.webmanifest"
       - "sw.js"
       - "build-info.json"
@@ -37,8 +39,8 @@ jobs:
       - name: PWA build invariants
         shell: bash
         run: |
-          grep -Fq '"version": "1.3.1.0"' build-info.json
-          grep -Fq 'nvd-1.3.1.0' sw.js
+          grep -Fq '"version": "1.3.1"' build-info.json
+          grep -Fq 'nvd-1.3.1' sw.js
           ! grep -Fq '__CACHE__' sw.js
           ! grep -Fq '__ASSETS__' sw.js
           test -f desktop/index.html
