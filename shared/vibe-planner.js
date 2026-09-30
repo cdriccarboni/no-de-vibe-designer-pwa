@@ -11,12 +11,26 @@ const INTENTS = [
   ["camera", ["webcam","camera live","camera","video live"]],
   ["videofile", ["fichier video","fichier vidéo","video fichier","clip video"]],
   ["whale", ["baleine","whale"]],
-  ["blob", ["blob","metaball","forme organique"]],
+  ["blob", ["blob","forme organique"]],
+  ["threadcurtain", ["thread curtain","rideau de fils","rideau de fil","fils numeriques","fils numériques"]],
+  ["flowfield", ["flow field","champ de flux","particules flux","body particles"]],
+  ["reactiondiffusion", ["reaction diffusion","reaction-diffusion","réaction diffusion"]],
+  ["ribbontrail", ["ribbon trail","rubans","ruban lumineux","trails ruban"]],
+  ["metaballs", ["metaballs","metaball","sdf organique"]],
+  ["sand", ["interactive sand","sable interactif","sable numerique","sable numérique"]],
+  ["swarm", ["swarm","boids","essaim","nuée","nuee"]],
+  ["ripple", ["ripple","ondes","champ d ondes","ondes interactives"]],
   ["dream", ["dream","reve","rêve","visuel onirique"]],
   ["p5", ["p5","processing"]],
   ["sketch", ["sketch","dessin generatif","dessin génératif"]],
   ["blackhole", ["trou noir","black hole","blackhole"]],
   ["threshold", ["threshold","seuil","silhouette","detourage","détourage"]],
+  ["depthmask", ["depth mask","silhouette mask","masque profondeur","masque silhouette"]],
+  ["opticalflow", ["optical flow","flux optique","mouvement video","mouvement vidéo"]],
+  ["feedbackfx", ["ghost feedback","feedback video","feedback vidéo"]],
+  ["fluidwarp", ["fluid warp","warp fluide","deformation fluide","déformation fluide"]],
+  ["refraction", ["refraction","réfraction","glass","verre","lentille"]],
+  ["pointcloud", ["point cloud","nuage de points","depth points"]],
   ["ghost", ["ghost","fantome","fantôme","trainee","traînée","trail"]],
   ["mirror", ["miroir","mirror"]],
   ["shadow", ["ombre","shadow"]],
@@ -51,6 +65,13 @@ const INTENTS = [
   ["wifi", ["wifi","wi-fi"]],
   ["bluetooth", ["bluetooth"]],
   ["automation", ["automation","automatisation","lfo"]],
+  ["force", ["force"]],
+  ["noise", ["noise","bruit procedural","bruit procédural"]],
+  ["curlfield", ["curl field","champ curl","tourbillon vectoriel"]],
+  ["particle", ["particle","particule"]],
+  ["trail", ["trail node","trainee video","traînée vidéo"]],
+  ["spring", ["spring","ressort","inertie ressort"]],
+  ["sdf", ["sdf","signed distance","champ de distance"]],
   ["timer", ["timer","minuteur","temporisateur"]],
   ["smooth", ["lissage","smooth"]],
   ["compare", ["comparaison","compare","plus grand","plus petit"]],
@@ -77,11 +98,11 @@ const INTENTS = [
 ];
 
 const VIDEO_CHAIN = new Set([
-  "threshold","ghost","mirror","shadow","bodyclone","anaglyph","creativefx","storm",
-  "bending","transmute","shader","mapping","videoreturn","transform"
+  "threshold","depthmask","opticalflow","ghost","feedbackfx","mirror","shadow","bodyclone","fluidwarp","refraction","pointcloud","anaglyph","creativefx","storm",
+  "bending","transmute","shader","mapping","videoreturn","transform","trail"
 ]);
-const VIDEO_SOURCES = ["remote-camera","phone-camera-back","phone-camera-front","camera","videofile","whale","blob","dream","p5","sketch","blackhole"];
-const CONTROL_SOURCES = ["midi","gyro","accelerometer","orientation","touch","multitouch","sensors","automation","timer","number"];
+const VIDEO_SOURCES = ["remote-camera","phone-camera-back","phone-camera-front","camera","videofile","whale","blob","threadcurtain","flowfield","reactiondiffusion","ribbontrail","metaballs","sand","swarm","ripple","dream","p5","sketch","blackhole","particle","sdf"];
+const CONTROL_SOURCES = ["midi","gyro","accelerometer","orientation","touch","multitouch","sensors","automation","noise","curlfield","spring","force","timer","number"];
 
 function firstPort(type, dir, preferred = null) {
   const labels = portLabels(type) || [];
@@ -216,6 +237,33 @@ export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
     ops.push({ op:"addClip", track:/cue|top/.test(t) ? 4 : 1, start:0, duration:seconds, label:/cue|top/.test(t) ? "TOP Vibe" : "Vibe", kind:/cue|top/.test(t) ? "cue" : "effect" });
   } else if (/\b(top|cue)\b/.test(t)) {
     ops.push({ op:"addClip", track:4, start:0, duration:1, label:"TOP Vibe", kind:"cue" });
+  }
+
+  // Macros interactives issues de la veille TouchDesigner.
+  if (/rideau de fils|rideau de fil|thread curtain/.test(t)) {
+    add("pointer",70,70); add("smooth",260,70); add("threadcurtain",500,70);
+    connect("pointer","smooth","number");
+    connect("smooth","threadcurtain","number");
+    notes.push("Thread Curtain local : souris/main → lissage → rideau, sans caméra obligatoire.");
+  }
+  if (/essaim|swarm|boids/.test(t)) {
+    add("pointer",70,70); add("spring",280,70); add("swarm",520,70);
+    connect("pointer","spring","number");
+    connect("spring","swarm","number");
+  }
+  if (/sable interactif|interactive sand/.test(t)) {
+    add("pointer",70,70); add("sand",360,70); connect("pointer","sand","number");
+  }
+  if (/reaction diffusion|reaction-diffusion|réaction diffusion/.test(t)) {
+    add("reactiondiffusion",300,70);
+  }
+  if (/point cloud|nuage de points/.test(t) && !source) {
+    add("camera",70,70); add("pointcloud",360,70); connect("camera","pointcloud","video");
+  }
+  if (/fluid warp|warp fluide|refraction|réfraction|glass/.test(t) && !source) {
+    add("camera",70,70);
+    const target=/refraction|réfraction|glass/.test(t)?"refraction":"fluidwarp";
+    add(target,360,70); connect("camera",target,"video");
   }
 
   // Useful scene macros.
