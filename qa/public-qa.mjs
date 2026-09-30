@@ -84,4 +84,4 @@ assert(lightPage?.widgets.some(w => w.binding?.kind === "sacn" && w.binding?.uni
 
 console.log("PUBLIC QA OK");
 
-// QA trigger 1.3.0
+// QA trigger 1.3.0 · 2
