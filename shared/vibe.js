@@ -365,6 +365,8 @@ export async function runVibe(text, project, { forceLocal = false } = {}) {
   };
 }
 
+const AI_PROTECTED_EXTERNAL_TYPES = new Set(["arduino","esp","servo","dmx","osc","twozero","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
+
 const ALLOWED_TYPES = new Set(["camera", "pointer", "whale", "blob", "threshold", "ghost", "mirror", "bodyclone", "shadow", "transform", "composite", "blackhole", "shader", "midi", "osc", "tracking", "stageio", "subpatch", "audio", "organicaudio", "soundmemo", "phone-camera-front", "phone-camera-back"]);
 
 export function applyVibeOps(project, ops, helpers) {
@@ -411,6 +413,10 @@ export function applyVibeOps(project, ops, helpers) {
         const n = op.id ? nodeById(op.id) : findByType(op.type).at(-1);
         if (!n) {
           errors.push(`setParam : node introuvable (${op.type || op.id})`);
+          continue;
+        }
+        if (AI_PROTECTED_EXTERNAL_TYPES.has(n.type) && op.key === "auto" && op.value === true) {
+          errors.push(`Sécurité scène : l’IA ne peut pas armer automatiquement « ${n.title || n.type} »`);
           continue;
         }
         n.params = { ...n.params, [op.key]: op.value };
