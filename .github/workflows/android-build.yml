@@ -14,7 +14,7 @@ on:
       - ".github/workflows/android-build.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   android:
@@ -86,3 +86,20 @@ jobs:
           name: No-de-Vibe-Designer-1.3.0-android-unsigned-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+
+
+      - name: Publish downloadable binaries
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          mkdir -p downloads
+          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/No-de-Vibe-Designer-1.3.0-debug.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab downloads/No-de-Vibe-Designer-1.3.0-unsigned.aab
+          printf '%s\n' '# Android downloads' ''             '- APK test: No-de-Vibe-Designer-1.3.0-debug.apk'             '- AAB release: No-de-Vibe-Designer-1.3.0-unsigned.aab (non signé, non publiable sur Play tel quel)'             > downloads/README.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add downloads
+          if ! git diff --cached --quiet; then
+            git commit -m "build(android): publish No-de 1.3.0 binaries"
+            git push
+          fi
