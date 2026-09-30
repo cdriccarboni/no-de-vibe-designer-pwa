@@ -17,6 +17,9 @@ export const STUDIO_MSG = Object.freeze({
   PING: "studio-ping",
   PONG: "studio-pong",
   STATUS: "studio-status",
+  MONITOR_START: "studio-monitor-start",
+  MONITOR_FRAME: "studio-monitor-frame",
+  MONITOR_STOP: "studio-monitor-stop",
   DISCONNECT: "studio-disconnect"
 });
 
