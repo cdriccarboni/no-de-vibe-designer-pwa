@@ -36,7 +36,8 @@ navigateSurface("mobile", {
   locationObj: {
     href: "https://localhost/index.html?chooser=1",
     assign: value => navCalls.push(value)
-  }
+  },
+  root: new URL("https://localhost/")
 });
 assert(navCalls[0] === "/mobile/", "Android surface navigation stays inside the app");
 
