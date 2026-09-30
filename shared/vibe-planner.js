@@ -5,6 +5,9 @@ export function normalizeVibeText(text) {
 }
 
 const INTENTS = [
+  ["presence", ["presence","présence","interprete","interprète"]],
+  ["livingshadow", ["ombre vivante","ombre autonome","ombre qui se detache","ombre qui se détache"]],
+  ["stage-output", ["sortie scene","sortie scène","sortie video","sortie vidéo"]],
   ["remote-camera", ["remote camera","camera distante","camera telephone","camera téléphone"]],
   ["phone-camera-back", ["camera arriere","camera arrière","camera back"]],
   ["phone-camera-front", ["camera avant","camera front"]],
@@ -12,7 +15,7 @@ const INTENTS = [
   ["videofile", ["fichier video","fichier vidéo","video fichier","clip video"]],
   ["whale", ["baleine","whale"]],
   ["blob", ["blob","forme organique"]],
-  ["threadcurtain", ["thread curtain","rideau de fils","rideau de fil","fils numeriques","fils numériques"]],
+  ["threadcurtain", ["thread curtain","rideau de fils numerique","rideau de fil numerique","rideau de fils numérique","rideau de fil numérique","fils numeriques","fils numériques"]],
   ["flowfield", ["flow field","champ de flux","particules flux","body particles"]],
   ["reactiondiffusion", ["reaction diffusion","reaction-diffusion","réaction diffusion"]],
   ["ribbontrail", ["ribbon trail","rubans","ruban lumineux","trails ruban"]],
@@ -148,8 +151,86 @@ function phraseIndex(t, phrases) {
   return best;
 }
 
+
+function extractPerformerName(rawText) {
+  const raw = String(rawText || "");
+  const direct = raw.match(/(?:capte|capter|filmer|filme|suit|suivre|presence de|présence de|ombre de|retour de)\s+([A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ-]{1,30})/i);
+  if (direct?.[1]) return direct[1][0].toUpperCase() + direct[1].slice(1).toLowerCase();
+  const stop = new Set(["Je","Il","Elle","On","En","Et","Puis","Quand","Cette","Ce","La","Le","Les","Une","Un","Bon","Voilà","Selon","Max","Node","No","Vibe","Designer","Ombre","Rideau","Camera","Caméra","Retour","Sortie","Jardin","Cour"]);
+  const candidates = raw.match(/\b[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ-]{2,30}\b/g) || [];
+  return candidates.find(x => !stop.has(x)) || "Interprète";
+}
+
+function extractStageSurface(t) {
+  if (/rideau de fil|rideau de fils/.test(t)) return "Rideau de fils";
+  if (/cyclo|cyclorama/.test(t)) return "Cyclo";
+  if (/tulle/.test(t)) return "Tulle";
+  if (/ecran fond|écran fond|fond de scene|fond de scène/.test(t)) return "Écran fond";
+  if (/ecran|écran/.test(t)) return "Écran";
+  if (/sol|plancher/.test(t)) return "Sol";
+  return "Sortie Scène";
+}
+
+function sceneZones(t) {
+  let sourceZone = /(?:interprete|interprète|comedien|comédien|acteur|actrice|personne|[a-z]+)\s+(?:sera|est|se place|va)\s+(?:a|à)\s+jardin/.test(t) || /a jardin|à jardin/.test(t) ? "jardin" : null;
+  let shadowZone = /ombre[^.]{0,80}(?:a|à)\s+cour/.test(t) ? "cour" : null;
+  if (!sourceZone && /jardin/.test(t)) sourceZone = "jardin";
+  if (!shadowZone && /cour/.test(t)) shadowZone = "cour";
+  sourceZone ||= "jardin";
+  shadowZone ||= sourceZone === "jardin" ? "cour" : sourceZone === "cour" ? "jardin" : "cour";
+  return { sourceZone, shadowZone };
+}
+
+function livingShadowScenePlan(rawText, t) {
+  const shadowLanguage = /ombre|silhouette/.test(t);
+  const stageLanguage = /danse|miroir|decroch|décroch|autonom|prend vie|prendre vie|retour video|retour vidéo|jardin|cour/.test(t);
+  if (!shadowLanguage || !stageLanguage) return null;
+
+  const person = extractPerformerName(rawText);
+  const { sourceZone, shadowZone } = sceneZones(t);
+  const surface = extractStageSurface(t);
+  const mirrorDance = /miroir|danse|danser/.test(t);
+  const autonomous = /autonom|prend vie|prendre vie|vit seule|vie propre/.test(t);
+  const sourceType = /remote camera|camera distante|caméra distante|telephone|téléphone/.test(t) ? "remote-camera" : "camera";
+  const mode = mirrorDance ? "mirror" : autonomous ? "autonomous" : "attached";
+
+  const ops = [
+    { op:"addNode", type:sourceType, x:60, y:80, allowDuplicate:true, title:`Caméra · ${person}`, params:{ sourceName:person } },
+    { op:"addNode", type:"presence", x:300, y:80, allowDuplicate:true, title:`Présence · ${person}`, params:{ person, zone:sourceZone, sourceZone, threshold:.45 } },
+    { op:"addNode", type:"videoreturn", x:550, y:20, allowDuplicate:true, title:`Retour · ${person}`, params:{ person } },
+    { op:"addNode", type:"livingshadow", x:560, y:180, allowDuplicate:true, title:`Ombre Vivante · ${person}`, params:{
+      person, sourceZone, shadowZone, mode, autonomy:autonomous ? .7 : .58, threshold:.45, detachable:true
+    }},
+    { op:"addNode", type:"mapping", x:830, y:180, allowDuplicate:true, title:`Mapping · ${surface}`, params:{ surfaceName:surface, scale:1 } },
+    { op:"addNode", type:"stage-output", x:1070, y:180, allowDuplicate:true, title:`Sortie · ${surface}`, params:{ surfaceName:surface } },
+
+    { op:"connect", fromType:sourceType, fromPort:0, toType:"presence", toPort:0 },
+    { op:"connect", fromType:"presence", fromPort:4, toType:"videoreturn", toPort:0 },
+    { op:"connect", fromType:"presence", fromPort:4, toType:"livingshadow", toPort:0 },
+    { op:"connect", fromType:"livingshadow", fromPort:3, toType:"mapping", toPort:0 },
+    { op:"connect", fromType:"mapping", fromPort:2, toType:"stage-output", toPort:0 }
+  ];
+
+  return {
+    engine:"scene-language",
+    ops,
+    note:`Scène comprise · ${person} (${sourceZone}) → Ombre Vivante (${shadowZone}) → ${surface}.`,
+    diagnostics:{
+      performer:person, sourceZone, shadowZone, surface,
+      behavior:{ mirrorDance, autonomous, detachable:true },
+      notes:[
+        "La caméra est ajoutée sans demander automatiquement la permission.",
+        "L’ombre peut être décrochée par le bouton de l’Inspector ou par son entrée Trigger.",
+        "La sortie scénique reste locale : aucun appareil externe n’est armé automatiquement."
+      ]
+    }
+  };
+}
+
 export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
   const t = normalizeVibeText(text);
+  const scenePlan = livingShadowScenePlan(text, t);
+  if (scenePlan) return scenePlan;
   const ops = [];
   const notes = [];
   const existing = new Set((project.nodes || []).map(n => n.type));
@@ -240,7 +321,7 @@ export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
   }
 
   // Macros interactives issues de la veille TouchDesigner.
-  if (/rideau de fils|rideau de fil|thread curtain/.test(t)) {
+  if (/thread curtain|rideau de fils numerique|rideau de fil numerique|rideau de fils numérique|rideau de fil numérique|fils numeriques|fils numériques/.test(t)) {
     add("pointer",70,70); add("smooth",260,70); add("threadcurtain",500,70);
     connect("pointer","smooth","number");
     connect("smooth","threadcurtain","number");
