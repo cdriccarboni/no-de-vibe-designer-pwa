@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           grep -Fq '"version": "1.3.1"' build-info.json
-          grep -Fq 'nvd-1.3.1' sw.js
+          grep -Fq 'nvd-1.3.1-multi' sw.js
           ! grep -Fq '__CACHE__' sw.js
           ! grep -Fq '__ASSETS__' sw.js
           test -f desktop/index.html
