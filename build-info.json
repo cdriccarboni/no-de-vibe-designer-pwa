@@ -1,9 +1,9 @@
 {
   "name": "No-de Vibe Designer",
-  "version": "3.0.0",
-  "builtAt": "2026-09-30T23:09:52.960Z",
+  "version": "3.0.2",
+  "builtAt": "2026-09-30T23:30:05.479Z",
   "files": 117,
-  "cacheRevision": "d7bf8f4384",
+  "cacheRevision": "d272678405",
   "surfaces": [
     "designer",
     "mobile",
@@ -11,12 +11,14 @@
     "plateau",
     "camera"
   ],
-  "sourceCommit": "d7bf8f438497e8b204721d3542339e0de24c80eb",
+  "sourceCommit": "d2726784056a868c74074ec8c5287ba7ebe666b5",
   "features": {
     "graphicsEngine": "3",
     "quickMap": true,
     "imageVibe": true,
     "noviceManual": true,
-    "rolesFlexible": true
+    "rolesFlexible": true,
+    "copyrightLink": true,
+    "cueEngine": "2.2"
   }
 }
