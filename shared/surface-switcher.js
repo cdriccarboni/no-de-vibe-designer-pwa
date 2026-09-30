@@ -88,6 +88,12 @@ export function installSurfaceSwitcher({current="designer",label="Interface"}={}
   auto.onclick=()=>{setPreferredSurface("auto");location.href=surfaceUrl("auto");};
   menu.appendChild(auto);
 
+  const privacy=document.createElement("button");
+  privacy.type="button";
+  privacy.innerHTML="<b>Confidentialité</b><small>Politique de confidentialité · Google Play</small>";
+  privacy.onclick=()=>{location.href=new URL("privacy/",pwaRootUrl()).href;};
+  menu.appendChild(privacy);
+
   const toggle=wrap.querySelector(".nvd-surface-toggle");
   const close=()=>{menu.hidden=true;toggle.setAttribute("aria-expanded","false");};
   toggle.onclick=(e)=>{
