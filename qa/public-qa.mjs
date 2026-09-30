@@ -39,7 +39,7 @@ navigateSurface("mobile", {
   },
   root: new URL("https://localhost/")
 });
-assert(navCalls[0] === "/mobile/", "Android surface navigation stays inside the app");
+assert(navCalls[0] === "/mobile/index.html", "Android surface navigation stays inside the app");
 
 const libraryTypes = new Set();
 for (const [, items] of NODE_GROUPS) for (const [, type] of items) libraryTypes.add(type);
