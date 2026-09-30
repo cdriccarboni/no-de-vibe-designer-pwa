@@ -69,7 +69,7 @@ export function spec(type){
     soundmemo:["Mémo sonore",["record","tag","out"]],
     arduino:["Arduino / Serial",["command","trigger","status"]],
     esp:["ESP32 / Wemos Serial",["command","trigger","status"]],
-    servo:["Servo / Serial",["channel","angle","speed","status"]],
+    servo:["Servo / Serial",["channel","angle","speed","trigger","status"]],
     rfid:["RFID / QR Serial",["tag","present","raw"]],
     sensors:["Capteurs génériques",["sensor","value","status"]],
     twozero:["TWOZERO / TD Bridge",["value","trigger","status"]],
