@@ -2,7 +2,7 @@ import { NODE_GROUPS } from "../shared/node-specs.js";
 import { EXECUTABLE_TYPES } from "../shared/ports.js";
 import { createNodeProcessors } from "../shared/node-processors.js";
 
-const allowedExperimental = new Set(["p5","td","isadora","sketch","showimport","dream"]);
+const allowedExperimental = new Set();
 const library = new Map();
 for (const [group, items] of NODE_GROUPS) {
   for (const [label, type] of items) library.set(type, { group, label });
@@ -34,8 +34,8 @@ if (unexpectedExperimental.length) {
   console.error("FAIL · new experimental nodes must be explicitly reviewed:", unexpectedExperimental.join(", "));
   process.exit(1);
 }
-if (executableLibrary.length < 75) {
-  console.error("FAIL · production node coverage regressed below 75");
+if (executableLibrary.length < 81) {
+  console.error("FAIL · production node coverage regressed below 81");
   process.exit(1);
 }
 console.log("OK · production Library is internally consistent");
