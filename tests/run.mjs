@@ -522,6 +522,55 @@ const uniValue = { kind: "text", value: "go" };
 assert(logicFns.get("universal")({ id: "u", params: {} }, new Map([[0, { value: uniValue }]]), {}).get(1) === uniValue, "universal preserves value");
 assert(logicFns.get("connectors")({ id: "c", params: {} }, new Map([[0, { value: uniValue }]]), {}).get(2) === uniValue, "connectors preserve value");
 
+console.log("final-engines-1.2");
+for (const type of ["p5","td","isadora","sketch","showimport","dream"]) {
+  assert(isExecutable(type), `${type} final engine executable`);
+}
+const genCtx = {
+  width: 32, height: 24, time: 1.25,
+  pointer: { x: 0.4, y: 0.6, speed: 0.1 },
+  warnings: [], nodeState: new Map()
+};
+for (const type of ["p5","sketch","dream"]) {
+  const out = logicFns.get(type)(
+    { id: type, params: { seed: 2, energy: .7, intensity: .8 } },
+    new Map(),
+    genCtx
+  );
+  assert(out.get(2)?.pixels?.length === 32 * 24 * 4, `${type} generates a raster frame`);
+}
+const showRaw = JSON.stringify({ name: "Test show", cues: [
+  { label: "TOP 1", time: 1.5, actions: [] },
+  { label: "TOP 2", time: 3, actions: [{ type: "jump-time", value: 4 }] }
+]});
+const showOut = logicFns.get("showimport")(
+  { id: "show", params: { manifest: showRaw } },
+  new Map(),
+  {}
+);
+assert(showOut.get(1)?.value === 2 && /READY/.test(showOut.get(2)?.value || ""), "show importer processor summary");
+const { applyShowManifest } = await import("../shared/show-importer.js");
+const showProject = newProject();
+const imported = applyShowManifest(showProject, showRaw);
+assert(imported.added.length === 2 && showProject.timeline.filter(c => c.kind === "cue").length === 2, "show importer applies real cues");
+
+const finalOsc = [];
+const finalOscCtx = {
+  oscUdpSend: msg => { finalOsc.push(msg); return Promise.resolve(); },
+  warnings: [], nodeState: new Map()
+};
+logicFns.get("td")(
+  { id: "td-final", title: "TD Tool", params: { host: "127.0.0.1", address: "/td/test", port: 9000 } },
+  new Map([[0, { value: numOutForTest(.5) }], [1, { value: { kind: "trigger", value: 1 } }]]),
+  finalOscCtx
+);
+logicFns.get("isadora")(
+  { id: "isa-final", title: "Isadora Tool", params: { host: "127.0.0.1", address: "/isadora/test", port: 9000 } },
+  new Map([[0, { value: numOutForTest(.2) }], [1, { value: { kind: "trigger", value: 1 } }]]),
+  finalOscCtx
+);
+assert(finalOsc.length === 2 && finalOsc[0].address === "/td/test" && finalOsc[1].address === "/isadora/test", "TD and Isadora engines send real OSC on trigger");
+
 console.log("wrap-box-ports");
 const wrapGraph = {
   nodes: [
