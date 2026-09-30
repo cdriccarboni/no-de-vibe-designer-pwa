@@ -15,7 +15,7 @@ import { planManualSave, planManualOpen, saveStatusMessage, MANUAL_SAVE_KEY } fr
 import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { connectRemote } from "../shared/remote-client.js";
 import { REMOTE_PORT } from "../shared/remote-protocol.js";
-import { applyCue, listCues, nextCue, previousCue } from "../shared/stage/cues.js";
+import { applyCue, listCues, nextCue, previousCue, standingByCue, setCuePlayhead, advanceCuePlayhead, buildCueState } from "../shared/stage/cues.js";
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
 import { createHostCard, hostCardToQrPayload } from "../shared/discovery/host-card.js";
 import { discoveryCapabilities } from "../shared/discovery/lan-beacon.js";
@@ -1605,64 +1605,153 @@ $("#controlsClose")?.addEventListener("click", () => $("#controlsModal")?.classL
 $("#controlsRefresh")?.addEventListener("click", renderControlSurface);
 $("#controlsModal")?.addEventListener("click", e => { if (e.target.id === "controlsModal") e.currentTarget.classList.add("hidden"); });
 
+function sendCueState(clientId = "") {
+  if (!remoteSession?.online) return false;
+  remoteSession.send({
+    type: STUDIO_MSG.CUE_STATE,
+    state: buildCueState(project),
+    clientId: clientId || undefined,
+    t: Date.now()
+  });
+  return true;
+}
+
+function bumpCueRevision() {
+  project.meta ||= {};
+  project.meta.cueRevision = (Number(project.meta.cueRevision) || 0) + 1;
+}
+
+function selectDesktopCue(cue) {
+  if (!cue) return null;
+  setCuePlayhead(project, cue.id);
+  bumpCueRevision();
+  autosave();
+  sendCueState();
+  log(`STANDBY · ${cue.number || ""} ${cue.label || cue.id}`);
+  return cue;
+}
+
 function fireDesktopCue(cue) {
   if (!cue) {
-    log("ERREUR · aucun cue");
+    log("ERREUR · aucun cue en attente");
     return;
   }
   const applied = applyCue(project, {
-    id: cue.id,
-    label: cue.label,
+    ...cue,
     time: cue.time ?? cue.start,
-    actions: cue.actions || [{ type: "jump-time", value: cue.time ?? cue.start }]
+    actions: cue.actions?.length ? cue.actions : [{ type: "jump-time", value: cue.time ?? cue.start }]
   });
   project = applied.project;
+
+  let hasError = false;
   for (const effect of applied.effects) {
     if (effect.type === "jump-time" || effect.type === "go") {
       runtime.time = Number(effect.time ?? cue.time ?? cue.start) || 0;
       runtime.play();
       syncPlayButton();
     }
-    if (effect.type === "error") log(`ERREUR cue · ${effect.error}`);
-    if (effect.type === "osc") log(`Cue OSC déclaré · ${effect.address} (à transmettre)`);
-    if (effect.type === "artnet") log(`Cue Art-Net déclaré · u${effect.universe} ch${effect.channel}=${effect.value}`);
-    if (effect.type === "panic") log("PANIC · audio coupé dans le projet");
+    if (effect.type === "error") {
+      hasError = true;
+      log(`ERREUR cue · ${effect.error}`);
+    }
+    if (effect.type === "osc") {
+      try {
+        if (typeof window.nvdDesktop?.sendOscUdp === "function") {
+          window.nvdDesktop.sendOscUdp({
+            host: effect.host || "127.0.0.1",
+            port: effect.port || 9000,
+            address: effect.address,
+            args: effect.args || []
+          });
+        } else {
+          devices.bridge.send({ type:"osc", ...effect });
+        }
+      } catch (e) { log(`Cue OSC · ${e?.message || e}`); }
+    }
+    if (effect.type === "artnet") {
+      try {
+        if (typeof window.nvdDesktop?.sendArtNetUdp === "function") window.nvdDesktop.sendArtNetUdp(effect);
+        else devices.bridge.send({ type:"artnet", ...effect });
+      } catch (e) { log(`Cue Art-Net · ${e?.message || e}`); }
+    }
   }
-  project.meta = project.meta || {};
-  project.meta.transport = { action: "go", cueId: cue.id, start: cue.time ?? cue.start, label: cue.label };
+  if (hasError) {
+    sendCueState();
+    return;
+  }
+
+  project.meta ||= {};
+  project.meta.transport = {
+    action: "go",
+    cueId: cue.id,
+    start: cue.time ?? cue.start,
+    label: cue.label,
+    firedAt: Date.now()
+  };
+  project.meta.activeCueId = cue.id;
+  const next = advanceCuePlayhead(project, cue.id);
+  bumpCueRevision();
+
   try { publishHostState(); } catch { /* */ }
   redraw();
   autosave();
-  log(`GO · ${cue.label || cue.id}`);
+  sendCueState();
+  log(`GO · ${cue.number || ""} ${cue.label || cue.id}`);
+
+  const mode = cue.continueMode || (cue.autoFollow ? "auto-follow" : cue.autoContinue ? "auto-continue" : "manual");
+  if (next && mode !== "manual") {
+    const waitMs = mode === "auto-follow"
+      ? Math.max(0, Number(cue.duration || 0) + Number(cue.postWait || 0)) * 1000
+      : Math.max(0, Number(cue.postWait || 0)) * 1000;
+    window.setTimeout(() => {
+      const standby = standingByCue(project);
+      if (standby?.id === next.id) fireDesktopCue(next);
+    }, waitMs);
+  }
 }
 
-$("#cueGo").onclick = () => {
+function handleCueCommand(action, cueId = "") {
   const cues = listCues(project);
-  const current = project.meta?.transport?.cueId;
-  const cue = cues.find(c => c.id === current) || cues[0];
-  fireDesktopCue(cue);
-};
-$("#cueNext").onclick = () => {
-  const cues = listCues(project);
-  const cue = nextCue(cues, project.meta?.transport?.cueId);
-  if (!cue) return log("ERREUR · pas de cue suivant");
-  fireDesktopCue(cue);
-};
-$("#cuePrev").onclick = () => {
-  const cues = listCues(project);
-  const cue = previousCue(cues, project.meta?.transport?.cueId);
-  if (!cue) return log("ERREUR · pas de cue précédent");
-  fireDesktopCue(cue);
-};
-$("#cuePanic").onclick = () => {
-  const applied = applyCue(project, null, { panic: true });
-  project = applied.project;
-  runtime.stop();
-  syncPlayButton();
-  redraw();
-  autosave();
-  log("PANIC");
-};
+  if (!cues.length) {
+    log("Conduite · aucune cue");
+    return null;
+  }
+  const standby = standingByCue(project, cues);
+
+  if (action === "go") {
+    fireDesktopCue(standby);
+    return standby;
+  }
+  if (action === "select") {
+    return selectDesktopCue(cues.find(cue => cue.id === cueId) || standby);
+  }
+  if (action === "next") {
+    const cue = nextCue(cues, standby?.id) || standby;
+    return selectDesktopCue(cue);
+  }
+  if (action === "prev") {
+    const cue = previousCue(cues, standby?.id) || standby;
+    return selectDesktopCue(cue);
+  }
+  if (action === "panic") {
+    const applied = applyCue(project, null, { panic: true });
+    project = applied.project;
+    runtime.stop();
+    syncPlayButton();
+    bumpCueRevision();
+    redraw();
+    autosave();
+    sendCueState();
+    log("PANIC");
+    return null;
+  }
+  return standby;
+}
+
+$("#cueGo").onclick = () => handleCueCommand("go");
+$("#cueNext").onclick = () => handleCueCommand("next");
+$("#cuePrev").onclick = () => handleCueCommand("prev");
+$("#cuePanic").onclick = () => handleCueCommand("panic");
 
 function downloadText(content, fileName, mime = "text/plain") {
   const blob = new Blob([content], { type: mime });
@@ -2519,6 +2608,21 @@ function handleCompanionStudioMessage(msg) {
     showCompanionDetect(msg);
     log(`Companion Studio · détecté · ${msg.clientId || "?"}`);
     if (companionLayout) sendCompanionLayout(msg.clientId || "");
+    sendCueState(msg.clientId || "");
+    return;
+  }
+  if (msg.type === STUDIO_MSG.CUE_ACTION) {
+    const result = handleCueCommand(msg.action || "go", msg.cueId || "");
+    sendCueState(msg.clientId || "");
+    remoteSession?.send?.({
+      type: STUDIO_MSG.FEEDBACK,
+      widgetId: "cue-list",
+      value: result?.id || null,
+      ok: true,
+      detail: msg.action || "go",
+      clientId: msg.clientId,
+      t: Date.now()
+    });
     return;
   }
   if (msg.type === STUDIO_MSG.LAYOUT) {
