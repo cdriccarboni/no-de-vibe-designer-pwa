@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.6 — 2026-09-30
+
+### Finition discrète / états
+- Conserve les triangles de dépliage/repliage de toute la Library à gauche, avec état mémorisé et zone de clic sur tout l’en-tête.
+- Remplace les anciens intitulés ambigus par des états techniques non envahissants dans les infobulles : Prêt, matériel requis, permission requise, logiciel/bridge requis ou relais natif requis.
+- Aucun nouveau panneau permanent : l’ergonomie Designer reste inchangée.
+- Version alignée pour Desktop, PWA multi-surface, Companion et Android (versionCode 136).
+
 ## 1.3.1 — 2026-09-30
 
 ### PWA / UX
