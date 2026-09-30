@@ -38,6 +38,7 @@ export function applyCompanionBinding({
   cameraControl = null,
   videoControl = null,
   audioPlayerControl = null,
+  stageControl = null,
   onLog = () => {}
 } = {}) {
   if (!widget?.id) throw new Error("Widget absent");
@@ -60,6 +61,17 @@ export function applyCompanionBinding({
     if (kind === "stage") {
       const action = binding.action || "go";
       if (!project) throw new Error("Projet hôte absent");
+      if (typeof stageControl === "function") {
+        const result = stageControl(action, value);
+        onLog(`Companion · Stage ${action}`);
+        return makeStudioFeedback({
+          widgetId: widget.id,
+          value: result?.id || result?.cueId || action,
+          ok: true,
+          detail: result?.label || result?.id || action,
+          rttMs: Date.now() - t0
+        });
+      }
       if (typeof listCues === "function" && typeof applyCue === "function") {
         const cues = listCues(project);
         if (action === "go" || action === "next") {
