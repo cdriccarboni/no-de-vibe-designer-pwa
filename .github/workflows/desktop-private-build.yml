@@ -1,0 +1,30 @@
+name: Desktop private-source access
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/desktop-private-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  access-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check private source access with repository token
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote "https://x-access-token:${GH_TOKEN}@github.com/cdriccarboni/no-de-vibe-designer.git" HEAD >/tmp/lsremote.txt 2>/tmp/err.txt; then
+            echo "PRIVATE_SOURCE_ACCESS=YES"
+            cat /tmp/lsremote.txt
+          else
+            echo "PRIVATE_SOURCE_ACCESS=NO"
+            cat /tmp/err.txt
+            exit 2
+          fi
