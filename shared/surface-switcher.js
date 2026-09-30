@@ -7,11 +7,11 @@
 export const SURFACE_PREF_KEY = "nvd.surface.preference";
 
 export const SURFACES = Object.freeze([
-  { id:"designer", label:"Designer", detail:"Canvas · Library · Timeline · Vibe", path:"desktop/" },
-  { id:"mobile", label:"Mobile", detail:"Interface compacte · capteurs · conduite", path:"mobile/" },
-  { id:"regie", label:"Régie", detail:"Companion Studio · pages personnalisables", path:"studio/?surface=regie" },
-  { id:"plateau", label:"Plateau", detail:"Companion Studio directement en mode Plateau", path:"studio/?surface=plateau" },
-  { id:"camera", label:"Caméra", detail:"Remote Camera · WebRTC", path:"companion/" }
+  { id:"designer", label:"Designer", detail:"Canvas · Library · Timeline · Vibe", path:"desktop/index.html" },
+  { id:"mobile", label:"Mobile", detail:"Interface compacte · capteurs · conduite", path:"mobile/index.html" },
+  { id:"regie", label:"Régie", detail:"Companion Studio · pages personnalisables", path:"studio/index.html?surface=regie" },
+  { id:"plateau", label:"Plateau", detail:"Companion Studio directement en mode Plateau", path:"studio/index.html?surface=plateau" },
+  { id:"camera", label:"Caméra", detail:"Remote Camera · WebRTC", path:"companion/index.html" }
 ]);
 
 export function pwaRootUrl(){
