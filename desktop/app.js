@@ -51,7 +51,7 @@ const qall = s => [...document.querySelectorAll(s)];
 
 if ("serviceWorker" in navigator && window.nvdDesktop?.runtime !== "electron") {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("../sw.js", { scope: "../" }).catch(err => console.warn("PWA_SW", err?.message || err));
+    navigator.serviceWorker.register("./sw.js").catch(err => console.warn("PWA_SW", err?.message || err));
   });
 }
 
@@ -68,6 +68,44 @@ let panDrag = null;
 let graphPath = [];
 let pendingVibe = null;
 let rcSession = null;
+const DEMO_DISMISSED_KEY = `nvd.demo.dismissed.${APP_VERSION}`;
+let demoReturnProject = null;
+
+function setDemoBanner(active) {
+  const banner = $("#demoModeBanner");
+  if (banner) banner.classList.toggle("hidden", !active);
+  document.body.classList.toggle("demo-mode", Boolean(active));
+}
+
+function enterShowcaseDemo({ preserve = true } = {}) {
+  if (preserve && !demoReturnProject) {
+    try { demoReturnProject = JSON.parse(JSON.stringify(project)); } catch { demoReturnProject = newProject(); }
+  }
+  project = createDemoProject();
+  graphPath = [];
+  selectedNode = null;
+  selection.clear();
+  redraw();
+  runtime.play();
+  syncPlayButton();
+  setDemoBanner(true);
+  log("EXEMPLE · Wow interactif chargé · déplace la souris dans le Preview");
+}
+
+function exitShowcaseDemo() {
+  project = demoReturnProject ? validateProject(demoReturnProject) : newProject();
+  demoReturnProject = null;
+  graphPath = [];
+  selectedNode = null;
+  selection.clear();
+  localStorage.setItem(DEMO_DISMISSED_KEY, "1");
+  setDemoBanner(false);
+  redraw();
+  history.clear();
+  commitHistory();
+  autosave();
+  log("EXEMPLE · EXIT · projet précédent restauré");
+}
 
 const runtime = new Runtime($("#previewCanvas"), {
   onGraphEvent: ev => {
@@ -1927,12 +1965,9 @@ async function runCmd() {
     if (v === "output" || v === "output main") openOutput("main-output");
     else if (v === "output secondary") openOutput("local-window");
     else if (v === "demo" || v === "load demo") {
-      project = createDemoProject();
-      redraw();
-      runtime.play();
-      syncPlayButton();
-      autosave();
-      log("Demo P00 chargée");
+      enterShowcaseDemo({ preserve: true });
+    } else if (v === "exit" || v === "exit demo") {
+      exitShowcaseDemo();
     } else if (await devices.command(raw)) { /* handled */ }
     else {
       const types = ["camera", "tracking", "shader", "shadow", "osc", "midi", "dmx", "arduino", "esp", "servo"];
@@ -2032,10 +2067,15 @@ try {
   if (session.lastProjectName) log(`Session · dernier projet « ${session.lastProjectName} »`);
   if (session.remoteCamera?.room) log(`Session · Remote Camera connu ${session.remoteCamera.room} · ${session.remoteCamera.lastStatus || LINK_STATES.KNOWN}`);
 } catch { /* */ }
-if (project.nodes.length === 0 && generalPrefs.loadDemo !== false) {
+if (project.nodes.length === 0 && generalPrefs.loadDemo !== false && localStorage.getItem(DEMO_DISMISSED_KEY) !== "1") {
+  try { demoReturnProject = JSON.parse(JSON.stringify(project)); } catch { demoReturnProject = newProject(); }
   project = createDemoProject();
-  log("Démo Baleine interactive initialisée · aucune permission requise");
+  setDemoBanner(true);
+  log("EXEMPLE · Wow interactif initialisé · aucune permission requise");
+} else {
+  setDemoBanner(false);
 }
+$("#demoExitBtn")?.addEventListener("click", exitShowcaseDemo);
 redraw();
 history.clear();
 commitHistory();
