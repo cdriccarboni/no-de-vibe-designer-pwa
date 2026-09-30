@@ -1,6 +1,9 @@
 import { APP_NAME, APP_VERSION } from "./version.js";
 import { isExecutable } from "./ports.js";
 import { validateEdge } from "./graph-engine.js";
+import { deterministicVibePlan } from "./vibe-planner.js";
+import { secureVibePlan } from "./vibe-safety.js";
+import { buildLocalAiPrompt, directOllamaChat, directOllamaProbe, normalizeLocalAiConfig, sanitizeLocalAiResponse, selectLocalModel } from "./local-ai-core.js";
 
 /**
  * Vibe coding — génération structurée de patch.
@@ -10,11 +13,23 @@ import { validateEdge } from "./graph-engine.js";
  */
 
 export function readAiConfig() {
+  let raw = {};
   try {
-    return JSON.parse(localStorage.getItem("nvd.ai") || localStorage.getItem("cvd.ai") || "null") || {};
+    raw = JSON.parse(localStorage.getItem("nvd.ai") || localStorage.getItem("cvd.ai") || "null") || {};
   } catch {
-    return {};
+    raw = {};
   }
+  const local = normalizeLocalAiConfig(raw);
+  return {
+    ...raw,
+    localEnabled: local.enabled,
+    localBaseUrl: local.baseUrl,
+    localModel: local.model,
+    localTemperature: local.temperature,
+    localMaxOps: local.maxOps,
+    // Cloud is opt-in. Legacy configs remain readable but are not contacted unless enabled === true.
+    enabled: raw.enabled === true
+  };
 }
 
 export function saveAiConfig(cfg) {
@@ -49,288 +64,204 @@ function norm(text) {
  * Parse local déterministe → ops IR.
  */
 export function localVibeParse(text, project) {
-  const t = norm(text);
-  const ops = [];
-  const has = (type) => project.nodes.some(n => n.type === type);
+  return deterministicVibePlan(text, project);
+}
 
-  const backCam = t.includes("camera arriere") || t.includes("camera back");
-  const frontCam = t.includes("camera avant") || t.includes("camera front");
-  if (backCam && !has("phone-camera-back")) {
-    ops.push({ op: "addNode", type: "phone-camera-back", x: 40, y: 60 });
-  } else if (frontCam && !has("phone-camera-front")) {
-    ops.push({ op: "addNode", type: "phone-camera-front", x: 40, y: 60 });
-  } else if ((t.includes("camera") || t.includes("webcam") || /\bvideo\b/.test(t)) && !has("camera")) {
-    ops.push({ op: "addNode", type: "camera", x: 40, y: 60 });
-  }
-  if ((t.includes("gyro") || t.includes("gyroscope")) && !has("gyro")) {
-    ops.push({ op: "addNode", type: "gyro", x: 40, y: 320 });
-  }
-  if ((/\bnombre\b/.test(t) || t.includes("number")) && !has("number")) {
-    ops.push({ op: "addNode", type: "number", x: 40, y: 40 });
-  }
-  if ((t.includes("multipl") || t.includes("fois")) && !has("multiply")) {
-    ops.push({ op: "addNode", type: "multiply", x: 260, y: 40 });
-  }
-  if ((t.includes("addition") || t.includes("additionne")) && !has("add")) {
-    ops.push({ op: "addNode", type: "add", x: 260, y: 160 });
-  }
-  if (t.includes("lissage") && !has("smooth")) {
-    ops.push({ op: "addNode", type: "smooth", x: 480, y: 40 });
-  }
-  if ((t.includes("compar") || t.includes("compare")) && !has("compare")) {
-    ops.push({ op: "addNode", type: "compare", x: 480, y: 160 });
-  }
-  if ((t.includes("trou noir") || t.includes("blackhole")) && !has("blackhole")) {
-    ops.push({ op: "addNode", type: "blackhole", x: 40, y: 200 });
-  }
-  if ((t.includes("addition") || t.includes("additionne")) && !has("add")) {
-    ops.push({ op: "addNode", type: "add", x: 260, y: 160 });
-  }
-  if (t.includes("lissage") && !has("smooth")) {
-    ops.push({ op: "addNode", type: "smooth", x: 480, y: 40 });
-  }
-  if ((t.includes("compar") || t.includes("plus grand")) && !has("compare")) {
-    ops.push({ op: "addNode", type: "compare", x: 480, y: 160 });
-  }
-  if ((t.includes("trou noir") || t.includes("blackhole")) && !has("blackhole")) {
-    ops.push({ op: "addNode", type: "blackhole", x: 40, y: 200 });
-  }
-  if ((t.includes("shader") || t.includes("glsl")) && !has("shader")) {
-    ops.push({ op: "addNode", type: "shader", x: 280, y: 120 });
-  }
-  if (t.includes("midi") && !has("midi")) {
-    ops.push({ op: "addNode", type: "midi", x: 40, y: 220 });
-  }
-  if (/\bosc\b/.test(t) && !has("osc")) {
-    ops.push({ op: "addNode", type: "osc", x: 280, y: 220 });
-  }
-  if ((t.includes("tracking") || t.includes("point")) && !has("tracking")) {
-    ops.push({ op: "addNode", type: "tracking", x: 500, y: 60 });
-  }
+function buildVibePrompt(text, project) {
+  const executable = project?.nodes?.map(n => n.type) || [];
+  return `Tu es le moteur Vibe de ${APP_NAME} ${APP_VERSION}.
+Réponds UNIQUEMENT en JSON strict :
+{"ops":[{"op":"addNode","type":"...","x":0,"y":0},{"op":"connect","fromType":"...","fromPort":0,"toType":"...","toPort":0},{"op":"setParam","type":"...","key":"...","value":0},{"op":"addClip","track":0,"start":0,"duration":1,"label":"...","kind":"effect|points|cue|shader"}],"summary":"..."}.
+Utilise uniquement des nodes exécutables de No-de. N'active jamais automatiquement caméra, micro, Serial, OSC, Art-Net, Servo ou sortie externe. Toute action externe doit rester désarmée ou passer par un Trigger explicite.
+Projet actuel nodes: ${JSON.stringify(project.nodes.map(n => ({ id:n.id, type:n.type })))}
+Edges: ${JSON.stringify(project.edges || [])}
+Instruction utilisateur: ${text}
+Nodes déjà présents: ${JSON.stringify(executable)}`;
+}
 
-  // Intentions créatives locales : résultat rapide, nodes standards, aucun code opaque.
-  const wantsWhale = t.includes("baleine") || t.includes("whale");
-  const wantsBlob = /\bblob\b/.test(t) || t.includes("metaball") || t.includes("forme organique");
-  const wantsGhost = t.includes("fantom") || /\bghost\b/.test(t) || t.includes("trainee") || t.includes("traînee") || t.includes("trail");
-  const wantsThreshold = t.includes("threshold") || t.includes("seuil") || t.includes("silhouette") || t.includes("supprime le fond") || t.includes("enleve le fond");
-  const wantsMirror = t.includes("miroir") || /\bmirror\b/.test(t);
-  const wantsClone = t.includes("dedouble") || t.includes("dédouble") || t.includes("double-moi") || t.includes("clone") || t.includes("body clone");
+function parseAiOps(content, label = "IA") {
+  let parsed = content;
+  if (typeof parsed === "string") {
+    try { parsed = JSON.parse(parsed); }
+    catch { return { ok:false, unavailable:true, error:`${label} : JSON invalide` }; }
+  }
+  if (!parsed?.ops || !Array.isArray(parsed.ops)) {
+    return { ok:false, unavailable:true, error:`${label} : réponse sans tableau ops` };
+  }
+  return { ok:true, ops:parsed.ops, summary:parsed.summary || "" };
+}
 
-  if (wantsWhale && !has("whale")) {
-    if (!has("pointer")) ops.push({ op: "addNode", type: "pointer", x: 40, y: 60 });
-    ops.push({ op: "addNode", type: "whale", x: 310, y: 80 });
-  }
-  if (wantsBlob && !has("blob")) {
-    ops.push({ op: "addNode", type: "blob", x: 330, y: 220 });
-  }
+async function callLocalAi(text, project, cfg) {
+  const local = normalizeLocalAiConfig(cfg);
+  if (!local.enabled) return { ok:false, unavailable:true, error:"Local AI Core désactivé" };
 
-  const sourcePreference = () => {
-    for (const type of ["transform", "whale", "blob", "videofile", "camera", "phone-camera-back", "phone-camera-front"]) {
-      if (has(type) || ops.some(o => o.op === "addNode" && o.type === type)) return type;
-    }
-    return null;
-  };
+  const probe = await probeLocalAi(cfg);
+  if (!probe.ok) return { ok:false, unavailable:true, error:probe.error || "Ollama local indisponible" };
 
-  if (wantsGhost && !has("ghost")) {
-    const src = sourcePreference();
-    ops.push({ op: "addNode", type: "ghost", x: 620, y: 110 });
-    if (src) ops.push({ op: "connect", fromType: src, fromPort: src === "transform" ? 3 : (src === "whale" || src === "blob" ? 3 : 0), toType: "ghost", toPort: 0 });
+  const model = probe.model || local.model;
+  const prompt = buildLocalAiPrompt(text, project);
+  try {
+    const raw = typeof globalThis?.nvdDesktop?.localAiChat === "function"
+      ? await globalThis.nvdDesktop.localAiChat({
+          baseUrl:local.baseUrl,
+          model,
+          temperature:local.temperature,
+          system:prompt.system,
+          user:prompt.user
+        })
+      : await directOllamaChat({
+          baseUrl:local.baseUrl,
+          model,
+          temperature:local.temperature,
+          system:prompt.system,
+          user:prompt.user
+        });
+    const parsed = sanitizeLocalAiResponse(raw, { maxOps:local.maxOps });
+    if (!parsed.ok) return { ok:false, unavailable:true, error:parsed.error || "Réponse locale inexploitable" };
+    return {
+      ok:true,
+      engine:"local-ai",
+      ops:parsed.ops,
+      summary:parsed.summary,
+      note:"Local AI Core · " + model + " · OFFLINE",
+      localModel:model
+    };
+  } catch (e) {
+    return { ok:false, unavailable:true, error:"Local AI Core injoignable : " + (e?.message || e) };
   }
-  if (wantsThreshold && !has("threshold")) {
-    let src = sourcePreference();
-    if (!src && (t.includes("moi") || t.includes("personne") || t.includes("corps"))) {
-      ops.push({ op: "addNode", type: "camera", x: 40, y: 80 });
-      src = "camera";
-    }
-    ops.push({ op: "addNode", type: "threshold", x: 590, y: 180 });
-    if (src) ops.push({ op: "connect", fromType: src, fromPort: src === "transform" ? 3 : (src === "whale" || src === "blob" ? 3 : 0), toType: "threshold", toPort: 0 });
-  }
-  if (wantsMirror && !has("mirror")) {
-    const src = sourcePreference();
-    ops.push({ op: "addNode", type: "mirror", x: 620, y: 260 });
-    if (src) ops.push({ op: "connect", fromType: src, fromPort: src === "transform" ? 3 : (src === "whale" || src === "blob" ? 3 : 0), toType: "mirror", toPort: 0 });
-  }
-  if (wantsClone && !has("bodyclone")) {
-    let src = sourcePreference();
-    if (!src || (!["camera","phone-camera-back","phone-camera-front","videofile"].includes(src) && (t.includes("moi") || t.includes("corps") || t.includes("personne")))) {
-      if (!has("camera")) ops.push({ op: "addNode", type: "camera", x: 40, y: 80 });
-      src = "camera";
-    }
-    ops.push({ op: "addNode", type: "bodyclone", x: 600, y: 330 });
-    if (src) ops.push({ op: "connect", fromType: src, fromPort: 0, toType: "bodyclone", toPort: 0 });
-  }
-
-  if ((t.includes("plus lent") || t.includes("ralenti")) && has("whale")) {
-    ops.push({ op: "setParam", type: "whale", key: "motionSpeed", value: 0.55 });
-  }
-  if ((t.includes("plus vite") || t.includes("accelere") || t.includes("accélère")) && has("whale")) {
-    ops.push({ op: "setParam", type: "whale", key: "motionSpeed", value: 1.55 });
-  }
-  if ((t.includes("gross") || t.includes("plus grande")) && has("whale")) {
-    ops.push({ op: "setParam", type: "whale", key: "scale", value: 1.35 });
-  }
-  if ((t.includes("respir") || t.includes("vivant")) && has("whale")) {
-    ops.push({ op: "setParam", type: "whale", key: "breathe", value: 0.065 });
-  }
-  if ((t.includes("trainee") || t.includes("traînee") || t.includes("trail")) && has("whale")) {
-    ops.push({ op: "setParam", type: "whale", key: "trail", value: 0.42 });
-  }
-
-  const willHaveCam = has("camera") || ops.some(o => o.type === "camera");
-  const willHaveShader = has("shader") || ops.some(o => o.type === "shader");
-  const willHaveMidi = has("midi") || ops.some(o => o.type === "midi");
-  const willHaveOsc = has("osc") || ops.some(o => o.type === "osc");
-
-  if (willHaveCam && willHaveShader) {
-    ops.push({ op: "connect", fromType: "camera", fromPort: 0, toType: "shader", toPort: 0 });
-  }
-  if (willHaveMidi && willHaveShader) {
-    ops.push({ op: "connect", fromType: "midi", fromPort: 1, toType: "shader", toPort: 1 });
-  }
-  if (willHaveMidi && willHaveOsc) {
-    ops.push({ op: "connect", fromType: "midi", fromPort: 1, toType: "osc", toPort: 2 });
-  }
-  const willHaveNumber = has("number") || ops.some(o => o.type === "number");
-  const willHaveMul = has("multiply") || ops.some(o => o.type === "multiply");
-  if (willHaveNumber && willHaveMul) {
-    ops.push({ op: "connect", fromType: "number", fromPort: 0, toType: "multiply", toPort: 0 });
-  }
-
-  if (t.includes("5 seconde") || t.includes("5s") || t.includes("5 sec")) {
-    ops.push({ op: "addClip", track: 1, start: 12, duration: 5, label: "Anim points", kind: "points" });
-  }
-  if (t.includes("top") || t.includes("cue")) {
-    ops.push({ op: "addClip", track: 4, start: 10, duration: 1.5, label: "Top", kind: "cue" });
-  }
-
-  if ((t.includes("demo") || t.includes("chaine") || t.includes("patch video")) && !ops.some(o => o.op === "addNode")) {
-    if (!has("camera")) ops.push({ op: "addNode", type: "camera", x: 40, y: 60 });
-    if (!has("shader")) ops.push({ op: "addNode", type: "shader", x: 280, y: 120 });
-    ops.push({ op: "connect", fromType: "camera", fromPort: 0, toType: "shader", toPort: 0 });
-  }
-
-  return { engine: "local", ops, note: "Moteur local (règles). Pas d'appel IA." };
 }
 
 async function callRemoteAi(text, project, cfg) {
   const endpoint = (cfg.endpoint || "").trim();
   const apiKey = (cfg.apiKey || "").trim();
   const model = (cfg.model || "gpt-4o-mini").trim();
-  if (!endpoint) {
-    return { ok: false, unavailable: true, error: "Aucun endpoint IA configuré dans Préférences → IA / Vibe coding." };
-  }
+  if (!endpoint) return { ok:false, unavailable:true, error:"Aucun endpoint IA distant configuré." };
   const allowed = assertAiProviderAllowed({ endpoint, model });
-  if (!allowed.ok) {
-    return { ok: false, unavailable: true, error: allowed.error };
-  }
+  if (!allowed.ok) return { ok:false, unavailable:true, error:allowed.error };
 
-  const schemaHint = `Tu es le moteur Vibe de ${APP_NAME} ${APP_VERSION}.
-Réponds UNIQUEMENT en JSON: {"ops":[{"op":"addNode","type":"camera|pointer|whale|blob|threshold|ghost|mirror|bodyclone|transform|shader|midi|osc|tracking","x":n,"y":n},{"op":"connect","fromType":"...","fromPort":0,"toType":"...","toPort":0},{"op":"setParam","type":"...","key":"...","value":...},{"op":"addClip","track":0,"start":0,"duration":1,"label":"...","kind":"effect|points|cue|shader"}],"summary":"..."}
-Nodes exécutables prioritaires: camera, pointer, whale, blob, threshold, ghost, mirror, bodyclone, shadow, transform, composite, shader, midi, osc, tracking, stageio. La caméra n'est jamais activée par l'IA : seul l'utilisateur peut demander la permission.
-Projet actuel nodes: ${JSON.stringify(project.nodes.map(n => ({ id: n.id, type: n.type })))}
-edges: ${JSON.stringify(project.edges || [])}
-Instruction: ${text}`;
-
-  const headers = { "Content-Type": "application/json" };
+  const headers = { "Content-Type":"application/json" };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-
   let res;
   try {
     res = await fetch(endpoint, {
-      method: "POST",
+      method:"POST",
       headers,
-      body: JSON.stringify({
+      body:JSON.stringify({
         model,
-        temperature: 0.2,
-        messages: [
-          { role: "system", content: "Tu génères des opérations de patch JSON pour No-de Vibe Designer." },
-          { role: "user", content: schemaHint }
+        temperature:0.2,
+        messages:[
+          { role:"system", content:"Tu génères des opérations de patch JSON sûres pour No-de Vibe Designer." },
+          { role:"user", content:buildVibePrompt(text, project) }
         ],
-        response_format: { type: "json_object" }
+        response_format:{ type:"json_object" }
       })
     });
   } catch (e) {
-    return { ok: false, unavailable: true, error: `Moteur IA injoignable : ${e.message || e}` };
+    return { ok:false, unavailable:true, error:`Moteur IA distant injoignable : ${e?.message || e}` };
   }
-
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    return { ok: false, unavailable: true, error: `Moteur IA HTTP ${res.status} : ${body.slice(0, 200)}` };
+    return { ok:false, unavailable:true, error:`Moteur IA HTTP ${res.status} : ${body.slice(0,200)}` };
   }
-
   let data;
-  try {
-    data = await res.json();
-  } catch {
-    return { ok: false, unavailable: true, error: "Réponse IA non JSON" };
-  }
+  try { data = await res.json(); }
+  catch { return { ok:false, unavailable:true, error:"Réponse IA distante non JSON" }; }
 
-  let content = data.choices?.[0]?.message?.content;
-  if (content == null && data.ops) content = data;
-  if (typeof content === "string") {
-    try { content = JSON.parse(content); } catch {
-      return { ok: false, unavailable: true, error: "JSON IA invalide" };
-    }
+  const parsed = parseAiOps(data.choices?.[0]?.message?.content ?? data, "IA distante");
+  if (!parsed.ok) return parsed;
+  return { ok:true, engine:"ai", ops:parsed.ops, summary:parsed.summary, note:`IA distante · ${model}` };
+}
+
+export async function probeLocalAi(cfg = readAiConfig(), { fresh = false } = {}) {
+  const local = normalizeLocalAiConfig(cfg);
+  if (!local.enabled) return { ok:false, available:false, disabled:true, error:"Local AI Core désactivé", models:[] };
+  try {
+    const result = typeof globalThis?.nvdDesktop?.localAiProbe === "function"
+      ? await globalThis.nvdDesktop.localAiProbe({ baseUrl:local.baseUrl })
+      : await directOllamaProbe(local.baseUrl);
+    const models = Array.isArray(result?.models) ? result.models : [];
+    const model = selectLocalModel(models, local.model);
+    return { ok:true, available:true, baseUrl:local.baseUrl, models, model, fresh };
+  } catch (e) {
+    return { ok:false, available:false, baseUrl:local.baseUrl, models:[], error:e?.message || String(e) };
   }
-  if (!content?.ops || !Array.isArray(content.ops)) {
-    return { ok: false, unavailable: true, error: "Réponse IA sans tableau ops" };
-  }
-  return { ok: true, engine: "ai", ops: content.ops, summary: content.summary || "", note: `IA · ${model}` };
+}
+
+function finalizeVibeResult(result, project, source = result?.engine || "unknown") {
+  const secured = secureVibePlan(project, result?.ops || [], { source });
+  const securityNotes = [
+    ...(secured.security?.rewrites || []),
+    ...(secured.security?.dropped || []).map(x => `Refusé : ${x}`)
+  ];
+  return {
+    ...result,
+    ok: secured.ops.length > 0,
+    ops: secured.ops,
+    security: secured.security,
+    note: [result?.note, securityNotes.length ? `Safety Engine · ${securityNotes.length} correction(s)` : "Safety Engine · OK"].filter(Boolean).join(" · ")
+  };
 }
 
 export async function runVibe(text, project, { forceLocal = false } = {}) {
   const cfg = readAiConfig();
-  const blocked = assertAiProviderAllowed(cfg);
-  if (!blocked.ok && cfg.endpoint && !forceLocal) {
-    const local = localVibeParse(text, project);
-    return {
-      ok: local.ops.length > 0,
-      engine: "local-fallback",
-      ops: local.ops,
-      aiError: blocked.error,
-      note: `IA refusée — ${blocked.error} · moteur local uniquement`,
-      aiUnavailable: true
-    };
-  }
-  const preferAi = cfg.enabled !== false && cfg.endpoint && !forceLocal;
+  const localGenerativeEnabled = cfg.localEnabled !== false;
 
-  if (preferAi) {
+  if (!forceLocal && localGenerativeEnabled) {
+    const localAi = await callLocalAi(text, project, cfg);
+    if (localAi.ok) return finalizeVibeResult(localAi, project, "local-ai");
+
+    if (cfg.enabled === true && cfg.endpoint) {
+      const remote = await callRemoteAi(text, project, cfg);
+      if (remote.ok) {
+        return finalizeVibeResult({ ...remote, localAiError: localAi.error }, project, "remote-ai");
+      }
+    }
+
+    const rules = localVibeParse(text, project);
+    return finalizeVibeResult({
+      ok: rules.ops.length > 0,
+      engine: "local-planner-fallback",
+      ops: rules.ops,
+      summary: rules.note,
+      planner: rules.diagnostics,
+      aiError: localAi.error,
+      note: `IA locale indisponible — ${localAi.error} · repli Planner déterministe`,
+      aiUnavailable: true
+    }, project, "local-planner-fallback");
+  }
+
+  if (!forceLocal && cfg.enabled === true && cfg.endpoint) {
     const remote = await callRemoteAi(text, project, cfg);
-    if (remote.ok) return remote;
-    const local = localVibeParse(text, project);
-    return {
-      ok: local.ops.length > 0,
-      engine: "local-fallback",
-      ops: local.ops,
-      summary: local.note,
-      aiError: remote.error,
-      note: `IA indisponible — ${remote.error} · repli moteur local`
-    };
+    if (remote.ok) return finalizeVibeResult(remote, project, "remote-ai");
   }
 
   const local = localVibeParse(text, project);
-  const cfgMissing = !cfg.endpoint;
-  return {
+  return finalizeVibeResult({
     ok: local.ops.length > 0,
-    engine: "local",
+    engine: "local-planner",
     ops: local.ops,
     summary: local.note,
-    note: cfgMissing
-      ? "Moteur local (règles). Configure un endpoint IA dans Préférences pour un appel réel."
-      : "Moteur local (IA désactivée dans Préférences).",
-    aiUnavailable: cfgMissing || cfg.enabled === false
-  };
+    planner: local.diagnostics,
+    note: "Planner local déterministe.",
+    aiUnavailable: true
+  }, project, "local-planner");
 }
+
+const AI_PROTECTED_EXTERNAL_TYPES = new Set(["arduino","esp","servo","dmx","osc","twozero","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
 
 const ALLOWED_TYPES = new Set(["camera", "pointer", "whale", "blob", "threshold", "ghost", "mirror", "bodyclone", "shadow", "transform", "composite", "blackhole", "shader", "midi", "osc", "tracking", "stageio", "subpatch", "audio", "organicaudio", "soundmemo", "phone-camera-front", "phone-camera-back"]);
 
 export function applyVibeOps(project, ops, helpers) {
   const { addNode, addClip, ensureEdges, nodeById } = helpers;
-  const errors = [];
+  const secured = secureVibePlan(project, ops || [], { source: "apply", maxOps: 64, maxNewNodes: 16 });
+  const errors = [
+    ...(secured.security?.dropped || []).map(x => `Safety Engine · ${x}`),
+    ...(secured.security?.rewrites || []).map(x => `Safety Engine · ${x}`)
+  ];
   const applied = [];
   const findByType = (type) => project.nodes.filter(n => n.type === type);
 
-  for (const op of ops || []) {
+  for (const op of secured.ops) {
     try {
       if (op.op === "addNode") {
         if (!ALLOWED_TYPES.has(op.type) && !isExecutable(op.type)) {
@@ -341,7 +272,12 @@ export function applyVibeOps(project, ops, helpers) {
           applied.push({ op: "addNode", skipped: true, type: op.type, reason: "déjà présent" });
         } else {
           const n = addNode(op.type, op.x ?? 60, op.y ?? 60);
-          applied.push({ op: "addNode", id: n.id, type: op.type });
+          if (op.title) n.title = op.title;
+          if (op.params && typeof op.params === "object") {
+            n.params = { ...n.params, ...op.params };
+            if (AI_PROTECTED_EXTERNAL_TYPES.has(n.type) && n.params.auto === true) n.params.auto = false;
+          }
+          applied.push({ op: "addNode", id: n.id, type: op.type, title: n.title });
         }
       } else if (op.op === "connect") {
         ensureEdges();
@@ -368,6 +304,10 @@ export function applyVibeOps(project, ops, helpers) {
         const n = op.id ? nodeById(op.id) : findByType(op.type).at(-1);
         if (!n) {
           errors.push(`setParam : node introuvable (${op.type || op.id})`);
+          continue;
+        }
+        if (AI_PROTECTED_EXTERNAL_TYPES.has(n.type) && op.key === "auto" && op.value === true) {
+          errors.push(`Sécurité scène : l’IA ne peut pas armer automatiquement « ${n.title || n.type} »`);
           continue;
         }
         n.params = { ...n.params, [op.key]: op.value };
