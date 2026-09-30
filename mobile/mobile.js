@@ -1,3 +1,4 @@
+import { installSurfaceSwitcher } from "../shared/surface-switcher.js";
 import { newProject, validateProject, exportProject, createDemoProject } from "../shared/ir.js";
 import { NODE_GROUPS, spec } from "../shared/node-specs.js";
 import { Runtime } from "../shared/runtime.js";
@@ -20,6 +21,8 @@ import { projectSignature } from "../shared/remote-protocol.js";
 import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "../shared/pwa-update.js";
 import { makeArtNetPacket } from "../shared/adapters/websocket-bridge.js";
+
+installSurfaceSwitcher({ current:"mobile" });
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
