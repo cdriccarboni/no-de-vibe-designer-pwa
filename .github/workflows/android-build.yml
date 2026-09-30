@@ -1,6 +1,18 @@
 name: Android / Google Play
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "desktop/**"
+      - "mobile/**"
+      - "studio/**"
+      - "companion/**"
+      - "manifest.webmanifest"
+      - "sw.js"
+      - "build-info.json"
+      - "shared/**"
   workflow_dispatch:
     inputs:
       publish_to_play:
