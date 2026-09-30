@@ -185,6 +185,41 @@ export const EXECUTABLE_PORTS = {
     { name: "time", dir: "out", data: "number" },
     { name: "out", dir: "out", data: "video" }
   ],
+  videoreturn: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  mapping: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "scale", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  anaglyph: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "depth", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  creativefx: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "amount", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  storm: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "amount", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  bending: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "amount", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  transmute: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "amount", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
   "box-in": [
     { name: "out", dir: "out", data: "any" }
   ],
