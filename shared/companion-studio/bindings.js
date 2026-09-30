@@ -10,6 +10,8 @@ export const BINDING_KINDS = Object.freeze({
   stage: "stage",
   channel: "channel",
   osc: "osc",
+  artnet: "artnet",
+  sacn: "sacn",
   midi: "midi",
   serial: "serial",
   video: "video",
@@ -28,6 +30,8 @@ export function applyCompanionBinding({
   applyCue = null,
   listCues = null,
   sendOsc = null,
+  sendArtNet = null,
+  sendSacn = null,
   sendMidi = null,
   sendSerial = null,
   cameraControl = null,
@@ -80,6 +84,22 @@ export function applyCompanionBinding({
             value: next.id,
             ok: true,
             detail: next.label || next.id,
+            rttMs: Date.now() - t0
+          });
+        }
+        if (action === "panic") {
+          const applied = applyCue(project, null, { panic: true });
+          if (applied?.project) {
+            for (const key of Object.keys(project)) delete project[key];
+            Object.assign(project, applied.project);
+          }
+          runtime?.stop?.();
+          onLog("Companion · Stage PANIC");
+          return makeStudioFeedback({
+            widgetId: widget.id,
+            value: "panic",
+            ok: true,
+            detail: "PANIC",
             rttMs: Date.now() - t0
           });
         }
@@ -144,6 +164,30 @@ export function applyCompanionBinding({
       sendOsc({ host, port, address, args: [value] });
       onLog(`Companion · OSC ${address} → ${host}:${port}`);
       return makeStudioFeedback({ widgetId: widget.id, value, ok: true, detail: `OSC ${address}`, rttMs: Date.now() - t0 });
+    }
+
+    if (kind === "artnet") {
+      if (typeof sendArtNet !== "function") throw new Error("Transport Art-Net hôte indisponible");
+      const host = binding.artnetHost || "255.255.255.255";
+      const port = Number(binding.artnetPort) || 6454;
+      const universe = Math.max(0, Number(binding.universe) || 0);
+      const channel = Math.max(1, Math.min(512, Number(binding.channel) || 1));
+      const dmx = Math.max(0, Math.min(255, Math.round((typeof value === "boolean" ? (value ? 1 : 0) : Number(value) || 0) * 255)));
+      sendArtNet({ host, port, universe, channel, value: dmx });
+      onLog(`Companion · Art-Net U${universe} CH${channel} = ${dmx}`);
+      return makeStudioFeedback({ widgetId: widget.id, value: dmx, ok: true, detail: `Art-Net U${universe}/${channel}`, rttMs: Date.now() - t0 });
+    }
+
+    if (kind === "sacn") {
+      if (typeof sendSacn !== "function") throw new Error("Transport sACN hôte indisponible");
+      const host = binding.sacnHost || "";
+      const port = Number(binding.sacnPort) || 5568;
+      const universe = Math.max(1, Number(binding.universe) || 1);
+      const channel = Math.max(1, Math.min(512, Number(binding.channel) || 1));
+      const dmx = Math.max(0, Math.min(255, Math.round((typeof value === "boolean" ? (value ? 1 : 0) : Number(value) || 0) * 255)));
+      sendSacn({ host, port, universe, channel, value: dmx, priority: binding.priority || 100 });
+      onLog(`Companion · sACN U${universe} CH${channel} = ${dmx}`);
+      return makeStudioFeedback({ widgetId: widget.id, value: dmx, ok: true, detail: `sACN U${universe}/${channel}`, rttMs: Date.now() - t0 });
     }
 
     if (kind === "serial") {
