@@ -1,9 +1,10 @@
 {
   "name": "no-de-vibe-designer",
   "productName": "No-de Vibe Designer",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "No-de Vibe Designer — environnement de patch nodal pour le spectacle vivant",
-  "author": "Acousmatic / No-de Vibe Designer",
+  "author": "Cédric Carboni",
+  "homepage": "https://github.com/cdriccarboni",
   "license": "UNLICENSED",
   "private": true,
   "main": "electron/main.cjs",
