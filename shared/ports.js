@@ -73,6 +73,9 @@ export const EXECUTABLE_PORTS = {
     { name: "energy", dir: "in", data: "number" },
     { name: "out", dir: "out", data: "video" }
   ],
+  reactiondiffusion: [
+    { name: "out", dir: "out", data: "video" }
+  ],
   ribbontrail: [
     { name: "x", dir: "in", data: "number" },
     { name: "y", dir: "in", data: "number" },
