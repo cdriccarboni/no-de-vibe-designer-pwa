@@ -1,6 +1,6 @@
 # No-de Vibe Designer
 
-**Source canonique : `main` · No-de Vibe Designer V3.0.0.**  
+**Source canonique : `main` · No-de Vibe Designer V3.0.1.**  
 Production readiness : `docs/PRODUCTION_READINESS.md`.  
 La Library est à **105/105 nodes exécutables** ; les limites matérielles ou logicielles externes restent explicitement signalées.
 
@@ -28,7 +28,7 @@ Même moteur et même format de projet (`.cvd.json`, schéma `cvd.graph`) pour :
 - **PWA multi-surface** : Designer complet, Mobile, Régie, Plateau et Remote Camera dans une seule PWA.
 - **Bascule universelle** : tout appareil peut changer de rôle à tout moment ; Auto n’est qu’un défaut de démarrage.
 - **Deuxième ordinateur = télécommande possible** via Régie/Plateau, sans téléphone obligatoire.
-- **Cache multi-surface** : service worker commun fingerprinté `nvd-1.4.0-multi-*`, sans confusion entre écrans.
+- **Cache multi-surface** : service worker commun fingerprinté `nvd-3.0.x-multi-*`, sans confusion entre écrans.
 
 - **105/105 moteurs** : plus aucun node de Library sans ports + processeur.
 - **Vibe local-first** : Qwen/Ollama local prioritaire, Planner déterministe amélioré et Safety Engine indépendant.

@@ -1,7 +1,7 @@
 {
   "name": "no-de-vibe-designer",
   "productName": "No-de Vibe Designer",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "No-de Vibe Designer — environnement de patch nodal pour le spectacle vivant",
   "author": "Acousmatic / No-de Vibe Designer",
   "license": "UNLICENSED",
@@ -32,7 +32,7 @@
   "build": {
     "appId": "fr.acousmatic.nodevibedesigner",
     "productName": "No-de Vibe Designer",
-    "copyright": "Copyright © No-de Vibe Designer",
+    "copyright": "Copyright © 2026 Cédric Carboni",
     "directories": {
       "output": "dist/electron",
       "buildResources": "packaging/mac"
