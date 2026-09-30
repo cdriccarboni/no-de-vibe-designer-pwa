@@ -90,7 +90,7 @@ function enterShowcaseDemo({ preserve = true } = {}) {
   runtime.play();
   syncPlayButton();
   setDemoBanner(true);
-  log("EXEMPLE · Wow interactif chargé · déplace la souris dans le Preview");
+  log("EXEMPLE · Wow interactif V2.2 · souris + pinch trackpad dans le Preview");
 }
 
 function exitShowcaseDemo() {
@@ -1430,11 +1430,43 @@ function autosave() {
   try { publishHostState(); } catch { /* hôte distant optionnel */ }
 }
 
-$("#previewOverlay").addEventListener("pointermove", e => {
+const previewOverlay = $("#previewOverlay");
+let previewPinchSpread = Number(runtime.pointer?.spread || 0);
+let safariPinchStartSpread = previewPinchSpread;
+
+previewOverlay.addEventListener("pointermove", e => {
   const r = e.currentTarget.getBoundingClientRect();
   runtime.setPointer((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
 });
-$("#previewOverlay").onclick = e => {
+
+// Chrome/Edge on macOS expose trackpad pinch as ctrl+wheel.
+// Pinch-out opens the digital curtain; pinch-in closes it.
+previewOverlay.addEventListener("wheel", e => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  const delta = Math.max(-80, Math.min(80, -e.deltaY));
+  previewPinchSpread = Math.max(0, Math.min(1, previewPinchSpread + delta * .0065));
+  runtime.setGestureSpread(previewPinchSpread);
+  if (document.body.classList.contains("demo-mode")) {
+    const pct = Math.round(previewPinchSpread * 100);
+    $("#demoModeBanner span").textContent = `Souris = mouvement · écarte/pince 2 doigts = ouverture ${pct}%`;
+  }
+}, { passive:false });
+
+// Safari/WebKit native gesture events.
+previewOverlay.addEventListener("gesturestart", e => {
+  e.preventDefault();
+  safariPinchStartSpread = previewPinchSpread;
+}, { passive:false });
+previewOverlay.addEventListener("gesturechange", e => {
+  e.preventDefault();
+  const scale = Math.max(.25, Math.min(4, Number(e.scale) || 1));
+  previewPinchSpread = Math.max(0, Math.min(1, safariPinchStartSpread + (scale - 1) * .72));
+  runtime.setGestureSpread(previewPinchSpread);
+}, { passive:false });
+previewOverlay.addEventListener("gestureend", e => e.preventDefault(), { passive:false });
+
+previewOverlay.onclick = e => {
   const r = e.currentTarget.getBoundingClientRect();
   addPoint((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
   log("Point image ajouté");
@@ -2302,7 +2334,7 @@ if (project.nodes.length === 0 && generalPrefs.loadDemo !== false && localStorag
   try { demoReturnProject = JSON.parse(JSON.stringify(project)); } catch { demoReturnProject = newProject(); }
   project = createDemoProject();
   setDemoBanner(true);
-  log("EXEMPLE · Wow interactif initialisé · aucune permission requise");
+  log("EXEMPLE · V2.2 initialisé · souris + écartement 2 doigts · aucune permission requise");
 } else {
   setDemoBanner(false);
 }
