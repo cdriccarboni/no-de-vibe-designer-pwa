@@ -2601,6 +2601,20 @@ function handleCompanionStudioMessage(msg) {
         else runtime.toggle();
         syncPlayButton();
       },
+      audioPlayerControl: (slot, action, value) => {
+        sharedAudio.controlPlayer(slot, action, value)
+          .then(() => {
+            remoteSession?.send?.({
+              type: STUDIO_MSG.STATUS,
+              channel: "audio-player",
+              slot,
+              state: sharedAudio.playerState(slot),
+              t: Date.now()
+            });
+          })
+          .catch(e => log(`Audio P${slot} · ${e?.message || e}`));
+        return sharedAudio.playerState(slot);
+      },
       onLog: (m) => log(m)
     });
     remoteSession?.send?.({ ...feedback, clientId: msg.clientId });
