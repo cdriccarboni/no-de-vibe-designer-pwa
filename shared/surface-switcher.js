@@ -38,8 +38,8 @@ export function surfaceUrl(id,{root=pwaRootUrl()}={}){
   return new URL(s.path,root).href;
 }
 
-export function navigateSurface(id,{locationObj=globalThis.location}={}){
-  const target=new URL(surfaceUrl(id),locationObj?.href||pwaRootUrl());
+export function navigateSurface(id,{locationObj=globalThis.location,root=pwaRootUrl()}={}){
+  const target=new URL(surfaceUrl(id,{root}),locationObj?.href||root);
   const localTarget=target.pathname+target.search+target.hash;
   if(typeof locationObj?.assign==="function") locationObj.assign(localTarget);
   else if(locationObj) locationObj.href=localTarget;
