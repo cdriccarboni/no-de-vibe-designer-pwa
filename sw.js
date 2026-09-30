@@ -3,8 +3,16 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-1.3.0";
+const CACHE = "nvd-1.3.1-multi";
 const ASSETS = [
+  "./companion/companion.css",
+  "./companion/companion.js",
+  "./companion/index.html",
+  "./desktop/app.js",
+  "./desktop/index.html",
+  "./desktop/manifest.webmanifest",
+  "./desktop/output.html",
+  "./desktop/styles.css",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-192.png",
@@ -14,8 +22,15 @@ const ASSETS = [
   "./manuel/captures/patch-camera-shader.svg",
   "./manuel/captures/ui-overview.svg",
   "./manuel/index.html",
-  "./mobile.css",
-  "./mobile.js",
+  "./mobile/README_ANDROID.md",
+  "./mobile/icons/icon-192.png",
+  "./mobile/icons/icon-512.png",
+  "./mobile/icons/icon-maskable-192.png",
+  "./mobile/icons/icon-maskable-512.png",
+  "./mobile/index.html",
+  "./mobile/manifest.webmanifest",
+  "./mobile/mobile.css",
+  "./mobile/mobile.js",
   "./shared/adapters/midi-learn.js",
   "./shared/adapters/midi.js",
   "./shared/adapters/serial.js",
@@ -89,10 +104,14 @@ const ASSETS = [
   "./shared/show-importer.js",
   "./shared/stage/cues.js",
   "./shared/subpatch.js",
+  "./shared/surface-switcher.js",
   "./shared/version.js",
   "./shared/vibe-planner.js",
   "./shared/vibe-safety.js",
-  "./shared/vibe.js"
+  "./shared/vibe.js",
+  "./studio/index.html",
+  "./studio/studio.css",
+  "./studio/studio.js"
 ];
 
 self.addEventListener("install", (event) => {
@@ -119,13 +138,19 @@ self.addEventListener("fetch", (event) => {
 
   if (req.mode === "navigate") {
     event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
       try {
         const fresh = await fetch(req);
-        const cache = await caches.open(CACHE);
-        cache.put("./index.html", fresh.clone());
+        cache.put(req, fresh.clone());
         return fresh;
       } catch {
-        return (await caches.match("./index.html")) || (await caches.match(req)) || new Response("Hors ligne", { status: 503 });
+        const direct = await cache.match(req);
+        if (direct) return direct;
+        const fallbackUrl = new URL(req.url);
+        if (fallbackUrl.pathname.endsWith("/")) fallbackUrl.pathname += "index.html";
+        return (await cache.match(fallbackUrl.href))
+          || (await cache.match("./index.html"))
+          || new Response("Hors ligne", { status: 503 });
       }
     })());
     return;

@@ -1,25 +1,28 @@
-import { newProject, validateProject, exportProject, createDemoProject } from "./shared/ir.js";
-import { NODE_GROUPS, spec } from "./shared/node-specs.js";
-import { Runtime } from "./shared/runtime.js";
-import { SensorBus } from "./shared/sensor-bus.js";
-import { portDirection, portLabels, isExecutable } from "./shared/ports.js";
-import { validateEdge } from "./shared/graph-engine.js";
-import { createHistory } from "./shared/history.js";
-import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed } from "./shared/vibe.js";
-import { APP_NAME, APP_VERSION, BUILD_LABEL } from "./shared/version.js";
-import { addBoxPort, ensureSubGraph, wrapNodesInSubpatch } from "./shared/subpatch.js";
-import { planManualSave, saveStatusMessage } from "./shared/save-fallback.js";
-import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "./shared/exporters.js";
-import { ensureRouting, effectiveRoute } from "./shared/routing.js";
-import { DeviceManager } from "./shared/device-manager.js";
-import { createBrowserProjectStore } from "./shared/project-store.js";
-import { applyCue, listCues, nextCue, previousCue } from "./shared/stage/cues.js";
-import { loadRememberedHost, rememberHost, createHostCard } from "./shared/discovery/host-card.js";
-import { connectRemote } from "./shared/remote-client.js";
-import { projectSignature } from "./shared/remote-protocol.js";
-import { nestedBoxSelfTest } from "./shared/self-test.js";
-import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "./shared/pwa-update.js";
-import { makeArtNetPacket } from "./shared/adapters/websocket-bridge.js";
+import { installSurfaceSwitcher } from "../shared/surface-switcher.js";
+import { newProject, validateProject, exportProject, createDemoProject } from "../shared/ir.js";
+import { NODE_GROUPS, spec } from "../shared/node-specs.js";
+import { Runtime } from "../shared/runtime.js";
+import { SensorBus } from "../shared/sensor-bus.js";
+import { portDirection, portLabels, isExecutable } from "../shared/ports.js";
+import { validateEdge } from "../shared/graph-engine.js";
+import { createHistory } from "../shared/history.js";
+import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed } from "../shared/vibe.js";
+import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
+import { addBoxPort, ensureSubGraph, wrapNodesInSubpatch } from "../shared/subpatch.js";
+import { planManualSave, saveStatusMessage } from "../shared/save-fallback.js";
+import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
+import { ensureRouting, effectiveRoute } from "../shared/routing.js";
+import { DeviceManager } from "../shared/device-manager.js";
+import { createBrowserProjectStore } from "../shared/project-store.js";
+import { applyCue, listCues, nextCue, previousCue } from "../shared/stage/cues.js";
+import { loadRememberedHost, rememberHost, createHostCard } from "../shared/discovery/host-card.js";
+import { connectRemote } from "../shared/remote-client.js";
+import { projectSignature } from "../shared/remote-protocol.js";
+import { nestedBoxSelfTest } from "../shared/self-test.js";
+import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "../shared/pwa-update.js";
+import { makeArtNetPacket } from "../shared/adapters/websocket-bridge.js";
+
+installSurfaceSwitcher({ current:"mobile" });
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -1239,7 +1242,7 @@ function bindServiceWorker() {
   const built = document.querySelector('meta[name="nvd-pwa"]')?.content === "build";
   if (!built || !("serviceWorker" in navigator)) return;
   let waiting = null;
-  navigator.serviceWorker.register("./sw.js", { scope: "./" }).then((reg) => {
+  navigator.serviceWorker.register("../sw.js", { scope: "../" }).then((reg) => {
     const watch = (worker) => {
       if (!worker) return;
       const decide = () => {

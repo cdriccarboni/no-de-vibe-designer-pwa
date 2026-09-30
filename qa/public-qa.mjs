@@ -8,15 +8,29 @@ import { renderThreadCurtain } from "../shared/graphics/interactive-effects.js";
 import { encodeSacnChannel, sacnMulticastAddress } from "../shared/protocols/sacn.js";
 import { createRegiePreset, REGIE_PRESETS } from "../shared/companion-studio/regie-presets.js";
 import { APP_VERSION } from "../shared/version.js";
+import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl } from "../shared/surface-switcher.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(`QA FAIL · ${message}`);
   console.log(`OK · ${message}`);
 }
 
-console.log("No-de Vibe Designer public QA");
+console.log("No-de Vibe Designer public QA 1.3.1");
 
-assert(APP_VERSION === "1.3.0", "runtime version is 1.3.0");
+assert(APP_VERSION === "1.3.1", "runtime version is 1.3.1");
+assert(SURFACES.length === 5, "five switchable No-de surfaces are available");
+const surfaceMem = new Map();
+const surfaceStorage = {
+  getItem: key => surfaceMem.get(key) ?? null,
+  setItem: (key, value) => surfaceMem.set(key, value),
+  removeItem: key => surfaceMem.delete(key)
+};
+setPreferredSurface("plateau", surfaceStorage);
+assert(getPreferredSurface(surfaceStorage) === "plateau", "surface choice persists");
+setPreferredSurface("auto", surfaceStorage);
+assert(getPreferredSurface(surfaceStorage) === "", "Auto restores device-default routing");
+assert(/desktop/.test(surfaceUrl("designer", { root: new URL("https://example.test/no-de/") })), "Designer URL is explicit");
+assert(/surface=plateau/.test(surfaceUrl("plateau", { root: new URL("https://example.test/no-de/") })), "Plateau role is explicit and shareable");
 
 const libraryTypes = new Set();
 for (const [, items] of NODE_GROUPS) for (const [, type] of items) libraryTypes.add(type);
@@ -84,4 +98,4 @@ assert(lightPage?.widgets.some(w => w.binding?.kind === "sacn" && w.binding?.uni
 
 console.log("PUBLIC QA OK");
 
-// QA trigger 1.3.0 · 2
+// QA trigger 1.3.1 · 2
