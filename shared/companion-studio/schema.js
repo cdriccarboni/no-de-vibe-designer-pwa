@@ -78,6 +78,9 @@ export function normalizeWidget(w = {}) {
       h: Number(w.presentation?.h ?? w.height ?? 1),
       color: w.presentation?.color || "#d7b86a",
       textColor: w.presentation?.textColor || "#0f1113",
+      fontFamily: w.presentation?.fontFamily || "inherit",
+      fontSize: Math.max(9, Math.min(48, Number(w.presentation?.fontSize) || 15)),
+      layer: Math.max(0, Math.min(999, Number(w.presentation?.layer) || 0)),
       icon: w.presentation?.icon || "",
       visible: w.presentation?.visible !== false,
       locked: !!w.presentation?.locked,
@@ -106,8 +109,6 @@ export function normalizeWidget(w = {}) {
       serialText: w.binding?.serialText || null,
       cameraAction: w.binding?.cameraAction || null,
       videoAction: w.binding?.videoAction || null,
-      playerSlot: Math.max(1, Math.min(12, Number(w.binding?.playerSlot) || 1)),
-      playerAction: w.binding?.playerAction || null,
       valueOn: w.binding?.valueOn ?? true,
       valueOff: w.binding?.valueOff ?? false,
       momentary: !!w.binding?.momentary

@@ -66,8 +66,8 @@ export function createDemoProject() {
   p.name = "EXEMPLE — Wow interactif";
   p.nodes = [
     { id: "n1", type: "pointer", title: "Bouge la souris", x: 34, y: 122, params: { enabled: true, duration: 5, opacity: 1 } },
-    { id: "n2", type: "threadcurtain", title: "Rideau de fils · pinch", x: 250, y: 44, params: { enabled: true, duration: 5, opacity: 1, strands: 132, force: 1, wave: 0.42, lightWaves: 0.95, glow: 0.88, spreadReactive: true } },
-    { id: "n3", type: "ripple", title: "Ondes lumineuses", x: 250, y: 214, params: { enabled: true, duration: 5, opacity: 1, energy: 0.92, rings: 18 } },
+    { id: "n2", type: "threadcurtain", title: "Rideau de fils", x: 250, y: 44, params: { enabled: true, duration: 5, opacity: 1, strands: 118, force: 0.92, wave: 0.34 } },
+    { id: "n3", type: "ripple", title: "Ondes lumineuses", x: 250, y: 214, params: { enabled: true, duration: 5, opacity: 1, energy: 0.82, rings: 15 } },
     { id: "n4", type: "composite", title: "Fusion WOW", x: 518, y: 126, params: { enabled: true, duration: 5, opacity: 1, blend: "screen" } },
     { id: "n5", type: "transform", title: "Sortie / Transform", x: 746, y: 126, params: { enabled: true, duration: 5, opacity: 1, scale: 1.04, rotation: 0, dx: 0, dy: 0 } }
   ];
@@ -89,6 +89,6 @@ export function createDemoProject() {
     { id: "ch-ripple-energy", name: "Ondes · Énergie", nodeId: "n3", param: "energy", min: 0, max: 1, step: 0.01 }
   ];
   p.meta.demo = "wow-interactive";
-  p.meta.note = "V2.2 · déplace la souris dans le Preview ; écarte/pince deux doigts sur le trackpad pour ouvrir/fermer le rideau. EXIT restaure le projet précédent.";
+  p.meta.note = "Déplace la souris dans le Preview. EXIT restaure le projet précédent.";
   return p;
 }

@@ -5,6 +5,8 @@ export const LOCAL_AI_DEFAULTS = Object.freeze({
   enabled: true,
   baseUrl: "http://127.0.0.1:11434",
   model: "qwen2.5-coder:7b",
+  secondaryModel: "gemma3:1b",
+  parallel: true,
   temperature: 0.15,
   maxOps: 64,
   remoteFallback: false
@@ -17,20 +19,28 @@ export function normalizeLocalAiConfig(raw = {}) {
     enabled: cfg.localEnabled !== false,
     baseUrl: String(cfg.localBaseUrl || legacyEndpoint || LOCAL_AI_DEFAULTS.baseUrl).replace(/\/+$/, ""),
     model: String(cfg.localModel || LOCAL_AI_DEFAULTS.model).trim() || LOCAL_AI_DEFAULTS.model,
+    secondaryModel: String(cfg.localSecondaryModel || LOCAL_AI_DEFAULTS.secondaryModel).trim() || LOCAL_AI_DEFAULTS.secondaryModel,
+    parallel: cfg.localParallel !== false,
     temperature: Math.max(0, Math.min(1, Number(cfg.localTemperature ?? LOCAL_AI_DEFAULTS.temperature))),
     maxOps: Math.max(1, Math.min(128, Number(cfg.localMaxOps ?? LOCAL_AI_DEFAULTS.maxOps) || LOCAL_AI_DEFAULTS.maxOps)),
     remoteFallback: cfg.remoteFallback === true
   };
 }
 
-export function isLoopbackLocalAiUrl(raw = "") {
+export function isTrustedLocalAiUrl(raw = "") {
   try {
     const url = new URL(String(raw || LOCAL_AI_DEFAULTS.baseUrl));
-    return ["127.0.0.1", "localhost", "::1", "[::1]"].includes(url.hostname);
+    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    if (["127.0.0.1", "localhost", "::1"].includes(host)) return true;
+    if (/^10\./.test(host) || /^192\.168\./.test(host)) return true;
+    const m = host.match(/^172\.(\d+)\./);
+    return !!m && Number(m[1]) >= 16 && Number(m[1]) <= 31;
   } catch {
     return false;
   }
 }
+
+export const isLoopbackLocalAiUrl = isTrustedLocalAiUrl;
 
 export function modelNamesFromTags(payload = {}) {
   const models = Array.isArray(payload?.models) ? payload.models : [];
@@ -55,6 +65,15 @@ export function selectLocalModel(names = [], preferred = LOCAL_AI_DEFAULTS.model
     return { name, score };
   }).sort((a,b) => b.score - a.score);
   return ranked[0]?.score > -50 ? ranked[0].name : preferred;
+}
+
+
+export function selectLocalModels(names = [], preferred = LOCAL_AI_DEFAULTS.model, secondary = LOCAL_AI_DEFAULTS.secondaryModel) {
+  const primary = selectLocalModel(names, preferred);
+  const list = [...new Set((names || []).map(String).filter(Boolean))];
+  const secondaryBase = String(secondary || "").split(":")[0];
+  const second = list.find(n => n === secondary || n === secondaryBase || n.startsWith(secondaryBase + ":")) || "";
+  return { primary, secondary: second && second !== primary ? second : "" };
 }
 
 export function executableNodeCatalog() {
@@ -185,7 +204,7 @@ export function sanitizeLocalAiResponse(raw, { maxOps = LOCAL_AI_DEFAULTS.maxOps
 }
 
 export async function directOllamaProbe(baseUrl = LOCAL_AI_DEFAULTS.baseUrl) {
-  if (!isLoopbackLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige une adresse loopback");
+  if (!isTrustedLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige localhost ou une IP privée du réseau local");
   const res = await fetch(String(baseUrl).replace(/\/+$/, "") + "/api/tags", { method: "GET" });
   if (!res.ok) throw new Error("Ollama HTTP " + res.status);
   const data = await res.json();
@@ -193,7 +212,7 @@ export async function directOllamaProbe(baseUrl = LOCAL_AI_DEFAULTS.baseUrl) {
 }
 
 export async function directOllamaChat({ baseUrl, model, system, user, temperature = .15 } = {}) {
-  if (!isLoopbackLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige une adresse loopback");
+  if (!isTrustedLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige localhost ou une IP privée du réseau local");
   const res = await fetch(String(baseUrl).replace(/\/+$/, "") + "/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

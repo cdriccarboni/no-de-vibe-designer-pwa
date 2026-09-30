@@ -311,27 +311,6 @@ export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
   if (/inverse|inverser/.test(t)) { set("threshold","invert",true); set("shadow","invert",true); }
   if (/miroir vertical/.test(t)) set("mirror","axis","y");
 
-  // V2.2 · Thread Curtain / trackpad / luminous waves.
-  // This updates an existing demo instead of merely adding duplicate nodes.
-  if (/rideau de fil|rideau de fils|thread curtain/.test(t)) {
-    add("pointer",70,70);
-    add("threadcurtain",500,70);
-    connect("pointer","threadcurtain","number");
-    set("threadcurtain","force",1);
-    set("threadcurtain","wave",.42);
-    set("threadcurtain","lightWaves",.95);
-    set("threadcurtain","glow",.88);
-    set("threadcurtain","spreadReactive",true);
-    notes.push("Rideau V2.2 · souris directe + pinch trackpad pour ouvrir les fils.");
-  }
-  if (/onde|ondes|ripple|lumineu/.test(t)) {
-    add("ripple",500,235);
-    if (has("pointer")) connect("pointer","ripple","number");
-    set("ripple","energy",.92);
-    set("ripple","rings",18);
-    notes.push("Ondes lumineuses renforcées et centrées sur le pointeur.");
-  }
-
   // Timeline / cues from natural durations.
   const duration = t.match(/(\d+(?:[.,]\d+)?)\s*(?:seconde|secondes|sec|s)\b/);
   if (duration && /cue|top|timeline|pendant|duree|durée/.test(t)) {

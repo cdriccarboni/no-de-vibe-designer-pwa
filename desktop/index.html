@@ -22,7 +22,7 @@
   </div>
 </div>
 <div id="demoModeBanner" class="demo-mode-banner hidden" role="status">
-  <div><b>EXEMPLE · WOW INTERACTIF V2.2</b><span>Souris + écartement/pincement 2 doigts dans le Preview</span></div>
+  <div><b>EXEMPLE · WOW INTERACTIF</b><span>Déplace la souris dans le Preview</span></div>
   <button id="demoExitBtn" type="button">EXIT · QUITTER L’EXEMPLE</button>
 </div>
 <dialog id="companionEditorDialog" class="companion-editor-dialog">
@@ -41,7 +41,7 @@
 <div id="app">
   <header class="topbar">
     <div class="brand"><div class="brandmark" title="No-de Vibe Designer">◒</div><div><b>No-de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v2.2.0</span>
+    <span class="badge">v3.0.0</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
     <div class="themes workspace-modes"><button id="modeBureau" class="active">Bureau</button><button id="modePlateau">Plateau</button></div>
@@ -90,6 +90,20 @@
       <section class="panel vibe resizable-y">
         <div class="panel-head">Vibe <span class="sub">Entrée = envoyer · Shift+Entrée = nouvelle ligne</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
         <div class="panel-body vibe-body">
+          <div class="vibe-reference">
+            <label for="vibeImageFile" class="smallbtn vibe-image-pick">＋ Image</label>
+            <input id="vibeImageFile" type="file" accept="image/*" hidden>
+            <img id="vibeImageThumb" class="vibe-image-thumb hidden" alt="Référence Image Vibe">
+            <select id="vibeImageTarget" aria-label="Cible Image Vibe">
+              <option value="auto">Auto</option>
+              <option value="p5">p5 / Canvas</option>
+              <option value="glsl">GLSL</option>
+              <option value="particles">Particules</option>
+              <option value="sdf">SDF / Metaballs</option>
+            </select>
+            <button id="vibeImageClear" type="button" class="smallbtn hidden">Retirer</button>
+            <span id="vibeImageInfo" class="sub">Image optionnelle · analyse locale</span>
+          </div>
           <textarea id="vibeText" placeholder="Ex. : Fais réagir le rideau de fils à la souris">Fais réagir le rideau de fils à la souris et ajoute des ondes lumineuses.</textarea>
           <button id="applyVibe" class="generate">Envoyer ↵</button>
           <div id="vibePreview" class="vibe-preview hidden"></div>
@@ -188,9 +202,13 @@
       <div data-pref-panel="ai" class="hidden">
         <p class="hint"><b>IA locale prioritaire</b> : No-de utilise d’abord Ollama sur cette machine pour générer des opérations de patch JSON. Si elle est indisponible, repli automatique sur le moteur local déterministe.</p>
         <label>Activer l’IA générative locale <input id="aiLocalEnabled" type="checkbox" checked></label>
-        <label class="stack">Serveur local<input id="aiLocalBase" type="url" value="http://127.0.0.1:11434"></label>
-        <label class="stack">Modèle local<input id="aiLocalModel" type="text" value="qwen2.5-coder:7b"></label>
+        <label class="stack">Serveur local / LAN<input id="aiLocalBase" type="url" value="http://127.0.0.1:11434" placeholder="http://192.168.1.20:11434"></label>
+        <label class="stack">Modèle principal<input id="aiLocalModel" type="text" value="qwen2.5-coder:7b"></label>
+        <label class="stack">Modèle léger<input id="aiLocalSecondaryModel" type="text" value="gemma3:1b"></label>
+        <label>Duo local parallèle <input id="aiLocalParallel" type="checkbox" checked></label>
         <div class="preferences-actions">
+          <button id="aiInstallQwen" class="smallbtn" type="button">Installer Qwen</button>
+          <button id="aiInstallGemma" class="smallbtn" type="button">Installer Gemma</button>
           <button id="aiLocalProbe" class="smallbtn" type="button">Tester l’IA locale</button>
           <span id="aiLocalStatus" class="hint">Non testée</span>
         </div>
@@ -214,7 +232,6 @@
           <li><b>Audio</b> — moteur local actif (Audio Lab, filtre, delay, FFT, Organic Audio). <b>NDI Out</b> utilise un relais natif et reste PLATFORM-LIMITED sans hôte compatible. Syphon/Spout ne sont pas encore exposés comme moteurs actifs.</li>
         </ul>
         <div class="preferences-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
-          <button type="button" id="audioRackBtn" class="smallbtn">12 Players audio</button>
           <button type="button" id="runDiagnosticBtn" class="smallbtn">Diagnostic spectacle</button>
           <button type="button" id="copyDiagnosticBtn" class="smallbtn">Copier diagnostic</button>
           <button type="button" id="showHostCard" class="smallbtn">Carte hôte / QR</button>
@@ -223,6 +240,35 @@
           <button type="button" id="exportPdBtn" class="smallbtn">Export Pure Data</button>
           <button type="button" id="exportMilluminBtn" class="smallbtn">Carte Millumin OSC</button>
         </div>
+        <hr>
+        <p class="hint"><b>Vibe Out</b> — transforme le patch courant en fichier de travail ouvrable dans un logiciel externe grâce à l’IA locale ou à ton endpoint externe.</p>
+        <label class="stack">Cible
+          <select id="vibeOutTarget">
+            <option value="max">Max/MSP · JS à copier-coller</option>
+            <option value="touchdesigner">TouchDesigner · Python à copier-coller</option>
+            <option value="p5">p5.js · sketch</option>
+            <option value="processing">Processing · .pde</option>
+            <option value="puredata">Pure Data · .pd</option>
+            <option value="maxpat">Max/MSP · fichier .maxpat</option>
+          </select>
+        </label>
+        <label class="stack">IA
+          <select id="vibeOutProvider">
+            <option value="auto">Auto · local puis endpoint</option>
+            <option value="local">Locale · Ollama</option>
+            <option value="external">Endpoint externe configuré</option>
+          </select>
+        </label>
+        <label class="stack">Consigne
+          <textarea id="vibeOutInstruction" rows="4" placeholder="Ex. : recrée le patch en gardant les contrôles OSC et organise le réseau proprement."></textarea>
+        </label>
+        <div class="preferences-actions">
+          <button type="button" id="vibeOutGenerate" class="smallbtn">Vibe Out → générer</button>
+          <button type="button" id="vibeOutCopy" class="smallbtn" disabled>Copier le code</button>
+          <button type="button" id="vibeOutDownload" class="smallbtn" disabled>Télécharger</button>
+          <span id="vibeOutStatus" class="hint">Prêt</span>
+        </div>
+        <textarea id="vibeOutResult" rows="12" spellcheck="false" placeholder="Le code généré apparaîtra ici…"></textarea>
         <pre id="diagnosticOut" class="term-log" style="max-height:260px;margin-top:10px;display:none"></pre>
         <pre id="hostCardOut" class="term-log" style="max-height:160px;margin-top:10px;display:none"></pre>
       </div>
@@ -244,13 +290,6 @@
   </div>
 </div>
 
-<div id="audioRackModal" class="preferences-modal hidden">
-  <div class="preferences-card wide">
-    <div class="preferences-head"><div><b>12 Players stéréo</b><span class="hint">Même rack que le Companion · fichiers locaux au Mac</span></div><button id="audioRackClose" type="button">×</button></div>
-    <div id="audioRackGrid" class="control-surface"></div>
-  </div>
-</div>
-
 <div id="magicFxModal" class="preferences-modal hidden">
   <div class="preferences-card magic-card">
     <div class="preferences-head"><b>Magic FX</b><button id="magicFxClose" type="button">×</button></div>
@@ -262,6 +301,11 @@
       <button type="button" data-magic-fx="bodyclone"><b>Body Clone</b><small>dédoublement simple</small></button>
       <button type="button" data-magic-fx="blob"><b>Blob</b><small>forme organique</small></button>
       <button type="button" data-magic-fx="blackhole"><b>Black Hole</b><small>visuel génératif</small></button>
+      <button type="button" data-supernode="digital-curtain"><b>Digital Curtain · V3</b><small>SuperNode interactif</small></button>
+      <button type="button" data-supernode="living-shadow"><b>Living Shadow · V3</b><small>SuperNode corps / ombre</small></button>
+      <button type="button" data-supernode="feedback-dream"><b>Feedback Dream · V3</b><small>SuperNode feedback</small></button>
+      <button type="button" data-supernode="particle-field"><b>Particle Field · V3</b><small>SuperNode particules</small></button>
+      <button type="button" data-supernode="quick-map"><b>Quick Map · V3</b><small>mapping téléphone</small></button>
     </div>
     <p class="hint magic-hint">Sélectionne une source vidéo puis choisis un effet. Le résultat reste un vrai node dans PATCH.</p>
   </div>
