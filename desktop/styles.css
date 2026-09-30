@@ -171,3 +171,9 @@ html.electron-macos .topbar{padding-left:84px}
 .shader-shell textarea:focus{border-color:var(--accent,#d7b86a)}
 .shader-actions{display:flex;align-items:center;gap:8px;padding:0 12px 12px}
 .shader-actions #shaderStatus{margin-left:auto;font-size:11px;color:var(--muted,#8f989f)}
+
+.copyright-link{color:inherit;text-decoration:none;display:inline-flex;align-items:center;min-height:22px}
+.copyright-link .copyright-hover{display:none}
+.copyright-link:hover .copyright-default,.copyright-link:focus-visible .copyright-default{display:none}
+.copyright-link:hover .copyright-hover,.copyright-link:focus-visible .copyright-hover{display:inline}
+.copyright-link:hover,.copyright-link:focus-visible{color:var(--accent);text-decoration:none;outline:none}
