@@ -30,13 +30,19 @@ self.addEventListener("fetch", (event) => {
 
   if (req.mode === "navigate") {
     event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
       try {
         const fresh = await fetch(req);
-        const cache = await caches.open(CACHE);
-        cache.put("./index.html", fresh.clone());
+        cache.put(req, fresh.clone());
         return fresh;
       } catch {
-        return (await caches.match("./index.html")) || (await caches.match(req)) || new Response("Hors ligne", { status: 503 });
+        const direct = await cache.match(req);
+        if (direct) return direct;
+        const fallbackUrl = new URL(req.url);
+        if (fallbackUrl.pathname.endsWith("/")) fallbackUrl.pathname += "index.html";
+        return (await cache.match(fallbackUrl.href))
+          || (await cache.match("./index.html"))
+          || new Response("Hors ligne", { status: 503 });
       }
     })());
     return;
