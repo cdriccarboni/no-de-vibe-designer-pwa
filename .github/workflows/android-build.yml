@@ -71,6 +71,20 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Verify APK metadata and signature
+        shell: bash
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          {
+            echo "No-de Vibe Designer 1.3.0"
+            echo
+            "$AAPT" dump badging "$APK" | grep -E '^package:|^application-label:|^sdkVersion:|^targetSdkVersion:' || true
+            echo
+            "$APKSIGNER" verify --verbose --print-certs "$APK"
+          } | tee android-verification.txt
+
       - name: Build unsigned release AAB
         working-directory: android
         run: ./gradlew bundleRelease --no-daemon
@@ -95,6 +109,7 @@ jobs:
           mkdir -p downloads
           cp android/app/build/outputs/apk/debug/app-debug.apk downloads/No-de-Vibe-Designer-1.3.0-debug.apk
           cp android/app/build/outputs/bundle/release/app-release.aab downloads/No-de-Vibe-Designer-1.3.0-unsigned.aab
+          cp android-verification.txt downloads/android-verification.txt
           printf '%s\n' '# Android downloads' ''             '- APK test: No-de-Vibe-Designer-1.3.0-debug.apk'             '- AAB release: No-de-Vibe-Designer-1.3.0-unsigned.aab (non signé, non publiable sur Play tel quel)'             > downloads/README.md
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
