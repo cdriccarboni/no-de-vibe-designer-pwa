@@ -1,4 +1,4 @@
-name: Runtime QA 1.3
+name: Runtime QA 1.3.1
 
 on:
   workflow_dispatch:
@@ -28,16 +28,27 @@ jobs:
       - name: Syntax check public runtime
         shell: bash
         run: |
-          node --check mobile.js
+          node --check desktop/app.js
+          node --check mobile/mobile.js
+          node --check studio/studio.js
+          node --check companion/companion.js
           find shared -type f -name '*.js' -print0 | xargs -0 -n1 node --check
           node --check qa/public-qa.mjs
       - name: PWA build invariants
         shell: bash
         run: |
-          grep -Fq '"version": "1.3.0"' build-info.json
-          grep -Fq 'nvd-1.3.0' sw.js
+          grep -Fq '"version": "1.3.1.0"' build-info.json
+          grep -Fq 'nvd-1.3.1.0' sw.js
           ! grep -Fq '__CACHE__' sw.js
           ! grep -Fq '__ASSETS__' sw.js
-          ! grep -Fq '../shared/' mobile.js
+          test -f desktop/index.html
+          test -f mobile/index.html
+          test -f studio/index.html
+          test -f companion/index.html
+          grep -Fq 'desktop/' index.html
+          grep -Fq 'studio/' index.html
+          grep -Fq 'companion/' index.html
+          ! test -f mobile.js
+          ! test -f mobile.css
       - name: Engine QA
         run: node qa/public-qa.mjs
