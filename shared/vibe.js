@@ -3,7 +3,7 @@ import { isExecutable } from "./ports.js";
 import { validateEdge } from "./graph-engine.js";
 import { deterministicVibePlan } from "./vibe-planner.js";
 import { secureVibePlan } from "./vibe-safety.js";
-import { buildLocalAiPrompt, directOllamaChat, directOllamaProbe, normalizeLocalAiConfig, sanitizeLocalAiResponse, selectLocalModel } from "./local-ai-core.js";
+import { buildLocalAiPrompt, directOllamaChat, directOllamaProbe, normalizeLocalAiConfig, sanitizeLocalAiResponse, selectLocalModels } from "./local-ai-core.js";
 
 /**
  * Vibe coding — génération structurée de patch.
@@ -25,6 +25,8 @@ export function readAiConfig() {
     localEnabled: local.enabled,
     localBaseUrl: local.baseUrl,
     localModel: local.model,
+    localSecondaryModel: local.secondaryModel,
+    localParallel: local.parallel,
     localTemperature: local.temperature,
     localMaxOps: local.maxOps,
     // Cloud is opt-in. Legacy configs remain readable but are not contacted unless enabled === true.
@@ -98,9 +100,10 @@ async function callLocalAi(text, project, cfg) {
   const probe = await probeLocalAi(cfg);
   if (!probe.ok) return { ok:false, unavailable:true, error:probe.error || "Ollama local indisponible" };
 
-  const model = probe.model || local.model;
+  const models = (probe.localModels || [probe.model]).filter(Boolean);
   const prompt = buildLocalAiPrompt(text, project);
-  try {
+
+  const ask = async model => {
     const raw = typeof globalThis?.nvdDesktop?.localAiChat === "function"
       ? await globalThis.nvdDesktop.localAiChat({
           baseUrl:local.baseUrl,
@@ -117,20 +120,47 @@ async function callLocalAi(text, project, cfg) {
           user:prompt.user
         });
     const parsed = sanitizeLocalAiResponse(raw, { maxOps:local.maxOps });
-    if (!parsed.ok) return { ok:false, unavailable:true, error:parsed.error || "Réponse locale inexploitable" };
+    if (!parsed.ok) throw new Error(parsed.error || "Réponse locale inexploitable");
+    return { model, ...parsed };
+  };
+
+  try {
+    if (local.parallel && models.length > 1) {
+      const settled = await Promise.allSettled(models.slice(0, 2).map(ask));
+      const successes = settled.filter(x => x.status === "fulfilled").map(x => x.value);
+      if (!successes.length) {
+        const reasons = settled.map(x => x.reason?.message || x.reason).filter(Boolean).join(" · ");
+        throw new Error(reasons || "Duo IA local indisponible");
+      }
+      // Qwen/primary remains authoritative for graph mutation; the lightweight second model
+      // acts as a fast second opinion and can fill in only when primary failed.
+      const primary = successes.find(x => x.model === models[0]) || successes[0];
+      const second = successes.find(x => x !== primary);
+      return {
+        ok:true,
+        engine:"local-ai-duo",
+        ops:primary.ops,
+        summary:primary.summary || second?.summary || "",
+        note:"Local AI Core · " + successes.map(x => x.model).join(" + ") + " · OFFLINE",
+        localModel:primary.model,
+        localModels:successes.map(x => x.model)
+      };
+    }
+
+    const parsed = await ask(models[0] || local.model);
     return {
       ok:true,
       engine:"local-ai",
       ops:parsed.ops,
       summary:parsed.summary,
-      note:"Local AI Core · " + model + " · OFFLINE",
-      localModel:model
+      note:"Local AI Core · " + parsed.model + " · OFFLINE",
+      localModel:parsed.model,
+      localModels:[parsed.model]
     };
   } catch (e) {
     return { ok:false, unavailable:true, error:"Local AI Core injoignable : " + (e?.message || e) };
   }
 }
-
 async function callRemoteAi(text, project, cfg) {
   const endpoint = (cfg.endpoint || "").trim();
   const apiKey = (cfg.apiKey || "").trim();
@@ -176,12 +206,23 @@ export async function probeLocalAi(cfg = readAiConfig(), { fresh = false } = {})
   const local = normalizeLocalAiConfig(cfg);
   if (!local.enabled) return { ok:false, available:false, disabled:true, error:"Local AI Core désactivé", models:[] };
   try {
-    const result = typeof globalThis?.nvdDesktop?.localAiProbe === "function"
-      ? await globalThis.nvdDesktop.localAiProbe({ baseUrl:local.baseUrl })
+    const bridgeProbe = globalThis?.nvdDesktop?.localAiProbe || globalThis?.nvdDesktop?.probeLocalAi;
+    const result = typeof bridgeProbe === "function"
+      ? await bridgeProbe({ baseUrl:local.baseUrl, model:local.model })
       : await directOllamaProbe(local.baseUrl);
     const models = Array.isArray(result?.models) ? result.models : [];
-    const model = selectLocalModel(models, local.model);
-    return { ok:true, available:true, baseUrl:local.baseUrl, models, model, fresh };
+    const selected = selectLocalModels(models, local.model, local.secondaryModel);
+    const installed = result?.installed === true || models.includes(selected.primary) || models.some(name => String(name).split(":")[0] === String(selected.primary).split(":")[0]);
+    return {
+      ok:true,
+      available:true,
+      installed,
+      baseUrl:local.baseUrl,
+      models,
+      model:selected.primary,
+      localModels:[selected.primary, selected.secondary].filter(Boolean),
+      fresh
+    };
   } catch (e) {
     return { ok:false, available:false, baseUrl:local.baseUrl, models:[], error:e?.message || String(e) };
   }
