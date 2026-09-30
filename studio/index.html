@@ -29,6 +29,7 @@
       <button type="button" id="btnConnect">Connecter</button>
       <button type="button" id="btnDisconnect" class="ghost">Déconnecter</button>
       <button type="button" id="btnSave" class="ghost">Sauver layout</button>
+      <button type="button" id="btnRegie" class="ghost">Régie universelle</button>
       <button type="button" id="btnRequestMonitor" class="ghost">Monitor</button>
     </div>
   </section>
@@ -38,8 +39,14 @@
     <img id="monitorFrame" alt="Retour vidéo No-de" />
   </section>
 
+  <nav class="page-nav" aria-label="Pages de régie">
+    <button type="button" id="pagePrev" class="ghost" aria-label="Page précédente">‹</button>
+    <div id="pageTabs" class="page-tabs"></div>
+    <button type="button" id="pageNext" class="ghost" aria-label="Page suivante">›</button>
+  </nav>
+
   <main>
-    <div id="grid" class="cs-grid" aria-label="Surface Companion"></div>
+    <div id="grid" class="cs-grid" aria-label="Surface Companion" touch-action="pan-y"></div>
     <aside id="editor" class="cs-editor">
       <h2>Widget</h2>
       <p class="hint">Action / Binding / Presentation séparés — l’apparence ne casse pas le patch.</p>
@@ -57,6 +64,8 @@
           <option value="stage:prev">Stage · Prev</option>
           <option value="stage:next">Stage · Next</option>
           <option value="osc:send">OSC · envoyer</option>
+          <option value="artnet:send">Art-Net · canal DMX</option>
+          <option value="sacn:send">sACN · canal DMX</option>
           <option value="serial:send">Serial · envoyer</option>
           <option value="midi:send">MIDI · envoyer</option>
           <option value="camera:toggle">Caméra · toggle</option>
@@ -72,5 +81,24 @@
       <pre id="log" class="log"></pre>
     </aside>
   </main>
+
+  <dialog id="regieDialog" class="regie-dialog">
+    <form method="dialog" class="regie-card">
+      <header>
+        <div>
+          <p class="brand">No-de · théâtre</p>
+          <h2>Régie universelle</h2>
+          <p class="hint">Choisis les consoles et logiciels du spectacle. No-de crée les pages Son / Lumière / Vidéo / Plateau.</p>
+        </div>
+        <button value="cancel" class="ghost regie-close" aria-label="Fermer">×</button>
+      </header>
+      <div id="profileList" class="profile-list"></div>
+      <p class="hint">Les profils marqués « à adapter » génèrent des commandes éditables : aucune compatibilité non vérifiée n’est simulée.</p>
+      <div class="row regie-actions">
+        <button type="button" id="btnGenerateRegie">Générer / remplacer les pages</button>
+        <button value="cancel" class="ghost">Annuler</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>
