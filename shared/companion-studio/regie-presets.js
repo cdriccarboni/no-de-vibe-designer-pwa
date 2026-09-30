@@ -35,40 +35,6 @@ function son() {
   return validateCompanionDocument(doc);
 }
 
-function lecteurs12() {
-  const doc=createUniversalRegieLayout({name:"12 Players",profileIds:[],includeCore:true});
-  doc.pages=doc.pages.filter(p=>p.role==="show");
-  const colors=["#8fa79d","#7f98a8","#a58f72"];
-  for(let group=0;group<3;group++){
-    const p={
-      id:`page-audio-${group+1}`,
-      name:`Players ${group*4+1}–${group*4+4}`,
-      role:"audio-players",
-      icon:"▶",
-      cols:8,
-      rows:8,
-      widgets:[]
-    };
-    for(let offset=0;offset<4;offset++){
-      const slot=group*4+offset+1;
-      const color=colors[group%colors.length];
-      p.widgets.push(
-        button(`P${slot} · PLAY`,"", {kind:"audioplayer",action:"play",playerSlot:slot,playerAction:"play"}, {w:2,h:1,color}),
-        button("PAUSE","", {kind:"audioplayer",action:"pause",playerSlot:slot,playerAction:"pause"}, {w:1,h:1,color}),
-        button("STOP","", {kind:"audioplayer",action:"stop",playerSlot:slot,playerAction:"stop"}, {w:1,h:1,color:"#c97868"}),
-        button("LOOP","", {kind:"audioplayer",action:"loop",playerSlot:slot,playerAction:"loop"}, {type:"toggle",w:1,h:1,color}),
-        button("Niveau","", {kind:"audioplayer",action:"gain",playerSlot:slot,playerAction:"gain"}, {type:"fader",w:1,h:2,color}),
-        button("Pan","L ↔ R", {kind:"audioplayer",action:"pan",playerSlot:slot,playerAction:"pan"}, {type:"fader",w:1,h:2,color})
-      );
-    }
-    doc.pages.push(p);
-  }
-  doc.meta.presetId="lecteurs12";
-  doc.meta.audioPlayers=12;
-  doc.meta.note="Rack 12 lecteurs stéréo · Play/Pause/Stop/Loop/Niveau/Pan · points In/Loop/Out gérés par l'hôte.";
-  return validateCompanionDocument(doc);
-}
-
 function lumiere() {
   const doc=createUniversalRegieLayout({name:"Lumière",profileIds:[],includeCore:true});
   doc.pages=doc.pages.filter(p=>["show","lighting","stage"].includes(p.role));
@@ -108,7 +74,6 @@ function plateau() {
 export const REGIE_PRESETS=Object.freeze([
   {id:"conduite",name:"Conduite",badge:"base",description:"Cues et commandes de spectacle.",factory:conduite},
   {id:"son",name:"Son",badge:"son",description:"Page son compacte, à relier au profil de console utilisé.",factory:son},
-  {id:"lecteurs12",name:"12 Players",badge:"audio",description:"Rack 12 lecteurs stéréo pilotable depuis téléphone, tablette ou second ordinateur.",factory:lecteurs12},
   {id:"lumiere",name:"Lumière",badge:"lumière",description:"Page lumière compacte avec faders réseau prêts à configurer.",factory:lumiere},
   {id:"video",name:"Vidéo",badge:"vidéo",description:"Transport No-de et page vidéo prête à compléter.",factory:video},
   {id:"plateau",name:"Plateau",badge:"plateau",description:"Commandes plateau, caméra et état réseau.",factory:plateau}
