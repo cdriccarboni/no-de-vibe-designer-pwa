@@ -4,6 +4,8 @@ import { createWsCompanionTransport } from "/shared/companion-studio/transport-w
 import { STUDIO_MSG, makeStudioAction, makeStudioLayout } from "/shared/companion-studio/protocol.js";
 import { findWidget } from "/shared/companion-studio/bindings.js";
 import { loadRememberedHost } from "/shared/discovery/host-card.js";
+import { CONSOLE_PROFILES, PROTOCOL_FAMILIES } from "/shared/companion-studio/console-profiles.js";
+import { mergeRegieProfiles } from "/shared/companion-studio/layout-generator.js";
 
 const $ = (id) => document.getElementById(id);
 const logEl = $("log");
@@ -12,10 +14,12 @@ const netStatus = $("netStatus");
 
 let mode = STUDIO_MODES.EDITION;
 let doc = ensureCompanionLayout();
+let pageIndex = 0;
 let selectedId = doc.pages[0]?.widgets?.[0]?.id || null;
 let transport = null;
 let layoutRevision = 0;
 let monitorLastAt = 0;
+let swipeStart = null;
 const clientId = `studio-${Math.random().toString(36).slice(2, 7)}`;
 
 function log(msg) {
@@ -24,40 +28,126 @@ function log(msg) {
   console.info(line);
 }
 
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 function currentPage() {
-  return doc.pages[0];
+  if (!doc.pages?.length) doc = ensureCompanionLayout();
+  pageIndex = Math.max(0, Math.min(doc.pages.length - 1, pageIndex));
+  return doc.pages[pageIndex];
+}
+
+function setPage(index, { focus = false } = {}) {
+  const next = Math.max(0, Math.min((doc.pages?.length || 1) - 1, Number(index) || 0));
+  if (next === pageIndex && !focus) return;
+  pageIndex = next;
+  selectedId = currentPage()?.widgets?.[0]?.id || null;
+  renderPageNav();
+  renderGrid();
+  if (focus) grid.focus?.();
+}
+
+function renderPageNav() {
+  const tabs = $("pageTabs");
+  tabs.innerHTML = (doc.pages || []).map((p, i) =>
+    `<button type="button" class="page-tab ${i === pageIndex ? "active" : ""}" data-page="${i}">
+      <span>${escapeHtml(p.icon || "")}</span><b>${escapeHtml(p.name || `Page ${i + 1}`)}</b>
+    </button>`
+  ).join("");
+  tabs.querySelectorAll("[data-page]").forEach(btn => btn.onclick = () => setPage(+btn.dataset.page));
+  $("pagePrev").disabled = pageIndex <= 0;
+  $("pageNext").disabled = pageIndex >= (doc.pages?.length || 1) - 1;
+}
+
+function widgetHtml(w) {
+  const label = escapeHtml(w.presentation?.label || w.type);
+  const secondary = w.presentation?.secondary ? `<small>${escapeHtml(w.presentation.secondary)}</small>` : "";
+  const feedback = w.state?.feedback != null ? `<small class="feedback">${escapeHtml(String(w.state.feedback))}</small>` : "";
+  return `<span>${label}</span>${secondary}${feedback}`;
+}
+
+function applyWidgetPresentation(el, w) {
+  el.style.background = w.presentation?.color || "#d7b86a";
+  el.style.color = w.presentation?.textColor || "#0f1113";
+  el.style.gridColumn = `span ${Math.max(1, w.presentation?.w || 1)}`;
+  el.style.gridRow = `span ${Math.max(1, w.presentation?.h || 1)}`;
+  el.dataset.id = w.id;
 }
 
 function renderGrid() {
   const page = currentPage();
   grid.style.gridTemplateColumns = `repeat(${page.cols || 4}, 1fr)`;
   grid.innerHTML = "";
+
   for (const w of page.widgets || []) {
     if (w.presentation?.visible === false) continue;
+
+    if (w.type === "fader") {
+      const wrap = document.createElement("div");
+      wrap.className = "cs-widget cs-fader" + (w.id === selectedId ? " sel" : "");
+      applyWidgetPresentation(wrap, w);
+      const value = Number.isFinite(Number(w.state?.value)) ? Number(w.state.value) : 0;
+      wrap.innerHTML = `<span>${escapeHtml(w.presentation?.label || "Fader")}</span>
+        ${w.presentation?.secondary ? `<small>${escapeHtml(w.presentation.secondary)}</small>` : ""}
+        <input class="fader-input" type="range" min="0" max="1" step="0.005" value="${Math.max(0, Math.min(1, value))}">
+        <small class="fader-value">${Math.round(Math.max(0, Math.min(1, value)) * 100)}%</small>`;
+      wrap.onclick = (e) => {
+        if (e.target.matches("input")) return;
+        if (mode === STUDIO_MODES.EDITION) {
+          selectedId = w.id;
+          renderGrid();
+        }
+      };
+      const input = wrap.querySelector("input");
+      input.disabled = mode === STUDIO_MODES.EDITION;
+      input.oninput = () => {
+        const v = +input.value;
+        w.state = { ...(w.state || {}), value: v };
+        wrap.querySelector(".fader-value").textContent = `${Math.round(v * 100)}%`;
+        if (mode !== STUDIO_MODES.EDITION) fireAction(w, v);
+      };
+      grid.appendChild(wrap);
+      continue;
+    }
+
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "cs-widget" + (w.id === selectedId ? " sel" : "");
-    btn.style.background = w.presentation?.color || "#d7b86a";
-    btn.style.color = w.presentation?.textColor || "#0f1113";
-    btn.style.gridColumn = `span ${Math.max(1, w.presentation?.w || 1)}`;
-    btn.style.gridRow = `span ${Math.max(1, w.presentation?.h || 1)}`;
-    btn.dataset.id = w.id;
-    btn.innerHTML = `<span>${escapeHtml(w.presentation?.label || w.type)}</span>${
-      w.presentation?.secondary ? `<small>${escapeHtml(w.presentation.secondary)}</small>` : ""
-    }${w.state?.feedback != null ? `<small>${escapeHtml(String(w.state.feedback))}</small>` : ""}`;
-    btn.onclick = () => onWidgetClick(w.id);
+    btn.className = "cs-widget" + (w.id === selectedId ? " sel" : "") + (w.type === "toggle" ? " cs-toggle" : "");
+    applyWidgetPresentation(btn, w);
+    btn.innerHTML = widgetHtml(w);
+
+    if (w.type === "momentary") {
+      btn.onpointerdown = (e) => {
+        if (mode === STUDIO_MODES.EDITION) return;
+        e.preventDefault();
+        fireAction(w, true);
+      };
+      const release = () => {
+        if (mode !== STUDIO_MODES.EDITION) fireAction(w, false);
+      };
+      btn.onpointerup = release;
+      btn.onpointercancel = release;
+      btn.onpointerleave = (e) => { if (e.buttons) release(); };
+      btn.onclick = () => {
+        if (mode === STUDIO_MODES.EDITION) {
+          selectedId = w.id;
+          renderGrid();
+        }
+      };
+    } else {
+      btn.onclick = () => onWidgetClick(w.id);
+    }
     grid.appendChild(btn);
   }
   syncEditor();
 }
 
-function escapeHtml(s) {
-  return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
 function targetForWidget(w) {
   const b = w?.binding || {};
   if (b.kind === "osc") return `${b.oscAddress || "/nvd/companion"}@${b.oscHost || "127.0.0.1"}:${b.oscPort || 9000}`;
+  if (b.kind === "artnet") return `U${b.universe ?? 0}/CH${b.channel || 1}@${b.artnetHost || "255.255.255.255"}:${b.artnetPort || 6454}`;
+  if (b.kind === "sacn") return `U${Math.max(1, b.universe || 1)}/CH${b.channel || 1}@${b.sacnHost || "multicast"}:${b.sacnPort || 5568}`;
   if (b.kind === "serial") return b.serialText || "COMPANION {value}";
   if (b.kind === "midi") return (b.midiData || [176,0,-1]).join(",");
   if (b.kind === "camera") return b.cameraAction || b.action || "toggle";
@@ -67,7 +157,11 @@ function targetForWidget(w) {
 
 function syncEditor() {
   const w = findWidget(doc, selectedId);
-  if (!w) return;
+  if (!w) {
+    $("editor").classList.toggle("no-selection", true);
+    return;
+  }
+  $("editor").classList.toggle("no-selection", false);
   $("edLabel").value = w.presentation?.label || "";
   $("edSecondary").value = w.presentation?.secondary || "";
   $("edColor").value = w.presentation?.color || "#d7b86a";
@@ -76,7 +170,7 @@ function syncEditor() {
   const bind = `${w.binding?.kind || "action"}:${w.binding?.action || "ping"}`;
   $("edBinding").value = [...$("edBinding").options].some((o) => o.value === bind) ? bind : "action:ping";
   $("edTarget").value = targetForWidget(w);
-  const needsTarget = ["osc","serial","midi","camera","video"].includes(w.binding?.kind);
+  const needsTarget = ["osc","artnet","sacn","serial","midi","camera","video"].includes(w.binding?.kind);
   $("edTargetWrap").style.display = needsTarget ? "grid" : "none";
 }
 
@@ -87,14 +181,21 @@ function onWidgetClick(id) {
     renderGrid();
     return;
   }
-  // TEST or PLATEAU — fire real action
-  fireAction(w);
+  if (w?.type === "toggle") {
+    const next = !(w.state?.value === true);
+    w.state = { ...(w.state || {}), value: next };
+    fireAction(w, next);
+  } else {
+    fireAction(w);
+  }
   renderGrid();
 }
 
-function fireAction(w) {
+function fireAction(w, explicitValue) {
   if (!w) return;
-  const value = w.binding?.momentary || w.type === "momentary" ? true : (w.binding?.valueOn ?? true);
+  const value = explicitValue !== undefined
+    ? explicitValue
+    : (w.binding?.momentary || w.type === "momentary" ? true : (w.binding?.valueOn ?? true));
   const msg = makeStudioAction({
     widgetId: w.id,
     action: w.binding?.action || "press",
@@ -102,8 +203,8 @@ function fireAction(w) {
     clientId
   });
   if (!transport || transport.state !== "CONNECTED") {
-    log("Pas de lien — action locale seulement (sauve layout OK)");
-    w.state = { ...(w.state || {}), feedback: "offline" };
+    log("Pas de lien — action locale seulement (layout conservé)");
+    w.state = { ...(w.state || {}), value, feedback: "offline" };
     flash(w.id, false);
     return;
   }
@@ -141,6 +242,22 @@ function hideMonitor() {
   monitorLastAt = 0;
 }
 
+function parseDmxTarget(value, kind, w) {
+  const m = String(value || "").trim().match(/^U(\d+)\/CH(\d+)(?:@([^:]+)?(?::(\d+))?)?$/i);
+  if (!m) return;
+  w.binding.universe = kind === "sacn" ? Math.max(1, Number(m[1]) || 1) : Math.max(0, Number(m[1]) || 0);
+  w.binding.channel = Math.max(1, Math.min(512, Number(m[2]) || 1));
+  const host = m[3] || "";
+  const port = Number(m[4]) || (kind === "sacn" ? 5568 : 6454);
+  if (kind === "sacn") {
+    w.binding.sacnHost = host.toLowerCase() === "multicast" ? "" : host;
+    w.binding.sacnPort = port;
+  } else {
+    w.binding.artnetHost = host || "255.255.255.255";
+    w.binding.artnetPort = port;
+  }
+}
+
 function parseBindingTarget(w, kind, action, raw) {
   const value = String(raw || "").trim();
   w.binding.kind = kind;
@@ -153,6 +270,8 @@ function parseBindingTarget(w, kind, action, raw) {
     w.binding.oscAddress = address.startsWith("/") ? address : "/nvd/companion";
     w.binding.oscHost = colon >= 0 ? hostPort.slice(0, colon) || "127.0.0.1" : hostPort || "127.0.0.1";
     w.binding.oscPort = colon >= 0 ? Math.max(1, Math.min(65535, Number(hostPort.slice(colon + 1)) || 9000)) : 9000;
+  } else if (kind === "artnet" || kind === "sacn") {
+    parseDmxTarget(value, kind, w);
   } else if (kind === "serial") {
     w.binding.serialText = value || "COMPANION {value}";
   } else if (kind === "midi") {
@@ -169,12 +288,71 @@ function setMode(next) {
   mode = next;
   document.body.className = `mode-${mode}`;
   document.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  renderGrid();
   log(`Mode · ${mode}`);
+}
+
+function profileCategoryLabel(cat) {
+  return ({lighting:"Lumière",sound:"Son",video:"Vidéo",utility:"Outils"})[cat] || cat;
+}
+
+function renderRegieProfiles() {
+  const selected = new Set(doc.meta?.profileIds || []);
+  const groups = ["lighting","sound","video","utility"];
+  $("profileList").innerHTML = groups.map(cat => {
+    const list = CONSOLE_PROFILES.filter(p => p.category === cat);
+    if (!list.length) return "";
+    return `<section class="profile-group"><h3>${profileCategoryLabel(cat)}</h3>${list.map(p => {
+      const protocols = p.protocols.map(id => PROTOCOL_FAMILIES[id]?.label || id);
+      return `<label class="profile-card">
+        <input type="checkbox" value="${p.id}" ${selected.has(p.id) ? "checked" : ""}>
+        <span class="profile-copy"><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.maker)} · ${escapeHtml(protocols.join(" · "))}</small><em>${escapeHtml(p.note || "")}</em></span>
+      </label>`;
+    }).join("")}</section>`;
+  }).join("");
+}
+
+function openRegieDialog() {
+  renderRegieProfiles();
+  $("regieDialog").showModal();
+}
+
+function generateRegie() {
+  const ids = [...$("profileList").querySelectorAll('input[type="checkbox"]:checked')].map(x => x.value);
+  doc = mergeRegieProfiles(doc, ids);
+  pageIndex = 0;
+  selectedId = currentPage()?.widgets?.[0]?.id || null;
+  saveCompanionLayout(doc);
+  syncLayoutToHost();
+  renderPageNav();
+  renderGrid();
+  $("regieDialog").close();
+  log(`Régie universelle · ${ids.length} profil(s) · ${doc.pages.length} page(s)`);
 }
 
 document.querySelectorAll("[data-mode]").forEach((b) => {
   b.onclick = () => setMode(b.dataset.mode);
 });
+
+$("pagePrev").onclick = () => setPage(pageIndex - 1, { focus: true });
+$("pageNext").onclick = () => setPage(pageIndex + 1, { focus: true });
+
+grid.addEventListener("pointerdown", (e) => {
+  if (e.target.closest("input")) return;
+  swipeStart = { x:e.clientX, y:e.clientY, t:Date.now() };
+});
+grid.addEventListener("pointerup", (e) => {
+  if (!swipeStart) return;
+  const dx = e.clientX - swipeStart.x;
+  const dy = e.clientY - swipeStart.y;
+  swipeStart = null;
+  if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+    setPage(pageIndex + (dx < 0 ? 1 : -1), { focus: true });
+  }
+});
+
+$("btnRegie").onclick = openRegieDialog;
+$("btnGenerateRegie").onclick = generateRegie;
 
 $("edApply").onclick = () => {
   if (mode === STUDIO_MODES.PLATEAU) return;
@@ -221,7 +399,7 @@ $("edDelete").onclick = () => {
 
 $("edBinding").onchange = () => {
   const kind = String($("edBinding").value || "action:ping").split(":")[0];
-  $("edTargetWrap").style.display = ["osc","serial","midi","camera","video"].includes(kind) ? "grid" : "none";
+  $("edTargetWrap").style.display = ["osc","artnet","sacn","serial","midi","camera","video"].includes(kind) ? "grid" : "none";
 };
 
 $("btnSave").onclick = () => {
@@ -244,8 +422,10 @@ $("btnConnect").onclick = async () => {
           try {
             doc = validateCompanionDocument(msg.layout);
             saveCompanionLayout(doc);
-            selectedId = doc.pages[0]?.widgets?.[0]?.id || null;
+            pageIndex = Math.max(0, Math.min(pageIndex, doc.pages.length - 1));
+            selectedId = currentPage()?.widgets?.[0]?.id || null;
             layoutRevision = Math.max(layoutRevision, Number(msg.revision) || 0);
+            renderPageNav();
             renderGrid();
             transport?.send({
               type: STUDIO_MSG.LAYOUT_ACK,
@@ -286,7 +466,7 @@ $("btnConnect").onclick = async () => {
         if (msg.type === STUDIO_MSG.FEEDBACK) {
           const w = findWidget(doc, msg.widgetId);
           if (w) {
-            w.state = { value: msg.value, feedback: msg.detail || (msg.ok ? "OK" : "ERR") };
+            w.state = { ...(w.state || {}), value: msg.value, feedback: msg.detail || (msg.ok ? "OK" : "ERR") };
             flash(w.id, !!msg.ok);
             renderGrid();
           }
@@ -294,12 +474,8 @@ $("btnConnect").onclick = async () => {
           log(`Feedback ← ${msg.widgetId}${rtt} · ${msg.ok ? "OK" : msg.detail || "ERR"}`);
           return;
         }
-        if (msg.type === STUDIO_MSG.HELLO_ACK || msg.type === "hello-ack") {
-          log("Studio hello-ack");
-        }
-        if (msg.type === STUDIO_MSG.DETECT) {
-          log(`Detect ← hôte · ${msg.detail || "Companion vu"}`);
-        }
+        if (msg.type === STUDIO_MSG.HELLO_ACK || msg.type === "hello-ack") log("Studio hello-ack");
+        if (msg.type === STUDIO_MSG.DETECT) log(`Detect ← hôte · ${msg.detail || "Companion vu"}`);
       },
       onLog: log
     });
@@ -324,13 +500,13 @@ $("btnRequestMonitor").onclick = () => {
 };
 
 $("btnStopMonitor").onclick = () => {
-  try { transport?.send({ type: STUDIO_MSG.MONITOR_STOP, clientId, t: Date.now() }); } catch { /* */ }
+  try { transport?.send({ type: STUDIO_MSG.MONITOR_STOP, clientId, t: Date.now() }); } catch {}
   hideMonitor();
   log("Monitor · stop demandé");
 };
 
 $("btnDisconnect").onclick = () => {
-  try { transport?.send({ type: STUDIO_MSG.MONITOR_STOP, clientId, t: Date.now() }); } catch { /* */ }
+  try { transport?.send({ type: STUDIO_MSG.MONITOR_STOP, clientId, t: Date.now() }); } catch {}
   transport?.disconnect();
   transport = null;
   hideMonitor();
@@ -338,7 +514,6 @@ $("btnDisconnect").onclick = () => {
   log("Déconnecté");
 };
 
-// Boot: remember host / last WS
 try {
   const remembered = loadRememberedHost(localStorage);
   const saved = localStorage.getItem("nvd.companion.ws");
@@ -348,5 +523,6 @@ try {
 }
 
 setMode(STUDIO_MODES.EDITION);
+renderPageNav();
 renderGrid();
-log("Companion Studio prêt · Local First · connecte le pont pour feedback bidirectionnel");
+log("Companion Studio prêt · Régie universelle · swipe horizontal entre pages");
