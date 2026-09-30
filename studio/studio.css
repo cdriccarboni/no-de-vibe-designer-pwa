@@ -123,3 +123,12 @@ body.mode-PLATEAU .cs-editor,
 body.mode-PLATEAU .cs-connect { display: none; }
 body.mode-PLATEAU .cs-head .modes button[data-mode="EDITION"],
 body.mode-PLATEAU .cs-head .modes button[data-mode="TEST"] { opacity: .55; }
+
+
+.cs-monitor{margin:12px 14px 0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#050607}
+.cs-monitor[hidden]{display:none}
+.monitor-head{display:flex;align-items:center;gap:10px;padding:8px 10px;font-size:12px;color:var(--muted)}
+.monitor-head b{color:var(--text);margin-right:auto}
+.cs-monitor img{display:block;width:100%;max-height:52vh;object-fit:contain;background:#000}
+.cs-editor .row label{min-width:88px;flex:1}
+body.mode-PLATEAU .cs-monitor{margin-top:8px}
