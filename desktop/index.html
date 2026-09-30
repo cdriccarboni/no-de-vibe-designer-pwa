@@ -21,10 +21,14 @@
     <button type="button" data-detect="ignore" class="ghost">Ignore</button>
   </div>
 </div>
+<div id="demoModeBanner" class="demo-mode-banner hidden" role="status">
+  <div><b>EXEMPLE · WOW INTERACTIF</b><span>Déplace la souris dans le Preview</span></div>
+  <button id="demoExitBtn" type="button">EXIT · QUITTER L’EXEMPLE</button>
+</div>
 <div id="app">
   <header class="topbar">
     <div class="brand"><div class="brandmark" title="No-de Vibe Designer">◒</div><div><b>No-de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v1.3.2</span>
+    <span class="badge">v1.3.3</span>
     <div class="spacer"></div>
     <div class="themes workspace-modes"><button id="modeBureau" class="active">Bureau</button><button id="modePlateau">Plateau</button></div>
     <button id="controlsBtn" class="btn">Controls</button>
@@ -211,7 +215,7 @@
         <button type="button" id="clearAutosave" class="smallbtn danger">Effacer l’autosave locale</button>
       </div>
       <div data-pref-panel="manual" class="hidden">
-        <iframe id="manualFrame" class="manual-frame" src="../manuel/index.html" title="Manuel No-de Vibe Designer"></iframe>
+        <iframe id="manualFrame" class="manual-frame" src="../docs/manual/index.html" title="Manuel No-de Vibe Designer"></iframe>
       </div>
       <div data-pref-panel="about" class="hidden">
         <p id="versionInfo">No-de Vibe Designer</p>
