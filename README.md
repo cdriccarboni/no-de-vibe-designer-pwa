@@ -17,7 +17,7 @@ Même moteur et même format de projet (`.cvd.json`, schéma `cvd.graph`) pour :
 - **PWA multi-surface** : Designer complet, Mobile, Régie, Plateau et Remote Camera dans une seule PWA.
 - **Bascule universelle** : tout appareil peut changer de rôle à tout moment ; Auto n’est qu’un défaut de démarrage.
 - **Deuxième ordinateur = télécommande possible** via Régie/Plateau, sans téléphone obligatoire.
-- **Cache multi-surface** : service worker commun `nvd-1.3.1-multi`, sans confusion entre écrans.
+- **Cache multi-surface** : service worker commun fingerprinté `nvd-1.4.0-multi-*`, sans confusion entre écrans.
 
 - **105/105 moteurs** : plus aucun node de Library sans ports + processeur.
 - **Vibe local-first** : Qwen/Ollama local prioritaire, Planner déterministe amélioré et Safety Engine indépendant.
@@ -27,6 +27,19 @@ Même moteur et même format de projet (`.cvd.json`, schéma `cvd.graph`) pour :
 - **Régie Companion** : pages Conduite / Son / Lumière / Vidéo / Plateau, swipe horizontal, faders/toggles, profils consoles, presets sobres.
 - **Protocoles** : OSC, MIDI, Serial, Art-Net et **sACN/E1.31**.
 - **ART → No-de** : cycle Remote Camera / retour vidéo WebRTC, RTT, reconnexion, FIRST_FRAME→LIVE et approche NDI honnête réutilisés/adaptés depuis notre code ART.
+
+## Interfaces et rôles
+
+No-de n'assigne jamais définitivement un appareil à un rôle.
+
+- **Auto** : ordinateur → Designer ; téléphone/tablette → Mobile.
+- **Designer** : interface complète.
+- **Mobile** : interface compacte.
+- **Régie** : Companion Studio éditable.
+- **Plateau** : Companion directement en mode jeu.
+- **Caméra** : Remote Camera WebRTC.
+
+Depuis n'importe quelle interface, le sélecteur discret `Interface · … ▾` permet de changer de rôle immédiatement. Le choix manuel est mémorisé jusqu'au retour sur Auto. Cette règle vaut pour la PWA, Android et l'application Electron/macOS.
 
 ## Lancer le desktop
 
