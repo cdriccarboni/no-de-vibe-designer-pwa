@@ -40,10 +40,15 @@ export function surfaceUrl(id,{root=pwaRootUrl()}={}){
 
 export function navigateSurface(id,{locationObj=globalThis.location,root=pwaRootUrl()}={}){
   const target=new URL(surfaceUrl(id,{root}),locationObj?.href||root);
-  const localTarget=target.pathname+target.search+target.hash;
-  if(typeof locationObj?.assign==="function") locationObj.assign(localTarget);
-  else if(locationObj) locationObj.href=localTarget;
-  return localTarget;
+  const currentProtocol=String(locationObj?.protocol||"");
+  // Electron charge les interfaces depuis file:// : conserver l'URL complète.
+  // En HTTP(S), rester en chemin local évite de changer d'origine.
+  const destination=currentProtocol==="file:"||target.protocol==="file:"
+    ? target.href
+    : target.pathname+target.search+target.hash;
+  if(typeof locationObj?.assign==="function") locationObj.assign(destination);
+  else if(locationObj) locationObj.href=destination;
+  return destination;
 }
 
 function injectStyle(){
