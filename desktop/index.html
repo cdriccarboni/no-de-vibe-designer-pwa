@@ -214,6 +214,7 @@
           <li><b>Audio</b> — moteur local actif (Audio Lab, filtre, delay, FFT, Organic Audio). <b>NDI Out</b> utilise un relais natif et reste PLATFORM-LIMITED sans hôte compatible. Syphon/Spout ne sont pas encore exposés comme moteurs actifs.</li>
         </ul>
         <div class="preferences-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+          <button type="button" id="audioRackBtn" class="smallbtn">12 Players audio</button>
           <button type="button" id="runDiagnosticBtn" class="smallbtn">Diagnostic spectacle</button>
           <button type="button" id="copyDiagnosticBtn" class="smallbtn">Copier diagnostic</button>
           <button type="button" id="showHostCard" class="smallbtn">Carte hôte / QR</button>
@@ -240,6 +241,13 @@
         <p class="hint">Schéma projet <code>cvd.graph</code> · même moteur de patch entre les variantes compatibles.</p>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="audioRackModal" class="preferences-modal hidden">
+  <div class="preferences-card wide">
+    <div class="preferences-head"><div><b>12 Players stéréo</b><span class="hint">Même rack que le Companion · fichiers locaux au Mac</span></div><button id="audioRackClose" type="button">×</button></div>
+    <div id="audioRackGrid" class="control-surface"></div>
   </div>
 </div>
 
