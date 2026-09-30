@@ -1,7 +1,10 @@
-import { createRemoteCameraSession } from "/shared/remote-camera/session.js";
-import { listVideoInputs } from "/shared/remote-camera/camera.js";
-import { parseCompanionSearch } from "/shared/remote-camera/url.js";
-import { rcStateLabel } from "/shared/remote-camera/states.js";
+import { installSurfaceSwitcher } from "../shared/surface-switcher.js";
+import { createRemoteCameraSession } from "../shared/remote-camera/session.js";
+import { listVideoInputs } from "../shared/remote-camera/camera.js";
+import { parseCompanionSearch } from "../shared/remote-camera/url.js";
+import { rcStateLabel } from "../shared/remote-camera/states.js";
+
+installSurfaceSwitcher({ current:"camera" });
 
 const $ = (id) => document.getElementById(id);
 const stateEl = $("state");
