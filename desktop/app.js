@@ -119,6 +119,18 @@ const LIB = NODE_GROUPS.map(([title, items]) => [title, items]);
 const OSC_BRIDGE_TYPES = new Set(["twozero","td","isadora","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
 const SERIAL_NODE_TYPES = new Set(["arduino","esp","servo","rfid"]);
 let showExperimental = localStorage.getItem("nvd.showExperimental") === "1";
+const LIBRARY_EXPANDED_KEY = "nvd.library.expandedGroups";
+let expandedLibraryGroups = new Set();
+try {
+  const stored = JSON.parse(localStorage.getItem(LIBRARY_EXPANDED_KEY) || "[]");
+  if (Array.isArray(stored)) expandedLibraryGroups = new Set(stored.map(Number).filter(Number.isInteger));
+} catch {
+  expandedLibraryGroups = new Set();
+}
+
+function saveExpandedLibraryGroups() {
+  localStorage.setItem(LIBRARY_EXPANDED_KEY, JSON.stringify([...expandedLibraryGroups].sort((a, b) => a - b)));
+}
 
 function spec(t) {
   return sharedSpec(t);
@@ -156,17 +168,34 @@ function ensurePatchWorld() {
 }
 
 function buildLibrary() {
-  $("#libraryList").innerHTML = LIB.map(([title, items]) => {
+  const q = $("#search")?.value?.trim?.().toLowerCase?.() || "";
+  $("#libraryList").innerHTML = LIB.map(([title, items], groupIndex) => {
     const visible = items.filter(([, t]) => showExperimental || isExecutable(t));
     if (!visible.length) return "";
-    return `<div class="lib-section"><div class="lib-title">${title}</div>${visible.map(([n, t]) => {
-      const ok = isExecutable(t);
-      return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${ok ? "Exécutable" : "Expérimental — moteur incomplet ou backend externe requis"}"><span>${n}${ok ? "" : " · expérimental"}</span><span>${ok ? "＋" : "○"}</span></div>`;
-    }).join("")}</div>`;
+    const expanded = Boolean(q) || expandedLibraryGroups.has(groupIndex);
+    return `<div class="lib-section ${expanded ? "expanded" : "collapsed"}" data-lib-group="${groupIndex}">
+      <button type="button" class="lib-title" data-lib-toggle="${groupIndex}" aria-expanded="${expanded ? "true" : "false"}">
+        <span>${title}</span><span class="lib-chevron" aria-hidden="true">▾</span>
+      </button>
+      <div class="lib-items">${visible.map(([n, t]) => {
+        const ok = isExecutable(t);
+        return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${ok ? "Exécutable" : "Expérimental — moteur incomplet ou backend externe requis"}"><span>${n}${ok ? "" : " · expérimental"}</span><span>${ok ? "＋" : "○"}</span></div>`;
+      }).join("")}</div>
+    </div>`;
   }).join("");
+  qall("[data-lib-toggle]").forEach(toggle => {
+    toggle.onclick = () => {
+      const groupIndex = Number(toggle.dataset.libToggle);
+      if (expandedLibraryGroups.has(groupIndex)) expandedLibraryGroups.delete(groupIndex);
+      else expandedLibraryGroups.add(groupIndex);
+      saveExpandedLibraryGroups();
+      buildLibrary();
+    };
+  });
   qall("[data-add]").forEach(x => x.onclick = () => addNode(x.dataset.add));
-  const q = $("#search")?.value?.toLowerCase?.() || "";
-  if (q) qall(".lib-item").forEach(x => { x.style.display = x.textContent.toLowerCase().includes(q) ? "flex" : "none"; });
+  if (q) qall(".lib-item").forEach(x => {
+    x.style.display = x.textContent.toLowerCase().includes(q) ? "flex" : "none";
+  });
   const expCount = LIB.flatMap(([, items]) => items).filter(([, t]) => !isExecutable(t)).length;
   const mode = document.querySelector(".library-mode");
   if (mode) mode.style.display = expCount ? "flex" : "none";
@@ -1876,9 +1905,7 @@ $("#patchSpace").addEventListener("pointerup", e => {
 });
 
 qall(".collapse").forEach(b => b.onclick = () => b.closest(".panel").classList.toggle("collapsed"));
-$("#search").oninput = e => qall(".lib-item").forEach(x => {
-  x.style.display = x.textContent.toLowerCase().includes(e.target.value.toLowerCase()) ? "flex" : "none";
-});
+$("#search").oninput = () => buildLibrary();
 const experimentalToggle = $("#showExperimental");
 if (experimentalToggle) {
   experimentalToggle.checked = showExperimental;
