@@ -35,7 +35,16 @@ for (const req of ["index.html", "sw.js", "manifest.webmanifest", "build-info.js
 }
 
 const work = fs.mkdtempSync(path.join(fs.realpathSync("/tmp"), "nvd-pwa-"));
-fs.cpSync(dist, work, { recursive: true });
+run("git", ["clone", "--depth", "1", PUBLISH_REPO, work]);
+
+// Replace only generated PWA surfaces. Preserve public CI, release metadata,
+// privacy/play documentation and stable download pages.
+const generated = [
+  "desktop", "mobile", "studio", "companion", "shared", "manuel", "icons",
+  "index.html", "manifest.webmanifest", "sw.js", "build-info.json"
+];
+for (const entry of generated) fs.rmSync(path.join(work, entry), { recursive: true, force: true });
+fs.cpSync(dist, work, { recursive: true, force: true });
 fs.writeFileSync(path.join(work, ".nojekyll"), "");
 const version = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
 fs.writeFileSync(
@@ -43,15 +52,18 @@ fs.writeFileSync(
   `# No-de Vibe Designer — public PWA\n\nBuilt artifacts only. Source: private \`no-de-vibe-designer\`.\n\n- Public URL: ${PUBLIC_URL}\n- Version: ${version}\n`
 );
 
-run("git", ["init", "-b", "main"], { cwd: work });
 run("git", ["add", "-A"], { cwd: work });
-run(
-  "git",
-  ["-c", "user.email=cdriccarboni@users.noreply.github.com", "-c", "user.name=cdriccarboni", "commit", "-m", `deploy: No-de Vibe Designer PWA ${version}`],
-  { cwd: work }
-);
-run("git", ["remote", "add", "origin", PUBLISH_REPO], { cwd: work });
-run("git", ["push", "-u", "origin", "main", "--force"], { cwd: work });
+const diff = spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: work });
+if (diff.status !== 0) {
+  run(
+    "git",
+    ["-c", "user.email=cdriccarboni@users.noreply.github.com", "-c", "user.name=cdriccarboni", "commit", "-m", `deploy: No-de Vibe Designer PWA ${version}`],
+    { cwd: work }
+  );
+  run("git", ["push", "origin", "HEAD:main"], { cwd: work });
+} else {
+  console.log("PWA deploy · aucun changement à publier");
+}
 
 console.log(`PWA deployed · ${PUBLIC_URL}`);
 console.log("Verify: curl -fsS " + PUBLIC_URL + "build-info.json");
