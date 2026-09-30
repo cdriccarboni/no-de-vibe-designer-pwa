@@ -115,3 +115,21 @@ a{color:var(--accent)}
   .hero{height:70dvh}
 }
 body[data-mobile-mode="plateau"] #goBtn{box-shadow:0 0 0 1px var(--accent)}
+
+.quick-map-shell{display:grid;gap:10px}
+.quick-map-pad{position:relative;width:100%;aspect-ratio:16/9;border:1px solid var(--line);border-radius:14px;background:linear-gradient(90deg,#ffffff0d 1px,transparent 1px),linear-gradient(#ffffff0d 1px,transparent 1px),#08090b;background-size:12.5% 12.5%;touch-action:none;overflow:hidden}
+.quick-map-pad::after{content:"PROJECTION";position:absolute;inset:0;display:grid;place-items:center;color:#ffffff26;font-size:clamp(18px,8vw,42px);letter-spacing:.18em;pointer-events:none}
+.quick-map-handle{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:2px solid #fff;background:var(--accent);box-shadow:0 4px 18px #000a;z-index:2;touch-action:none}
+.quick-map-handle::after{content:attr(data-label);position:absolute;left:38px;top:7px;font-size:11px;color:#fff;text-shadow:0 1px 3px #000}
+.quick-map-handle.active{outline:3px solid var(--accent2)}
+.quick-map-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.quick-map-actions button{min-height:44px;border:1px solid var(--line);background:var(--panel2);border-radius:10px}
+.quick-map-nudge{display:grid;grid-template-columns:repeat(3,44px);justify-content:center;gap:5px}
+.quick-map-nudge button{min-height:42px;border:1px solid var(--line);background:var(--panel2);border-radius:9px}
+.quick-map-status{font-size:12px;color:var(--muted);min-height:1.5em}
+
+.vibe-image-row{display:flex;align-items:center;gap:8px;min-width:0}
+.vibe-image-pick,.vibe-image-row button,.vibe-image-row select{min-height:42px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;color:var(--text);padding:0 10px;font-size:12px}
+.vibe-image-pick{display:inline-flex;align-items:center;font-weight:650;white-space:nowrap}
+.vibe-image-row select{flex:1;min-width:0}
+.vibe-image-thumb{width:54px;height:42px;object-fit:cover;border:1px solid var(--line);border-radius:8px;background:#000;flex:none}

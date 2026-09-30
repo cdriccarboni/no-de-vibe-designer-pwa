@@ -17,6 +17,10 @@ import { createRegiePreset } from "../shared/companion-studio/regie-presets.js";
 import { transformRaster } from "../shared/graphics/transform.js";
 import { createPipeline, validatePipeline, orderPasses } from "../shared/graphics/pass-graph.js";
 import { WebGL2Backend } from "../shared/graphics/webgl2.js";
+import { DEFAULT_QUAD, validateQuad, homographyFromUnitSquare, transformPoint, warpPerspectiveFrame } from "../shared/graphics/mapping-v3.js";
+import { createQuickMapSession, setQuickMapCorner, quickMapRemoteOperation } from "../shared/quick-map.js";
+import { detectGraphicsCapabilities } from "../shared/graphics/engine-v3.js";
+import { analyzeImagePixels, autoImageVibeTarget, imageVibeOps, imageVibePrompt } from "../shared/image-vibe.js";
 import { encodeOscMessage, decodeOscMessage } from "../shared/protocols/osc.js";
 import { createNodeProcessors } from "../shared/node-processors.js";
 import { planManualSave, planManualOpen, saveStatusMessage, isStandaloneWebKit } from "../shared/save-fallback.js";
@@ -232,10 +236,12 @@ localStorage.setItem("nvd.ai", JSON.stringify({
   localEnabled: true,
   localBaseUrl: "http://127.0.0.1:11434",
   localModel: "qwen2.5-coder:7b",
+  localSecondaryModel: "gemma3:1b",
+  localParallel: true,
   enabled: false
 }));
 globalThis.nvdDesktop = {
-  probeLocalAi: async ({ model }) => ({ ok: true, installed: true, models: [model], requested: model }),
+  probeLocalAi: async ({ model }) => ({ ok: true, installed: true, models: [model, "gemma3:1b"], requested: model }),
   localAiChat: async ({ model }) => ({
     ok: true,
     model,
@@ -248,7 +254,7 @@ globalThis.nvdDesktop = {
 const localProbe = await probeLocalAi();
 assert(localProbe.ok && localProbe.installed, "local Ollama probe uses desktop bridge");
 const localAiRun = await runVibe("Ajoute un nombre", newProject());
-assert(localAiRun.engine === "local-ai" && localAiRun.ops[0]?.type === "number", "Vibe prioritizes local generative AI");
+assert(localAiRun.engine === "local-ai-duo" && localAiRun.ops[0]?.type === "number", "Vibe uses local Qwen + Gemma duo when both are installed");
 
 const guardedProject = newProject();
 guardedProject.nodes.push({ id: "servo-ai", type: "servo", title: "Servo", x: 0, y: 0, params: { enabled: true, auto: false } });
@@ -262,6 +268,37 @@ assert(guardedProject.nodes[0].params.auto === false, "AI cannot arm external au
 assert(guarded.errors.some(e => /Sécurité scène/.test(e)), "AI arm attempt is reported");
 
 delete globalThis.nvdDesktop;
+
+// --- AI operators / Rudiments / Vibe Out / Photo Controller ---
+console.log("ai-operators-rudiments-vibeout");
+assert(isExecutable("ai") && isExecutable("ai-image") && isExecutable("ai-video"), "AI text/media operators are executable");
+const aiFns = createNodeProcessors();
+const aiUnavailable = aiFns.get("ai-image")(
+  { id:"aiimg", params:{ enabled:true, prompt:"image", manualRunNonce:1 } },
+  new Map(),
+  { nodeState:new Map(), errors:[], warnings:[] }
+);
+assert(/UNAVAILABLE/.test(aiUnavailable.get(4)?.value || ""), "AI media node reports unavailable without backend");
+
+const { createRudimentNode, rudimentMeta } = await import("../shared/rudiments.js");
+const rudiment = createRudimentNode("thread-curtain", { nodeId:"r1", x:10, y:20 });
+assert(rudiment.type === "subpatch" && rudiment.params.graph.nodes.some(n => n.type === "threadcurtain"), "Rudiment creates an open subpatch");
+assert(rudimentMeta("ghost-silhouette")?.label, "Rudiment catalog is addressable");
+
+const { validateVibeOut, buildVibeOutPrompt } = await import("../shared/vibe-out.js");
+assert(validateVibeOut("max", "function bang(){ var p=this.patcher; p.newdefault(10,10,'button'); }").ok, "Vibe Out validates Max JS builder");
+assert(validateVibeOut("touchdesigner", "root = op('/project1')\na = root.create('constantTOP','a')").ok, "Vibe Out validates TouchDesigner Python");
+assert(validateVibeOut("p5", "function setup(){createCanvas(100,100)}\nfunction draw(){background(0)}").ok, "Vibe Out validates p5.js");
+assert(buildVibeOutPrompt("processing", newProject(), "dessine").user.includes("PATCH NO-DE"), "Vibe Out prompt includes project context");
+
+const { detectControllerRegions } = await import("../shared/companion-studio/photo-controller.js");
+const width = 8, height = 8, px = new Uint8ClampedArray(width * height * 4);
+for (let y=0; y<height; y++) for (let x=0; x<width; x++) {
+  const i=(y*width+x)*4, v=(x<4) ? 20 : ((x+y)%2 ? 240 : 30);
+  px[i]=px[i+1]=px[i+2]=v; px[i+3]=255;
+}
+const regions = detectControllerRegions({ data:px }, width, height, { cols:2, rows:2, max:4 });
+assert(regions.length >= 1 && regions.every(r => typeof r.color === "string"), "Photo Controller proposes local regions");
 
 // --- subpatch serialization ---
 console.log("subpatch");
@@ -738,7 +775,56 @@ const badPipe = createPipeline({ passes: [{ id: "a", kind: "shader", inputs: ["b
 assert(!validatePipeline(badPipe).ok, "pass cycle rejected");
 let glMissing = false;
 try { new WebGL2Backend(null).compile("void main(){}"); } catch (e) { glMissing = /WebGL2 indisponible/.test(e.message); }
+
 assert(glMissing, "WebGL2 backend honest without context");
+
+console.log("graphics-v3-mapping");
+const mapQuad = [{x:.1,y:.12},{x:.9,y:.06},{x:.86,y:.9},{x:.14,y:.95}];
+assert(validateQuad(mapQuad).ok, "V3 mapping accepts convex quad");
+const H = homographyFromUnitSquare(mapQuad);
+const mappedTL = transformPoint(H, {x:0,y:0});
+const mappedBR = transformPoint(H, {x:1,y:1});
+assert(Math.abs(mappedTL.x-.1)<1e-6 && Math.abs(mappedTL.y-.12)<1e-6, "homography maps top-left");
+assert(Math.abs(mappedBR.x-.86)<1e-6 && Math.abs(mappedBR.y-.9)<1e-6, "homography maps bottom-right");
+const idPixels = new Uint8ClampedArray([
+  255,0,0,255, 0,255,0,255,
+  0,0,255,255, 255,255,255,255
+]);
+const idWarp = warpPerspectiveFrame({width:2,height:2,pixels:idPixels,kind:"video"}, DEFAULT_QUAD);
+assert(idWarp.pixels.every((v,i)=>v===idPixels[i]), "identity Quick Map preserves pixels");
+let qm = createQuickMapSession({ nodeId:"map-1" });
+qm = setQuickMapCorner(qm, 0, {x:.05,y:.08});
+const qmOp = quickMapRemoteOperation(qm);
+assert(qmOp.kind === "quick-map-set" && Math.abs(qmOp.params.corners[0].x-.05)<1e-9, "Quick Map creates remote calibration op");
+const capsV3 = detectGraphicsCapabilities();
+assert(capsV3.cpu === true && ["webgpu","webgl2","cpu"].includes(capsV3.preferred), "V3 graphics capabilities always keep CPU fallback");
+
+const mapProject = newProject();
+mapProject.nodes.push({id:"map-host",type:"mapping",title:"Mapping",x:0,y:0,params:{enabled:true}});
+const mapState = initialRemoteState(mapProject);
+const mapApplied = applyRemoteMessage(mapState, {baseRevision:0,op:{...qmOp,nodeId:"phone-local-id"}});
+assert(mapApplied.ok && mapApplied.state.project.nodes[0].params.mappingV3 === true, "Quick Map remote op falls back to host mapping node");
+
+
+console.log("image-vibe-v3");
+const imgData = {
+  width: 3,
+  height: 2,
+  data: new Uint8ClampedArray([
+    240,30,20,255, 30,220,40,255, 30,40,230,255,
+    245,35,25,255, 25,215,35,255, 35,45,225,255
+  ])
+};
+const imgAnalysis = analyzeImagePixels(imgData);
+assert(imgAnalysis.paletteHex.length >= 2, "Image Vibe extracts palette");
+assert(imgAnalysis.width === 3 && imgAnalysis.height === 2, "Image Vibe preserves dimensions");
+assert(["p5","glsl","particles","sdf"].includes(autoImageVibeTarget(imgAnalysis)), "Image Vibe auto target is executable");
+const imgOps = imageVibeOps(imgAnalysis, "glsl", "anime cette image");
+assert(imgOps.length === 1 && imgOps[0].type === "shader" && /precision mediump float/.test(imgOps[0].params.glsl), "Image Vibe GLSL creates executable shader node");
+const p5Ops = imageVibeOps(imgAnalysis, "p5", "dessin vivant");
+assert(p5Ops[0].type === "p5" && /wave\(/.test(p5Ops[0].params.script), "Image Vibe p5 creates executable sketch node");
+const imgPrompt = imageVibePrompt("rends-la organique", imgAnalysis, "particles");
+assert(/analyse locale non sémantique/.test(imgPrompt) && /Particules/.test(imgPrompt), "Image Vibe enriches prompt honestly");
 
 console.log("osc-packet");
 const packet = encodeOscMessage("/vibe/test", [1.5, "ping"]);
@@ -752,7 +838,7 @@ assert(oscBad, "unsupported osc type throws");
 
 console.log("project-format");
 const pFresh = newProject();
-assert(pFresh.version === 2 && APP_VERSION === "1.3.6", "project format 2 / app 1.3.6");
+assert(pFresh.version === 2 && APP_VERSION === "3.0.0", "project format 2 / app 3.0.0");
 const old = validateProject({ schema: "cvd.graph", version: 1, name: "old", nodes: [], edges: [] });
 assert(old.version === 2, "v1 projects migrate to format 2");
 let futureFail = false;

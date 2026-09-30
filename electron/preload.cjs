@@ -28,5 +28,14 @@ contextBridge.exposeInMainWorld("nvdDesktop", {
   },
   async localAiChat(options = {}) {
     return ipcRenderer.invoke("nvd:local-ai-chat", options);
+  },
+  async installLocalAi(options = {}) {
+    return ipcRenderer.invoke("nvd:local-ai-install", options);
+  },
+  async aiNodeRequest(options = {}) {
+    return ipcRenderer.invoke("nvd:ai-node-request", options);
+  },
+  async aiAssetRequest(options = {}) {
+    return ipcRenderer.invoke("nvd:ai-asset-request", options);
   }
 });

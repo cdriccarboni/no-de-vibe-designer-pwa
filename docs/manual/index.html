@@ -1,113 +1,181 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Manuel — No-de Vibe Designer</title>
-  <style>
-    :root{--bg:#101214;--panel:#171a1e;--text:#e8eaed;--muted:#8b949e;--accent:#d7b86a;--line:#2d333b;--ok:#7dcea0;--warn:#e6b35a;--bad:#e07a7a}
-    *{box-sizing:border-box}body{margin:0;font:14px/1.55 system-ui,sans-serif;background:var(--bg);color:var(--text);padding:20px 22px 48px}
-    h1{font-size:22px;margin:0 0 6px}h2{font-size:16px;margin:28px 0 8px;color:var(--accent)}
-    p,li{color:var(--muted)}.lead{color:var(--text);font-size:15px}
-    figure{margin:14px 0}img{max-width:100%;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
-    figcaption{font-size:12px;margin-top:6px}code{background:var(--panel);padding:1px 5px;border-radius:4px;font-size:12px}
-    .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}ul,ol{padding-left:18px}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101214">
+<title>Prise en main — No-de Vibe Designer V3</title>
+<style>
+:root{--bg:#101214;--panel:#171a1e;--panel2:#20242a;--text:#f2f3f4;--muted:#a0a8b0;--accent:#d7b86a;--line:#303740;--ok:#8cc79d;--warn:#e3ba6d}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,sans-serif}
+main{max-width:920px;margin:auto;padding:24px 18px 80px}h1{font-size:clamp(28px,6vw,48px);line-height:1.05;margin:10px 0}h2{margin-top:44px;font-size:24px}h3{font-size:18px;margin:0 0 8px}
+p,li{color:var(--muted)}b,strong{color:var(--text)}a{color:var(--accent)}code{background:#0b0d0f;border:1px solid var(--line);padding:2px 6px;border-radius:5px}
+.hero{padding:28px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,var(--panel2),var(--panel));margin-bottom:20px}.hero p{font-size:18px;max-width:720px}
+.badge{display:inline-block;border:1px solid var(--accent);color:var(--accent);border-radius:999px;padding:4px 9px;font-size:12px}
+.nav{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 30px}.nav a{text-decoration:none;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 12px;font-size:13px}
+.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}.step,.card,.sos{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:14px}.step strong{display:block;color:var(--accent);font-size:12px;margin-bottom:6px}.step span{font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.card p{margin-bottom:0}.card .n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--panel2);color:var(--accent);font-weight:700;margin-bottom:8px}
+.flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:14px;background:#0c0e10;border:1px solid var(--line);border-radius:12px;font-weight:650}.flow span{color:var(--accent)}
+.tip{border-left:3px solid var(--accent);padding:10px 14px;background:var(--panel);border-radius:0 10px 10px 0}.tip p{margin:0}.sos{border-color:#5b5035}.sos h3{color:var(--warn)}
+table{width:100%;border-collapse:collapse;background:var(--panel);border-radius:12px;overflow:hidden}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left}th{font-size:12px;color:var(--accent)}td{color:var(--muted)}
+details{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:12px 14px;margin:10px 0}summary{cursor:pointer;font-weight:700}
+figure{margin:18px 0}img{max-width:100%;border:1px solid var(--line);border-radius:12px;background:var(--panel)}figcaption{font-size:12px;color:var(--muted)}
+.check{list-style:none;padding:0}.check li{margin:8px 0}.check li::before{content:"□";color:var(--accent);margin-right:8px}
+.small{font-size:13px}.ok{color:var(--ok)}
+@media(max-width:760px){.steps{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.hero{padding:20px}main{padding:14px 12px 60px}}
+@media print{body{background:white;color:black}.hero,.step,.card,.sos,details,table{background:white;border-color:#bbb}.nav{display:none}p,li,td{color:#333}}
+</style>
 </head>
 <body>
-  <h1>Manuel — No-de Vibe Designer</h1>
-  <p class="lead">Guide simple pour créer, connecter, jouer et sauvegarder un patch. Version logicielle courante indiquée dans Préférences → Version.</p>
+<main>
+<section class="hero">
+  <span class="badge">No-de Vibe Designer V3 · prise en main</span>
+  <h1>Ta première régie en 10 minutes</h1>
+  <p>Ce guide est fait pour quelqu’un qui n’a jamais utilisé No-de — et même pour quelqu’un qui n’a jamais travaillé avec des nodes. Commence ici, fais fonctionner une petite régie, puis découvre le reste seulement quand tu en as besoin.</p>
+</section>
 
-  <h2>1. Lancer l’application</h2>
-  <ol>
-    <li>Ouvrez <b>No-de Vibe Designer.app</b> (build Electron autonome, Apple Silicon).</li>
-    <li>Ou en développement : <code>./LANCER-No-de-Vibe-Designer.command</code> puis <code>http://127.0.0.1:4173/desktop/</code>.</li>
-    <li>Autorisez caméra / micro si le système le demande.</li>
-  </ol>
-  <figure>
-    <img src="./captures/ui-overview.svg" alt="Vue d’ensemble">
-    <figcaption>Figure 1 — Library, Patch, Preview, Vibe, Timeline, Console.</figcaption>
-  </figure>
+<nav class="nav">
+  <a href="#10min">10 minutes</a><a href="#nodes">Comprendre les nodes</a><a href="#regie">Régie simple</a><a href="#mapping">Quick Map</a><a href="#image-vibe">Image → Vibe</a><a href="#sos">Dépannage</a>
+</nav>
 
-  <h2>2. Créer et connecter des nodes</h2>
-  <ol>
-    <li>Dans la Library, cliquez un node marqué exécutable (＋).</li>
-    <li>Les nodes « ○ indisponible » n’ont pas encore de moteur : ils ne font pas de vrai travail.</li>
-    <li>Tirez un câble d’une sortie (cercle) vers une entrée. Une incompatibilité de type est refusée avec un message clair.</li>
-    <li>Double-clic sur un câble pour le supprimer. ⌫ supprime le node sélectionné. ⌘D le duplique.</li>
-  </ol>
-  <figure>
-    <img src="./captures/patch-camera-shader.svg" alt="Patch caméra shader">
-    <figcaption>Figure 2 — Chaîne Caméra → Shader (+ MIDI optionnel).</figcaption>
-  </figure>
-  <p>Console : <code>demo</code> charge le patch de démonstration.</p>
+<section id="10min">
+<h2>1. Le parcours à retenir</h2>
+<div class="steps">
+  <div class="step"><strong>1 · OUVRIR</strong><span>Lance No-de et regarde le Preview.</span></div>
+  <div class="step"><strong>2 · CRÉER</strong><span>Ajoute un node ou demande quelque chose dans Vibe.</span></div>
+  <div class="step"><strong>3 · RELIER</strong><span>Une sortie va vers une entrée.</span></div>
+  <div class="step"><strong>4 · JOUER</strong><span>▶ lance. GO déclenche les cues.</span></div>
+  <div class="step"><strong>5 · SAUVER</strong><span>Enregistre avant de fermer ou de modifier lourdement.</span></div>
+</div>
+<p class="tip"><strong>La règle la plus importante :</strong> tu n’as pas besoin de comprendre tout No-de pour l’utiliser. Pour une petite régie, concentre-toi sur Library, Patch, Preview, Timeline et GO.</p>
+</section>
 
-  <h2>3. Sous-patches</h2>
-  <ol>
-    <li>Ajoutez un node <b>Sous-patch</b>.</li>
-    <li>Ouvrez-le (double-clic ou bouton Inspector) : le fil d’Ariane au-dessus du canvas montre Racine / …</li>
-    <li>Créez des nodes à l’intérieur, connectez-les. <b>Stage I/O</b> fait entrer/sortir le signal du parent.</li>
-    <li>Revenez à la racine via le fil d’Ariane. Tout est enregistré dans le fichier projet.</li>
-  </ol>
+<section id="nodes">
+<h2>2. Les nodes, sans jargon</h2>
+<p>Un <strong>node</strong> est simplement une boîte qui fait une chose. Une caméra donne une image. Un effet transforme cette image. Une sortie l’envoie au Preview ou à la scène.</p>
+<div class="flow">SOURCE <span>→</span> EFFET <span>→</span> SORTIE</div>
+<div class="cards">
+  <div class="card"><span class="n">A</span><h3>Ajouter</h3><p>Choisis un node dans la Library. Il apparaît sur le Patch.</p></div>
+  <div class="card"><span class="n">B</span><h3>Relier</h3><p>Glisse depuis un petit cercle de sortie vers un cercle d’entrée. Si le type n’est pas compatible, No-de refuse le câble.</p></div>
+  <div class="card"><span class="n">C</span><h3>Régler</h3><p>Clique un node : ses paramètres utiles apparaissent dans l’Inspector.</p></div>
+  <div class="card"><span class="n">D</span><h3>Voir</h3><p>Le Preview montre le résultat. Espace ou ▶ lance/met en pause.</p></div>
+</div>
+<figure><img src="./captures/patch-camera-shader.svg" alt="Exemple de patch caméra vers shader"><figcaption>Exemple : une source Caméra alimente un Shader puis une sortie.</figcaption></figure>
+</section>
 
-  <h2>4. Audio</h2>
-  <ul>
-    <li><b>Audio Lab</b> / <b>Organic Audio</b> : oscillateur Web Audio (fréquence, gain). Arrêt du node = silence, pas de traitement résiduel.</li>
-    <li><b>Mémo sonore</b> : niveau micro. L’enregistrement fichier n’est <span class="bad">pas encore disponible</span>.</li>
-    <li>Test matériel micro : <span class="warn">à vérifier</span> selon permissions macOS.</li>
-  </ul>
+<section id="regie">
+<h2>3. Faire une régie simple</h2>
+<h3>Cas pratique : un visuel, un effet, un TOP</h3>
+<ol>
+  <li>Crée un nouveau projet.</li>
+  <li>Ajoute ta source visuelle : <strong>Caméra live</strong>, <strong>Fichier vidéo</strong> ou un moteur génératif.</li>
+  <li>Ajoute un effet simple : <strong>Transform</strong>, <strong>Creative FX</strong>, <strong>Shader</strong> ou un SuperNode.</li>
+  <li>Relie la source à l’effet, puis à <strong>Sortie Scène</strong>.</li>
+  <li>Vérifie le résultat dans <strong>Preview</strong>.</li>
+  <li>Dans la Timeline, crée un <strong>Cue</strong>. Donne-lui un nom compréhensible, par exemple « TOP vidéo entrée ».</li>
+  <li>Passe en mode <strong>Plateau / Régie</strong> et teste <strong>GO</strong>.</li>
+  <li>Enregistre le projet.</li>
+</ol>
+<div class="tip"><p><strong>Nomme les choses comme en spectacle.</strong> « Cyclo », « Écran fond », « TOP entrée public » est plus utile que « Output 1 » ou « Cue 3 ».</p></div>
 
-  <h2>5. Vibe coding</h2>
-  <ol>
-    <li>Décrivez en français ce que vous voulez (ex. « caméra reliée à un shader »).</li>
-    <li>Appuyez sur <b>Entrée</b> (Shift+Entrée = nouvelle ligne).</li>
-    <li>Un <b>aperçu</b> des opérations s’affiche : Appliquer ou Annuler.</li>
-    <li>Après application, ⌘Z annule.</li>
-  </ol>
-  <p>Sans endpoint IA : moteur local (règles), clairement annoncé. <span class="bad">Grok / xAI est exclu.</span></p>
+<h3>Avant le spectacle</h3>
+<ul class="check">
+  <li>Le Preview produit bien une image.</li>
+  <li>Les médias nécessaires sont accessibles.</li>
+  <li>Les sorties externes nécessaires ont été testées sur le vrai matériel.</li>
+  <li>Chaque cue important a été déclenché une fois.</li>
+  <li>Le projet a été enregistré.</li>
+  <li>Le téléphone / Companion est chargé et connecté si tu l’utilises.</li>
+</ul>
+</section>
 
-  <h2>6. Configurer l’IA</h2>
-  <ol>
-    <li>Préférences → IA / Vibe.</li>
-    <li>Endpoint OpenAI-compatible + clé (stockée localement, jamais dans le dépôt).</li>
-    <li>Mac série M (16 Go) : un modèle local volumineux n’est pas téléchargé automatiquement. Vous pouvez pointer vers un serveur local déjà installé (ex. Ollama) si vous le configurez vous-même.</li>
-  </ol>
+<section>
+<h2>4. Vibe : demander au lieu de construire</h2>
+<p>Dans le champ <strong>Vibe</strong>, décris simplement ce que tu veux. No-de prépare d’abord un aperçu : rien n’est appliqué tant que tu n’as pas validé.</p>
+<div class="cards">
+  <div class="card"><h3>Exemple simple</h3><p>« Fais un rideau de fils qui réagit à la souris et ajoute des ondes. »</p></div>
+  <div class="card"><h3>Exemple spectacle</h3><p>« Crée une ombre de l’interprète capté à jardin et projette-la à cour. »</p></div>
+</div>
+<p><strong>Annuler :</strong> après application, Undo / ⌘Z / Ctrl+Z permet de revenir en arrière.</p>
+<p class="small">Les accès caméra, micro, Serial, OSC, Art-Net et autres sorties matérielles ne sont pas armés automatiquement par Vibe.</p>
+</section>
 
-  <h2>7. Entrées / sorties</h2>
-  <ul>
-    <li><b>Caméra</b> — node Caméra live → Preview / OUTPUT.</li>
-    <li><b>MIDI</b> — <code>midi connect</code> puis node MIDI Hub. Matériel : à vérifier.</li>
-    <li><b>Serial</b> — <code>serial connect</code>. Matériel : à vérifier.</li>
-    <li><b>OSC</b> — node OSC + <code>bridge connect ws://…</code>. Sans bridge : erreur visible.</li>
-  </ul>
-  <p>Max/MSP et TouchDesigner : <b>pas</b> d’import/exécution native universelle. Seuls des bridges / génération partielle sont prévus ; les nodes « Bridge » restants sont encore indisponibles.</p>
+<section id="mapping">
+<h2>5. Mapping : le téléphone fait gagner du temps</h2>
+<p>Le <strong>Quick Map</strong> sert à régler une projection depuis la salle ou le plateau au lieu de rester devant l’ordinateur.</p>
+<ol>
+  <li>Ajoute un node <strong>Mapping vidéo / Quick Map</strong> dans le projet.</li>
+  <li>Sur le téléphone : <strong>Outils → Bureau distant → Connecter</strong>.</li>
+  <li>Ouvre <strong>Outils → Quick Map</strong>.</li>
+  <li>Déplace les quatre points <strong>HG, HD, BD, BG</strong> sur les quatre coins de la surface projetée.</li>
+  <li>Pour une correction très fine, sélectionne un coin puis utilise les flèches.</li>
+  <li>La calibration est envoyée au projet. Sur l’ordinateur, l’Inspector permet ensuite de corriger les coordonnées au besoin.</li>
+</ol>
+<div class="tip"><p>Le mapping utilise une vraie déformation projective : un trapèze ou une surface vue de biais n’est pas traité comme un simple zoom.</p></div>
+</section>
 
-  <h2>8. Sauvegarder et rouvrir</h2>
-  <ol>
-    <li><b>Enregistrer</b> → fichier <code>.cvd.json</code>.</li>
-    <li>Autosave navigateur / profil Electron.</li>
-    <li>Fermez complètement l’app, rouvrez : le patch (nodes, câbles, sous-patches, paramètres) doit revenir.</li>
-  </ol>
+<section id="image-vibe">
+<h2>6. Donner vie à une photo ou un dessin</h2>
+<p>Dans Vibe, clique <strong>＋ Image</strong>. La photo ou le dessin enrichit la création sans créer un nouveau panneau compliqué.</p>
+<ol>
+  <li>Choisis une image.</li>
+  <li>Choisis la cible : <strong>Auto</strong>, <strong>p5 / Canvas</strong>, <strong>GLSL</strong>, <strong>Particules</strong> ou <strong>SDF / Metaballs</strong>.</li>
+  <li>Ajoute une phrase si tu veux : « rends-la lente et organique », « elle réagit à la souris », etc.</li>
+  <li>Appuie sur Envoyer puis vérifie l’aperçu des opérations.</li>
+</ol>
+<p>No-de analyse localement la palette, la luminosité, le contraste, la saturation et la densité de contours pour créer un point de départ exécutable. <strong>Cette analyse n’invente pas une compréhension sémantique de la photo.</strong></p>
+</section>
 
-  <h2>9. Téléphone et PWA</h2>
-  <ol>
-    <li>Construire : <code>npm run build:pwa</code>. Servir en local : <code>npm run serve:pwa</code> puis ouvrir <code>http://127.0.0.1:4175/</code>.</li>
-    <li><b>Bureau</b> édite le graphe (nodes, câbles, Vibe, timeline). <b>Plateau</b> déclenche les cues (GO) et le retour scène.</li>
-    <li>L’enregistrement manuel écrit le projet dans le navigateur (IndexedDB) et propose aussi un fichier <code>.cvd.json</code> quand le navigateur le permet.</li>
-    <li>Une mise à jour du service worker affiche « Nouvelle version disponible ». Le patch n’est pas rechargé tant que vous n’appuyez pas sur Mettre à jour.</li>
-    <li>Outils → Bureau distant : URL <code>ws://</code> du pont (défaut <code>ws://127.0.0.1:4174</code>). Sans hôte desktop, le pont applique les opérations. Un projet différent s’affiche comme conflit.</li>
-  </ol>
-  <p>Caméra, micro, mouvement, GPS, Bluetooth et MIDI dépendent de l’appareil. S’ils manquent, le node le dit. Rien n’est simulé.</p>
+<section>
+<h2>7. Téléphone : Bureau, Plateau et Régie</h2>
+<table>
+<tr><th>Mode</th><th>À quoi il sert</th></tr>
+<tr><td>Bureau</td><td>Modifier le patch, les nodes et les paramètres.</td></tr>
+<tr><td>Plateau</td><td>Déclencher les cues et surveiller le résultat avec une interface épurée.</td></tr>
+<tr><td>Régie / Companion</td><td>Avoir des boutons, faders et commandes adaptés au spectacle.</td></tr>
+<tr><td>Caméra</td><td>Utiliser le téléphone comme source vidéo distante lorsqu’une session Remote Camera est configurée.</td></tr>
+<tr><td>Quick Map</td><td>Calibrer rapidement une projection depuis la salle.</td></tr>
+</table>
+</section>
 
-  <h2>10. Dépannage</h2>
-  <ul>
-    <li>Caméra noire → permissions Système → Confidentialité.</li>
-    <li>Câble rouge → types incompatibles ou node indisponible.</li>
-    <li>OSC silencieux → bridge WebSocket requis.</li>
-    <li>App non signée → Gatekeeper peut demander un clic droit → Ouvrir.</li>
-    <li>PWA qui ne s’installe pas → servir le dossier <code>dist/pwa</code> (pas les sources <code>mobile/</code>, qui importent <code>../shared/</code>).</li>
-  </ul>
+<section id="sos">
+<h2>8. Si quelque chose ne marche pas</h2>
+<div class="cards">
+  <div class="sos"><h3>Écran noir</h3><p>Vérifie qu’une source produit bien une image, que les nodes sont reliés, puis regarde les erreurs du graphe.</p></div>
+  <div class="sos"><h3>Caméra absente</h3><p>Vérifie l’autorisation caméra du navigateur ou du système. No-de n’imite pas une caméra absente.</p></div>
+  <div class="sos"><h3>Le téléphone ne commande rien</h3><p>Vérifie Bureau distant, l’adresse de l’hôte et l’état « connecté ». En cas de conflit, recharge d’abord l’état distant.</p></div>
+  <div class="sos"><h3>Un câble est refusé</h3><p>Les types ne sont probablement pas compatibles. Relie une sortie vidéo à une entrée vidéo, un nombre à une entrée numérique, etc.</p></div>
+  <div class="sos"><h3>GO ne fait rien</h3><p>Vérifie qu’un cue existe dans la Timeline et qu’il agit sur le bon élément.</p></div>
+  <div class="sos"><h3>Situation de stress</h3><p>Utilise STOP pour arrêter la lecture. PANIC est réservé aux actions de sécurité prévues dans les cues/routages du projet.</p></div>
+</div>
+</section>
 
-  <p style="margin-top:32px;font-size:12px">Manuel aligné sur la version livrée — mis à jour avec le logiciel.</p>
+<section>
+<h2>9. Mini glossaire</h2>
+<table>
+<tr><th>Mot</th><th>Traduction simple</th></tr>
+<tr><td>Node</td><td>Une boîte qui fait une tâche.</td></tr>
+<tr><td>Patch</td><td>L’ensemble des nodes et de leurs câbles.</td></tr>
+<tr><td>Input / entrée</td><td>Ce que reçoit un node.</td></tr>
+<tr><td>Output / sortie</td><td>Ce que produit un node.</td></tr>
+<tr><td>Preview</td><td>L’image de contrôle.</td></tr>
+<tr><td>Cue / TOP</td><td>Une action préparée qu’on déclenche au bon moment.</td></tr>
+<tr><td>Mapping</td><td>Adapter l’image à la surface réelle de projection.</td></tr>
+<tr><td>SuperNode</td><td>Un effet complexe présenté comme une seule boîte simple.</td></tr>
+<tr><td>Vibe</td><td>Décrire en langage courant ce que tu veux créer.</td></tr>
+<tr><td>Companion</td><td>Interface de commande simplifiée, souvent sur téléphone/tablette.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>10. Pour aller plus loin</h2>
+<details><summary>Sous-patches et SuperNodes</summary><p>Un sous-patch regroupe plusieurs nodes dans une boîte. C’est la base des SuperNodes : interface simple à l’extérieur, moteur détaillé à l’intérieur.</p></details>
+<details><summary>Audio, MIDI, OSC, DMX et Serial</summary><p>Ces fonctions deviennent utiles quand la régie grandit. Teste toujours le matériel réel et ses permissions avant une représentation. Une passerelle ou un périphérique absent est signalé au lieu d’être simulé.</p></details>
+<details><summary>IA locale / endpoint</summary><p>Préférences → IA / Vibe permet d’utiliser un moteur local ou un endpoint distant autorisé. Ce réglage n’est pas nécessaire pour apprendre l’interface : le planner local reste disponible.</p></details>
+<details><summary>Développement et lancement local</summary><p>Les commandes de développement, builds PWA, Electron, Android et diagnostics sont documentés dans le dépôt. Elles ne sont pas nécessaires pour exploiter une régie déjà installée.</p></details>
+</section>
+
+<p class="small" style="margin-top:50px">Manuel terrain aligné sur No-de Vibe Designer V3. L’objectif : une personne novice doit pouvoir lancer et gérer une petite régie sans apprendre d’abord toute l’architecture du logiciel.</p>
+</main>
 </body>
 </html>

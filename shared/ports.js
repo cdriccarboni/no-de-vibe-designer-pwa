@@ -10,6 +10,8 @@ export const DATA_TYPES = {
   midi: "midi",
   text: "text",
   boolean: "boolean",
+  audio: "audio",
+  asset: "asset",
   any: "any"
 };
 
@@ -21,7 +23,9 @@ const COMPAT = {
   midi: new Set(["midi", "number", "any"]),
   text: new Set(["text", "any"]),
   boolean: new Set(["boolean", "number", "trigger", "text", "any"]),
-  any: new Set(["video", "number", "trigger", "midi", "text", "boolean", "any"])
+  audio: new Set(["audio", "any"]),
+  asset: new Set(["asset", "any"]),
+  any: new Set(["video", "number", "trigger", "midi", "text", "boolean", "audio", "asset", "any"])
 };
 
 export function typesCompatible(fromType, toType) {
@@ -250,6 +254,38 @@ export const EXECUTABLE_PORTS = {
   ],
   text: [
     { name: "value", dir: "out", data: "text" }
+  ],
+  ai: [
+    { name: "prompt", dir: "in", data: "text" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "response", dir: "out", data: "text" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  "ai-image": [
+    { name: "prompt", dir: "in", data: "text" },
+    { name: "image in", dir: "in", data: "video" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "image", dir: "out", data: "video" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  "ai-video": [
+    { name: "prompt", dir: "in", data: "text" },
+    { name: "image in", dir: "in", data: "video" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "video", dir: "out", data: "video" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  "ai-audio": [
+    { name: "prompt", dir: "in", data: "text" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "audio", dir: "out", data: "audio" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  "ai-3d": [
+    { name: "prompt", dir: "in", data: "text" },
+    { name: "trigger", dir: "in", data: "trigger" },
+    { name: "asset", dir: "out", data: "asset" },
+    { name: "status", dir: "out", data: "text" }
   ],
   timer: [
     { name: "start", dir: "in", data: "trigger" },

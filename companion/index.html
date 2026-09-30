@@ -4,28 +4,51 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0d10" />
-  <title>No-de · Remote Camera Companion</title>
+  <title>No-de · Companion</title>
   <link rel="stylesheet" href="./companion.css" />
   <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js" defer></script>
   <script type="module" src="./companion.js" defer></script>
 </head>
 <body>
-  <main class="rc">
-    <header>
+  <header class="companion-head">
+    <div>
       <p class="brand">No-de Companion</p>
-      <h1>Remote Camera</h1>
-      <p class="hint">Caméra explicite · LIVE seulement après la première image réelle.</p>
-    </header>
-    <p id="state" class="state">WAITING</p>
-    <label>Salon / code<input id="room" autocomplete="off" placeholder="CODE" /></label>
-    <label>Caméra<select id="device"><option value="">Par défaut (environment)</option></select></label>
-    <div class="actions">
-      <button id="connect" type="button">Activer caméra & connecter</button>
-      <button id="stop" type="button" class="stop">Couper</button>
+      <p class="hint">Télécommande · Controller · Caméra</p>
     </div>
-    <video id="preview" playsinline muted></video>
-    <pre id="metrics" class="metrics"></pre>
-    <p class="fine">Transport adapté d’ART Intercom (PeerJS MediaConnection). Pas d’auto-start caméra.</p>
-  </main>
+    <nav class="companion-tabs" aria-label="Mode Companion">
+      <button type="button" data-companion-tab="camera" class="active">Caméra</button>
+      <button type="button" data-companion-tab="controller">Controller</button>
+    </nav>
+  </header>
+
+  <section data-companion-panel="camera">
+    <main class="rc">
+      <header>
+        <h1>Remote Camera</h1>
+        <p class="hint">Caméra explicite · LIVE seulement après la première image réelle.</p>
+      </header>
+      <p id="state" class="state">WAITING</p>
+      <label>Salon / code<input id="room" autocomplete="off" placeholder="CODE" /></label>
+      <label>Caméra<select id="device"><option value="">Par défaut (environment)</option></select></label>
+      <div class="actions">
+        <button id="connect" type="button">Activer caméra & connecter</button>
+        <button id="stop" type="button" class="stop">Couper</button>
+      </div>
+      <video id="preview" playsinline muted></video>
+      <pre id="metrics" class="metrics"></pre>
+      <p class="fine">Transport adapté d’ART Intercom (PeerJS MediaConnection). Pas d’auto-start caméra.</p>
+    </main>
+  </section>
+
+  <section data-companion-panel="controller" hidden class="controller-panel">
+    <div class="controller-intro">
+      <div>
+        <h1>Vibe Controller</h1>
+        <p class="hint">Photo → Controller, widgets, faders, presets, OSC/MIDI/DMX/Serial et retour d’état.</p>
+      </div>
+      <button id="controllerReload" type="button" class="ghost">↻</button>
+    </div>
+    <iframe id="controllerFrame" title="No-de Companion Studio" loading="lazy"></iframe>
+  </section>
 </body>
 </html>

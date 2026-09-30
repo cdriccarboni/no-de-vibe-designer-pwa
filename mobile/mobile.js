@@ -21,6 +21,8 @@ import { projectSignature } from "../shared/remote-protocol.js";
 import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "../shared/pwa-update.js";
 import { makeArtNetPacket } from "../shared/adapters/websocket-bridge.js";
+import { analyzeImageFile, imageVibePrompt, imageVibeOps, imageVibeSummary } from "../shared/image-vibe.js";
+import { createQuickMapSession, setQuickMapCorner, nudgeQuickMapCorner, applyQuickMapToProject, quickMapRemoteOperation } from "../shared/quick-map.js";
 
 installSurfaceSwitcher({ current:"mobile" });
 
@@ -35,6 +37,7 @@ let wireDraft = null;
 let armed = null;
 let inspectorFor = null;
 let pendingVibe = null;
+let imageVibeState = { analysis:null, previewUrl:"" };
 let syncedRevision = 0;
 let pendingRemote = null;
 let link = null;
@@ -841,15 +844,58 @@ function connectRemoteUi() {
   });
 }
 
+async function setImageVibeFile(file) {
+  if (!file) return;
+  try {
+    if (imageVibeState.previewUrl) URL.revokeObjectURL(imageVibeState.previewUrl);
+    const loaded = await analyzeImageFile(file);
+    imageVibeState = loaded;
+    const thumb = $("#vibeImageThumb");
+    thumb.src = loaded.previewUrl;
+    thumb.classList.remove("hidden");
+    $("#vibeImageClear")?.classList.remove("hidden");
+    $("#vibeImageInfo").textContent = imageVibeSummary(loaded.analysis);
+    pushAlert("ok", "Image Vibe · analyse locale prête");
+  } catch (e) {
+    pushAlert("error", `Image Vibe · ${e?.message || e}`);
+  }
+}
+
+function clearImageVibe() {
+  if (imageVibeState.previewUrl) URL.revokeObjectURL(imageVibeState.previewUrl);
+  imageVibeState = { analysis:null, previewUrl:"" };
+  const thumb = $("#vibeImageThumb");
+  if (thumb) { thumb.removeAttribute("src"); thumb.classList.add("hidden"); }
+  $("#vibeImageClear")?.classList.add("hidden");
+  if ($("#vibeImageInfo")) $("#vibeImageInfo").textContent = "Image optionnelle · analyse locale";
+}
+
+$("#vibeImageFile")?.addEventListener("change", e => setImageVibeFile(e.target.files?.[0]));
+$("#vibeImageClear")?.addEventListener("click", () => {
+  clearImageVibe();
+  if ($("#vibeImageFile")) $("#vibeImageFile").value = "";
+});
+
 async function previewVibe() {
   const text = $("#vibeInput").value.trim();
-  if (!text) {
-    pushAlert("error", "Vibe · texte vide");
+  if (!text && !imageVibeState.analysis) {
+    pushAlert("error", "Vibe · ajoute un texte ou une image");
     return;
   }
   $("#applyVibeBtn").disabled = true;
   try {
-    const result = await runVibe(text, project);
+    const target = $("#vibeImageTarget")?.value || "auto";
+    const promptText = imageVibeState.analysis ? imageVibePrompt(text, imageVibeState.analysis, target) : text;
+    let result = await runVibe(promptText, project);
+    if (imageVibeState.analysis) {
+      const seedOps = imageVibeOps(imageVibeState.analysis, target, text);
+      result = {
+        ...result,
+        engine: `image-vibe+${result.engine || "local"}`,
+        ops: [...seedOps, ...(result.ops || [])],
+        note: `Image → Vibe · ${target} · ${result.note || "analyse locale"}`
+      };
+    }
     if (!result.ops?.length) {
       pendingVibe = null;
       $("#vibePreview").classList.add("hidden");
@@ -1133,9 +1179,116 @@ function onTouch(e) {
 touchPad.addEventListener("pointerdown", onTouch);
 touchPad.addEventListener("pointermove", (e) => { if (e.buttons || e.pressure) onTouch(e); });
 
-$$("[data-tool]").forEach((b) => {
+
+function openQuickMapTool() {
+  let mappingNode = (project.nodes || []).find(n => n.type === "mapping");
+  if (!mappingNode) {
+    mappingNode = createNode("mapping");
+    mappingNode.title = "Mapping vidéo · Quick Map";
+  }
+  let session = createQuickMapSession({ nodeId: mappingNode.id, corners: mappingNode.params?.corners });
+  const labels = ["HG","HD","BD","BG"];
+
+  showTool("quick-map", `
+    <div class="quick-map-shell">
+      <div><h3>Quick Map</h3><p class="hint">Depuis la salle : place les quatre coins sur la surface projetée. Au relâchement, la calibration est appliquée et envoyée au Bureau distant s'il est connecté.</p></div>
+      <div id="quickMapPad" class="quick-map-pad">
+        ${session.corners.map((p,i)=>`<button type="button" class="quick-map-handle" data-qm="${i}" data-label="${labels[i]}" style="left:${p.x*100}%;top:${p.y*100}%"></button>`).join("")}
+      </div>
+      <div class="quick-map-actions">
+        <button id="quickMapReset" type="button">Rectangle</button>
+        <button id="quickMapSend" type="button">Envoyer</button>
+        <button id="quickMapStage" type="button">Plateau</button>
+      </div>
+      <div class="quick-map-nudge">
+        <span></span><button data-qm-nudge="0,-1">↑</button><span></span>
+        <button data-qm-nudge="-1,0">←</button><button id="quickMapActive" type="button">HG</button><button data-qm-nudge="1,0">→</button>
+        <span></span><button data-qm-nudge="0,1">↓</button><span></span>
+      </div>
+      <div id="quickMapStatus" class="quick-map-status"></div>
+    </div>
+  `);
+
+  const pad = $("#quickMapPad");
+  let active = session.activeCorner || 0;
+  const status = (msg) => { const el=$("#quickMapStatus"); if(el) el.textContent=msg; };
+  const redraw = () => {
+    pad?.querySelectorAll("[data-qm]").forEach(el => {
+      const i = Number(el.dataset.qm);
+      const p = session.corners[i];
+      el.style.left = (p.x * 100) + "%";
+      el.style.top = (p.y * 100) + "%";
+      el.classList.toggle("active", i === active);
+    });
+    const a=$("#quickMapActive"); if(a) a.textContent=labels[active];
+  };
+  const apply = (sendRemote = false) => {
+    try {
+      applyQuickMapToProject(project, session, { source: "phone" });
+      runtime.setProject(project);
+      persist(false);
+      if (sendRemote) {
+        if (link?.online) {
+          link.sendOp(quickMapRemoteOperation(session));
+          status("Calibration envoyée au Bureau distant");
+        } else {
+          status("Calibration locale · connecte Bureau distant pour l'envoyer");
+        }
+      } else status("Calibration locale mise à jour");
+    } catch (e) {
+      pushAlert("error", `Quick Map : ${e?.message || e}`);
+    }
+  };
+  const move = (i, e) => {
+    const r = pad.getBoundingClientRect();
+    session = setQuickMapCorner(session, i, {
+      x: (e.clientX - r.left) / Math.max(1, r.width),
+      y: (e.clientY - r.top) / Math.max(1, r.height)
+    });
+    active = i;
+    redraw();
+    apply(false);
+  };
+
+  pad?.querySelectorAll("[data-qm]").forEach(handle => {
+    handle.onpointerdown = e => {
+      const i=Number(handle.dataset.qm);
+      active=i; redraw();
+      handle.setPointerCapture?.(e.pointerId);
+      move(i,e);
+    };
+    handle.onpointermove = e => {
+      if (!handle.hasPointerCapture?.(e.pointerId)) return;
+      move(Number(handle.dataset.qm),e);
+    };
+    handle.onpointerup = e => {
+      try { handle.releasePointerCapture?.(e.pointerId); } catch {}
+      move(Number(handle.dataset.qm),e);
+      apply(true);
+    };
+  });
+  $("#quickMapReset").onclick = () => {
+    session = createQuickMapSession({ nodeId: mappingNode.id });
+    active=0; redraw(); apply(true);
+  };
+  $("#quickMapSend").onclick = () => apply(true);
+  $("#quickMapStage").onclick = () => screen("stage");
+  $("#quickMapActive").onclick = () => { active=(active+1)%4; redraw(); };
+  $("#toolView").querySelectorAll("[data-qm-nudge]").forEach(btn => {
+    btn.onclick = () => {
+      const [dx,dy]=btn.dataset.qmNudge.split(",").map(Number);
+      session=nudgeQuickMapCorner(session,active,dx*0.002,dy*0.002);
+      redraw(); apply(true);
+    };
+  });
+  redraw();
+  apply(false);
+}
+
+$("[data-tool]").forEach((b) => {
   b.onclick = async () => {
     const tool = b.dataset.tool;
+    if (tool === "quick-map") return openQuickMapTool();
     if (tool === "export-max") return exportView("max");
     if (tool === "export-td") return exportView("td");
     if (tool === "export-pd") return exportView("pd");

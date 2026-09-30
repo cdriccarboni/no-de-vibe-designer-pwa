@@ -8,6 +8,7 @@ import { loadRememberedHost } from "../shared/discovery/host-card.js";
 import { CONSOLE_PROFILES, PROTOCOL_FAMILIES } from "../shared/companion-studio/console-profiles.js";
 import { mergeRegieProfiles } from "../shared/companion-studio/layout-generator.js";
 import { REGIE_PRESETS, createRegiePreset } from "../shared/companion-studio/regie-presets.js";
+import { imageFileToControllerTemplate } from "../shared/companion-studio/photo-controller.js";
 
 const $ = (id) => document.getElementById(id);
 const logEl = $("log");
@@ -22,6 +23,7 @@ let transport = null;
 let layoutRevision = 0;
 let monitorLastAt = 0;
 let swipeStart = null;
+let photoTemplate = null;
 const clientId = `studio-${Math.random().toString(36).slice(2, 7)}`;
 const requestedSurface = new URLSearchParams(location.search).get("surface") || "";
 installSurfaceSwitcher({ current: requestedSurface === "plateau" ? "plateau" : "regie" });
@@ -74,6 +76,9 @@ function widgetHtml(w) {
 function applyWidgetPresentation(el, w) {
   el.style.background = w.presentation?.color || "#d7b86a";
   el.style.color = w.presentation?.textColor || "#0f1113";
+  el.style.fontFamily = w.presentation?.fontFamily || "inherit";
+  el.style.fontSize = `${Math.max(9, Math.min(48, Number(w.presentation?.fontSize) || 15))}px`;
+  el.style.order = String(Math.max(0, Number(w.presentation?.layer) || 0));
   el.style.gridColumn = `span ${Math.max(1, w.presentation?.w || 1)}`;
   el.style.gridRow = `span ${Math.max(1, w.presentation?.h || 1)}`;
   el.dataset.id = w.id;
@@ -169,6 +174,10 @@ function syncEditor() {
   $("edLabel").value = w.presentation?.label || "";
   $("edSecondary").value = w.presentation?.secondary || "";
   $("edColor").value = w.presentation?.color || "#d7b86a";
+  $("edTextColor").value = w.presentation?.textColor || "#0f1113";
+  $("edFont").value = [...$("edFont").options].some(o => o.value === (w.presentation?.fontFamily || "inherit")) ? (w.presentation?.fontFamily || "inherit") : "inherit";
+  $("edFontSize").value = Math.max(9, Math.min(48, Number(w.presentation?.fontSize) || 15));
+  $("edLayer").value = Math.max(0, Math.min(999, Number(w.presentation?.layer) || 0));
   $("edW").value = Math.max(1, Math.min(4, Number(w.presentation?.w) || 1));
   $("edH").value = Math.max(1, Math.min(6, Number(w.presentation?.h) || 1));
   const bind = `${w.binding?.kind || "action"}:${w.binding?.action || "ping"}`;
@@ -386,6 +395,90 @@ grid.addEventListener("pointerup", (e) => {
 $("btnRegie").onclick = openRegieDialog;
 $("btnGenerateRegie").onclick = generateRegie;
 
+function contrastText(hex = "#777777") {
+  const raw = String(hex).replace("#", "");
+  const n = Number.parseInt(raw.length === 3 ? raw.split("").map(x => x + x).join("") : raw, 16);
+  if (!Number.isFinite(n)) return "#ffffff";
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (r * .299 + g * .587 + b * .114) > 150 ? "#0b0d10" : "#ffffff";
+}
+
+function applyPhotoTemplateToGrid() {
+  const opacity = Math.max(0, Math.min(.85, Number($("photoControllerOpacity")?.value) || .35));
+  if (!photoTemplate?.url) {
+    grid.style.backgroundImage = "";
+    grid.style.backgroundSize = "";
+    grid.style.backgroundPosition = "";
+    return;
+  }
+  const veil = Math.max(.05, 1 - opacity);
+  grid.style.backgroundImage = `linear-gradient(rgba(11,13,16,${veil}),rgba(11,13,16,${veil})),url("${photoTemplate.url}")`;
+  grid.style.backgroundSize = "cover";
+  grid.style.backgroundPosition = "center";
+}
+
+$("photoControllerInput")?.addEventListener("change", async e => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    if (photoTemplate?.url) URL.revokeObjectURL(photoTemplate.url);
+    photoTemplate = await imageFileToControllerTemplate(file);
+    applyPhotoTemplateToGrid();
+    $("photoControllerStatus").textContent = `Photo prête · ${photoTemplate.width}×${photoTemplate.height} · ${photoTemplate.regions.length} zones proposées`;
+    log(`Photo → Controller · ${photoTemplate.regions.length} zone(s) détectée(s) localement`);
+  } catch (err) {
+    $("photoControllerStatus").textContent = `Erreur · ${err?.message || err}`;
+  }
+});
+
+$("photoControllerOpacity")?.addEventListener("input", applyPhotoTemplateToGrid);
+
+$("photoControllerClear")?.addEventListener("click", () => {
+  if (photoTemplate?.url) URL.revokeObjectURL(photoTemplate.url);
+  photoTemplate = null;
+  applyPhotoTemplateToGrid();
+  $("photoControllerStatus").textContent = "Aucune photo chargée.";
+});
+
+$("photoControllerGenerate")?.addEventListener("click", () => {
+  if (!photoTemplate?.regions?.length) return log("Photo → Controller · choisis d’abord une photo");
+  const targetPage = (currentPage()?.widgets?.length || 0) === 0
+    ? currentPage()
+    : (() => {
+        const page = { id:`photo-${Date.now().toString(36)}`, name:"Photo", role:"custom", icon:"▦", cols:4, rows:6, widgets:[] };
+        doc.pages.push(page);
+        pageIndex = doc.pages.length - 1;
+        return page;
+      })();
+  targetPage.cols = 4;
+  targetPage.rows = 6;
+  targetPage.widgets = photoTemplate.regions.map((region, index) => normalizeWidget({
+    type:"button",
+    presentation:{
+      label:`B${index + 1}`,
+      secondary:"",
+      x:region.col,
+      y:region.row,
+      w:region.w || 1,
+      h:region.h || 1,
+      color:region.color || "#d7b86a",
+      textColor:contrastText(region.color),
+      fontFamily:"inherit",
+      fontSize:15,
+      layer:index
+    },
+    binding:{ kind:"action", action:"ping" }
+  }));
+  selectedId = targetPage.widgets[0]?.id || null;
+  saveCompanionLayout(doc);
+  syncLayoutToHost();
+  renderPageNav();
+  renderGrid();
+  applyPhotoTemplateToGrid();
+  $("photoControllerStatus").textContent = `Contrôleur créé · ${targetPage.widgets.length} layers · personnalise puis passe en Test/Plateau`;
+  log(`Photo → Controller · ${targetPage.widgets.length} layer(s) créés`);
+});
+
 $("edApply").onclick = () => {
   if (mode === STUDIO_MODES.PLATEAU) return;
   const w = findWidget(doc, selectedId);
@@ -393,6 +486,10 @@ $("edApply").onclick = () => {
   w.presentation.label = $("edLabel").value.trim() || w.presentation.label;
   w.presentation.secondary = $("edSecondary").value.trim();
   w.presentation.color = $("edColor").value;
+  w.presentation.textColor = $("edTextColor").value;
+  w.presentation.fontFamily = $("edFont").value || "inherit";
+  w.presentation.fontSize = Math.max(9, Math.min(48, Number($("edFontSize").value) || 15));
+  w.presentation.layer = Math.max(0, Math.min(999, Number($("edLayer").value) || 0));
   w.presentation.w = Math.max(1, Math.min(4, Number($("edW").value) || 1));
   w.presentation.h = Math.max(1, Math.min(6, Number($("edH").value) || 1));
   const [kind, action] = String($("edBinding").value || "action:ping").split(":");

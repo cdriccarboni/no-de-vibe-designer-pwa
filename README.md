@@ -1,6 +1,6 @@
 # No-de Vibe Designer
 
-**Source canonique : `main` · No-de Vibe Designer 1.4.0.**  
+**Source canonique : `main` · No-de Vibe Designer V3.0.0.**  
 Production readiness : `docs/PRODUCTION_READINESS.md`.  
 La Library est à **105/105 nodes exécutables** ; les limites matérielles ou logicielles externes restent explicitement signalées.
 
@@ -12,7 +12,18 @@ Même moteur et même format de projet (`.cvd.json`, schéma `cvd.graph`) pour :
 3. Android via Capacitor
 4. Companion Studio tablette (`studio/`)
 
-## Nouveautés 1.4.0
+## V3 · Graphics Engine
+
+- **Graphics Engine V3** : registre WebGPU / WebGL2 / CPU et familles de moteurs communes.
+- **WebGPU / WGSL** : backend réel initialisable pour les moteurs compute/render, avec fallback explicite.
+- **SuperNodes sans nouveau panneau** : Digital Curtain, Living Shadow, Feedback Dream, Particle Field et Quick Map passent par Magic FX.
+- **Quick Map téléphone** : quatre coins manipulables depuis Mobile, micro-ajustement, synchronisation Bureau distant et sauvegarde dans le projet.
+- **Mapping projectif réel** : homographie + warp perspective, avec fallback CPU déterministe.
+- Documentation : `docs/V3_GRAPHICS_ENGINE.md`.
+- **Image → Vibe** : photo/dessin en référence locale, analyse palette/contraste/contours et génération exécutable Auto, p5/Canvas, GLSL, Particules ou SDF.
+- **Manuel novice-first** : parcours « première régie en 10 minutes », Quick Map téléphone et dépannage terrain dans `docs/manual/`.
+
+## Base consolidée héritée de 1.4.0
 
 - **PWA multi-surface** : Designer complet, Mobile, Régie, Plateau et Remote Camera dans une seule PWA.
 - **Bascule universelle** : tout appareil peut changer de rôle à tout moment ; Auto n’est qu’un défaut de démarrage.

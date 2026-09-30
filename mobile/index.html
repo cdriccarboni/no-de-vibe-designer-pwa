@@ -86,6 +86,20 @@
 
     <section class="screen" data-screen="vibe">
       <div class="vibe-mobile">
+        <div class="vibe-image-row">
+          <label for="vibeImageFile" class="vibe-image-pick">＋ Image</label>
+          <input id="vibeImageFile" type="file" accept="image/*" hidden>
+          <img id="vibeImageThumb" class="vibe-image-thumb hidden" alt="Référence Image Vibe">
+          <select id="vibeImageTarget" aria-label="Cible Image Vibe">
+            <option value="auto">Auto</option>
+            <option value="p5">p5 / Canvas</option>
+            <option value="glsl">GLSL</option>
+            <option value="particles">Particules</option>
+            <option value="sdf">SDF / Metaballs</option>
+          </select>
+          <button id="vibeImageClear" class="hidden" type="button">Retirer</button>
+        </div>
+        <div id="vibeImageInfo" class="hint">Image optionnelle · analyse locale</div>
         <textarea id="vibeInput" placeholder="Dis ce que tu veux créer…">Crée un nombre et une multiplication.</textarea>
         <button id="applyVibeBtn" type="button">Prévisualiser</button>
       </div>
@@ -118,6 +132,7 @@
         <button data-tool="export-td" type="button">Export TD</button>
         <button data-tool="export-pd" type="button">Export PD</button>
         <button data-tool="export-millumin" type="button">Millumin OSC</button>
+        <button data-tool="quick-map" type="button">Quick Map</button>
         <button data-tool="routing" type="button">Routage</button>
         <button data-tool="manual" type="button">Manuel</button>
         <button data-tool="demo" type="button">Démo</button>

@@ -39,6 +39,20 @@
     <img id="monitorFrame" alt="Retour vidéo No-de" />
   </section>
 
+  <section class="photo-controller">
+    <div>
+      <p class="brand">Photo → Controller</p>
+      <p class="hint">Prends une photo/capture d’une interface : No-de prépare localement un layout éditable. Aucune image n’est envoyée au cloud.</p>
+    </div>
+    <div class="row">
+      <label class="photo-pick">Photo / caméra<input id="photoControllerInput" type="file" accept="image/*" capture="environment" /></label>
+      <button type="button" id="photoControllerGenerate">Générer le contrôleur</button>
+      <button type="button" id="photoControllerClear" class="ghost">Retirer le gabarit</button>
+    </div>
+    <label class="photo-opacity">Opacité du gabarit <input id="photoControllerOpacity" type="range" min="0" max="0.85" step="0.05" value="0.35" /></label>
+    <p id="photoControllerStatus" class="hint">Aucune photo chargée.</p>
+  </section>
+
   <nav class="page-nav" aria-label="Pages de régie">
     <button type="button" id="pagePrev" class="ghost" aria-label="Page précédente">‹</button>
     <div id="pageTabs" class="page-tabs"></div>
@@ -52,10 +66,26 @@
       <p class="hint">Action / Binding / Presentation séparés — l’apparence ne casse pas le patch.</p>
       <label>Nom <input id="edLabel" type="text" /></label>
       <label>Secondaire <input id="edSecondary" type="text" /></label>
-      <label>Couleur <input id="edColor" type="color" value="#d7b86a" /></label>
+      <div class="row">
+        <label>Couleur <input id="edColor" type="color" value="#d7b86a" /></label>
+        <label>Texte <input id="edTextColor" type="color" value="#0f1113" /></label>
+      </div>
+      <div class="row">
+        <label>Police
+          <select id="edFont">
+            <option value="inherit">Système</option>
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="monospace">Mono</option>
+          </select>
+        </label>
+        <label>Taille <input id="edFontSize" type="number" min="9" max="48" value="15" /></label>
+      </div>
       <div class="row">
         <label>Largeur <input id="edW" type="number" min="1" max="4" value="2" /></label>
         <label>Hauteur <input id="edH" type="number" min="1" max="6" value="1" /></label>
+        <label>Layer <input id="edLayer" type="number" min="0" max="999" value="0" /></label>
       </div>
       <label>Binding
         <select id="edBinding">

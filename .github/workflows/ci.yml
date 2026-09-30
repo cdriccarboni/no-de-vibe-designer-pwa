@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: nvd-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Production audit
+        run: npm run audit:production
+      - name: Core tests
+        run: npm test
+      - name: Syntax checks
+        run: npm run check
+      - name: Build PWA
+        run: npm run build:pwa
+      - name: Verify PWA
+        run: |
+          test -f dist/pwa/index.html
+          test -f dist/pwa/desktop/index.html
+          test -f dist/pwa/mobile/index.html
+          test -f dist/pwa/manuel/index.html
+          test -f dist/pwa/shared/image-vibe.js
+          test -f dist/pwa/shared/graphics/mapping-v3.js
+          grep -q '"version": "3.0.0"' dist/pwa/build-info.json

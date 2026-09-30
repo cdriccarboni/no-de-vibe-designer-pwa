@@ -12,6 +12,32 @@ const roomEl = $("room");
 const deviceEl = $("device");
 const metricsEl = $("metrics");
 const preview = $("preview");
+const controllerFrame = $("controllerFrame");
+
+function setCompanionTab(tab = "camera") {
+  document.querySelectorAll("[data-companion-tab]").forEach(b => b.classList.toggle("active", b.dataset.companionTab === tab));
+  document.querySelectorAll("[data-companion-panel]").forEach(p => { p.hidden = p.dataset.companionPanel !== tab; });
+  if (tab === "controller" && controllerFrame && !controllerFrame.src) {
+    const params = new URLSearchParams(location.search);
+    const ws = params.get("ws");
+    const pair = params.get("pair");
+    const q = new URLSearchParams({ surface:"regie", embed:"1" });
+    if (ws) q.set("ws", ws);
+    if (pair) q.set("pair", pair);
+    controllerFrame.src = `../studio/?${q.toString()}`;
+  }
+  try { sessionStorage.setItem("nvd.companion.tab", tab); } catch {}
+}
+
+document.querySelectorAll("[data-companion-tab]").forEach(b => {
+  b.addEventListener("click", () => setCompanionTab(b.dataset.companionTab));
+});
+$("controllerReload")?.addEventListener("click", () => {
+  if (!controllerFrame) return;
+  const src = controllerFrame.src;
+  controllerFrame.removeAttribute("src");
+  requestAnimationFrame(() => { controllerFrame.src = src || "../studio/?surface=regie&embed=1"; });
+});
 
 const parsed = parseCompanionSearch(location.search);
 if (parsed.room) roomEl.value = parsed.room;
@@ -79,3 +105,7 @@ $("stop").onclick = () => {
 
 fillDevices();
 renderState({ state: "WAITING" });
+let initialTab = "camera";
+try { initialTab = sessionStorage.getItem("nvd.companion.tab") || "camera"; } catch {}
+if (new URLSearchParams(location.search).get("mode") === "controller") initialTab = "controller";
+setCompanionTab(initialTab);

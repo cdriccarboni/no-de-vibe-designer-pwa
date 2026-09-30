@@ -7,7 +7,7 @@
 
 import { addNode, addTimelineClip, newProject, validateProject } from "./ir.js";
 import { validateEdge } from "./graph-engine.js";
-import { ensureSubGraph } from "./subpatch.js";
+import { ensureSubGraph } from "./subpatch.js";\nimport { validateQuad, mappingParams } from "./graphics/mapping-v3.js";
 
 export const REMOTE_PORT = 4174;
 
@@ -71,6 +71,22 @@ export function applyRemoteMessage(state, msg) {
       const n = (project.nodes || []).find(item => item.id === op.id);
       if (!n) return fail(state, `Node introuvable : ${op.id}`);
       n.params = { ...(n.params || {}), [op.key]: op.value };
+    } else if (op.kind === "quick-map-set") {
+      let target = op.nodeId
+        ? (project.nodes || []).find(n => n.id === op.nodeId && n.type === "mapping")
+        : null;
+      if (!target) target = (project.nodes || []).find(n => n.type === "mapping");
+      if (!target) return fail(state, "Aucun node Mapping vidéo à calibrer");
+      const check = validateQuad(op.params?.corners);
+      if (!check.ok) return fail(state, check.errors.join(" · "));
+      target.params = {
+        ...(target.params || {}),
+        ...mappingParams(check.quad, {
+          gridCols: op.params?.grid?.cols || op.params?.gridCols || 2,
+          gridRows: op.params?.grid?.rows || op.params?.gridRows || 2,
+          source: op.params?.calibrationSource || "phone"
+        })
+      };
     } else if (op.kind === "connect") {
       const v = validateEdge(project, op.from, op.to);
       if (!v.ok) return fail(state, v.errors.join(" · "));

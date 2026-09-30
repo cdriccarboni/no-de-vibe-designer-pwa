@@ -28,6 +28,9 @@ export class Runtime {
     this.resultCanvas = document.createElement("canvas");
     this.nodeFns = createNodeProcessors();
     this.previousOutputs = new Map();
+    this.nodeState = new Map();
+    this.aiRequest = null;
+    this.aiAssetRequest = null;
     this.deviceBus = { lastMidi: null, lastSerial: null };
     this.bridgeSend = null;
     this.serialSend = null;
@@ -45,6 +48,8 @@ export class Runtime {
   setDeviceBus(bus) { this.deviceBus = bus || this.deviceBus; }
   setBridgeSend(fn) { this.bridgeSend = fn; }
   setSerialSend(fn) { this.serialSend = fn || null; }
+  setAiRequest(fn) { this.aiRequest = fn || null; }
+  setAiAssetRequest(fn) { this.aiAssetRequest = fn || null; }
   setSensorBus(bus) { this.sensorBus = bus || null; }
   setOscUdpSend(fn) { this.oscUdpSend = fn || null; }
   setArtNetUdpSend(fn) { this.artnetUdpSend = fn || null; }
@@ -251,6 +256,9 @@ export class Runtime {
       deviceBus: this.deviceBus,
       bridgeSend: this.bridgeSend,
       serialSend: this.serialSend,
+      aiRequest: this.aiRequest,
+      aiAssetRequest: this.aiAssetRequest,
+      nodeState: this.nodeState,
       oscUdpSend: this.oscUdpSend,
       artnetUdpSend: this.artnetUdpSend,
       controls: this.project.controls || [],

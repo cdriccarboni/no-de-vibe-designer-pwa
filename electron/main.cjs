@@ -12,16 +12,30 @@ const APP_NAME = "No-de Vibe Designer";
 
 const LOCAL_AI_DEFAULT_BASE = "http://127.0.0.1:11434";
 
+function isTrustedAiHost(hostname = "") {
+  const host = String(hostname).toLowerCase().replace(/^\[|\]$/g, "");
+  if (["127.0.0.1", "localhost", "::1"].includes(host)) return true;
+  if (/^10\./.test(host) || /^192\.168\./.test(host)) return true;
+  const m = host.match(/^172\.(\d+)\./);
+  return !!m && Number(m[1]) >= 16 && Number(m[1]) <= 31;
+}
+
 function normalizeLocalAiBase(value = LOCAL_AI_DEFAULT_BASE) {
   const raw = String(value || LOCAL_AI_DEFAULT_BASE).trim().replace(/\/+$/, "");
   let url;
   try { url = new URL(raw); } catch { throw new Error("URL IA locale invalide"); }
-  const host = url.hostname.toLowerCase();
-  if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(host)) {
-    throw new Error("IA locale refusée : seul localhost est autorisé");
-  }
   if (!["http:", "https:"].includes(url.protocol)) throw new Error("Protocole IA locale invalide");
+  if (!isTrustedAiHost(url.hostname)) {
+    throw new Error("IA locale refusée : utilise localhost ou une IP privée du réseau local");
+  }
   return url.origin;
+}
+
+function normalizeAiEndpoint(value = "") {
+  let url;
+  try { url = new URL(String(value || "").trim()); } catch { throw new Error("Endpoint IA invalide"); }
+  if (!["http:", "https:"].includes(url.protocol)) throw new Error("Endpoint IA : HTTP/HTTPS uniquement");
+  return url.toString();
 }
 
 async function localAiRequest(pathname, { baseUrl = LOCAL_AI_DEFAULT_BASE, method = "GET", body = null, timeoutMs = 45000 } = {}) {
@@ -215,6 +229,125 @@ ipcMain.handle("nvd:local-ai-probe", async (_event, options = {}) => {
   const requested = String(options.model || "qwen2.5-coder:7b");
   const installed = models.includes(requested) || models.some(name => name.split(":")[0] === requested.split(":")[0]);
   return { ok: true, baseUrl: normalizeLocalAiBase(options.baseUrl), requested, installed, models };
+});
+
+ipcMain.handle("nvd:local-ai-install", async (_event, options = {}) => {
+  const model = String(options.model || "").trim();
+  if (!model || model.length > 120 || /[\r\n]/.test(model)) throw new Error("Nom de modèle Ollama invalide");
+  const data = await localAiRequest("/api/pull", {
+    baseUrl: options.baseUrl,
+    method: "POST",
+    timeoutMs: options.timeoutMs || 30 * 60 * 1000,
+    body: { name: model, stream: false }
+  });
+  return { ok: true, model, status: data?.status || "success" };
+});
+
+ipcMain.handle("nvd:ai-node-request", async (_event, options = {}) => {
+  const protocol = String(options.protocol || "ollama").toLowerCase();
+  const model = String(options.model || "qwen2.5-coder:7b").trim();
+  const prompt = String(options.prompt || "").slice(0, 30000);
+  const system = String(options.system || "Tu es un moteur créatif relié à No-de Vibe Designer.").slice(0, 12000);
+  if (!prompt.trim()) throw new Error("Prompt IA vide");
+
+  if (protocol === "ollama") {
+    const data = await localAiRequest("/api/chat", {
+      baseUrl: options.baseUrl,
+      method: "POST",
+      timeoutMs: options.timeoutMs || 60000,
+      body: {
+        model,
+        stream: false,
+        options: { temperature: Math.max(0, Math.min(1, Number(options.temperature ?? 0.2))) },
+        messages: [{ role: "system", content: system }, { role: "user", content: prompt }]
+      }
+    });
+    const content = String(data?.message?.content || "").trim();
+    if (!content) throw new Error("IA locale : réponse vide");
+    return { ok: true, protocol, model: data?.model || model, content };
+  }
+
+  const endpoint = normalizeAiEndpoint(options.endpoint);
+  const hostText = endpoint.toLowerCase();
+  if (hostText.includes("api.x.ai") || /\bgrok\b/.test(model.toLowerCase())) {
+    throw new Error("Ce fournisseur IA est désactivé dans No-de Vibe Designer");
+  }
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (options.apiKey) headers.Authorization = "Bearer " + String(options.apiKey);
+  const payload = protocol === "generic"
+    ? { model, prompt, input: prompt, ...(options.body && typeof options.body === "object" ? options.body : {}) }
+    : {
+        model,
+        temperature: Math.max(0, Math.min(1, Number(options.temperature ?? 0.2))),
+        messages: [{ role: "system", content: system }, { role: "user", content: prompt }]
+      };
+  const response = await fetch(endpoint, {
+    method: String(options.method || "POST").toUpperCase(),
+    headers,
+    body: JSON.stringify(payload)
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error("Endpoint IA HTTP " + response.status + " · " + text.slice(0, 240));
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { /* plain text allowed */ }
+  const content = String(
+    data?.choices?.[0]?.message?.content
+      ?? data?.message?.content
+      ?? data?.output_text
+      ?? data?.response
+      ?? data?.text
+      ?? text
+      ?? ""
+  ).trim();
+  if (!content) throw new Error("Endpoint IA : réponse vide");
+  return { ok: true, protocol, model, content };
+});
+
+ipcMain.handle("nvd:ai-asset-request", async (_event, options = {}) => {
+  const kind = String(options.kind || "image").toLowerCase();
+  const endpoint = normalizeAiEndpoint(options.endpoint);
+  const model = String(options.model || "").trim();
+  const prompt = String(options.prompt || "").slice(0, 30000);
+  if (!prompt.trim()) throw new Error("Prompt média IA vide");
+  if (!["image","video","audio","3d"].includes(kind)) throw new Error("Type média IA invalide");
+  const hostText = endpoint.toLowerCase();
+  if (hostText.includes("api.x.ai") || /\bgrok\b/.test(model.toLowerCase())) {
+    throw new Error("Ce fournisseur IA est désactivé dans No-de Vibe Designer");
+  }
+  const headers = { "Content-Type":"application/json", ...(options.headers || {}) };
+  if (options.apiKey) headers.Authorization = "Bearer " + String(options.apiKey);
+  const payload = {
+    kind,
+    model,
+    prompt,
+    input: prompt,
+    referenceUrl: options.referenceUrl || "",
+    ...(options.params && typeof options.params === "object" ? options.params : {}),
+    ...(options.body && typeof options.body === "object" ? options.body : {})
+  };
+  const response = await fetch(endpoint, {
+    method: String(options.method || "POST").toUpperCase(),
+    headers,
+    body: JSON.stringify(payload)
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error("Endpoint média IA HTTP " + response.status + " · " + text.slice(0,240));
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { /* plain text URL accepted */ }
+  const url = String(
+    data?.url
+      ?? data?.output_url
+      ?? data?.outputUrl
+      ?? data?.file_url
+      ?? data?.fileUrl
+      ?? data?.data_url
+      ?? data?.dataUrl
+      ?? data?.data?.[0]?.url
+      ?? (/^(https?:|data:)/.test(text.trim()) ? text.trim() : "")
+      ?? ""
+  ).trim();
+  if (!url) throw new Error("Endpoint média IA : aucune URL de sortie exploitable");
+  return { ok:true, kind, model, url };
 });
 
 ipcMain.handle("nvd:local-ai-chat", async (_event, options = {}) => {

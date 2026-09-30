@@ -20,6 +20,7 @@ import {
 } from "./graphics/interactive-effects.js";
 import { showManifestSummary } from "./show-importer.js";
 import { analyzePresence, renderLivingShadow } from "./graphics/living-shadow.js";
+import { warpPerspectiveFrame, validateQuad } from "./graphics/mapping-v3.js";
 
 function videoVal(el, opacity = 1) {
   return { kind: "video", el, opacity };
@@ -496,6 +497,170 @@ export function createNodeProcessors() {
     return new Map([[0, { kind: "text", value }]]);
   });
 
+  fns.set("ai", (node, inputs, ctx) => {
+    const out = new Map();
+    const prompt = readText(inputs.get(0), node.params?.prompt || "");
+    const triggerConnected = inputs.has(1);
+    const triggerNow = truthyTrigger(inputs.get(1));
+    const memory = nodeMemory(ctx);
+    const key = `ai-node:${node.id}`;
+    const prev = memory.get(key) || { response: "", status: "IDLE", trigger: false, pending: false, signature: "" };
+    const signature = [
+      node.params?.protocol || "ollama",
+      node.params?.baseUrl || "",
+      node.params?.endpoint || "",
+      node.params?.model || "",
+      prompt
+    ].join("|");
+    const manualNonce = Number(node.params?.manualRunNonce || 0);
+    const shouldSend = manualNonce !== Number(prev.manualNonce || 0)
+      || (triggerConnected
+        ? (triggerNow && !prev.trigger)
+        : (node.params?.auto === true && prompt && signature !== prev.signature));
+
+    let current = { ...prev, trigger: triggerNow, manualNonce };
+    if (shouldSend && !prev.pending) {
+      if (typeof ctx.aiRequest !== "function") {
+        current = { ...current, status: "UNAVAILABLE", pending: false, signature };
+      } else {
+        current = { ...current, status: "RUNNING", pending: true, signature };
+        memory.set(key, current);
+        Promise.resolve(ctx.aiRequest({
+          protocol: node.params?.protocol || "ollama",
+          baseUrl: node.params?.baseUrl || "http://127.0.0.1:11434",
+          endpoint: node.params?.endpoint || "",
+          model: node.params?.model || "qwen2.5-coder:7b",
+          prompt,
+          system: node.params?.system || "Tu es une IA créative connectée à No-de Vibe Designer.",
+          temperature: node.params?.temperature ?? 0.2
+        })).then(result => {
+          const state = memory.get(key) || {};
+          memory.set(key, {
+            ...state,
+            response: String(result?.content || ""),
+            status: result?.ok === false ? "ERROR" : "READY",
+            pending: false,
+            error: result?.error || ""
+          });
+        }).catch(error => {
+          const state = memory.get(key) || {};
+          memory.set(key, {
+            ...state,
+            status: "ERROR",
+            pending: false,
+            error: error?.message || String(error)
+          });
+        });
+      }
+    }
+    memory.set(key, current);
+    const state = memory.get(key) || current;
+    out.set(2, textOut(state.response || ""));
+    out.set(3, textOut(state.error ? `${state.status} · ${state.error}` : state.status || "IDLE"));
+    return out;
+  });
+
+  function aiMediaNode(kind, node, inputs, ctx) {
+    const isVisual = kind === "image" || kind === "video";
+    const prompt = readText(inputs.get(0), node.params?.prompt || "");
+    const triggerIndex = isVisual ? 2 : 1;
+    const outputIndex = isVisual ? 3 : 2;
+    const statusIndex = isVisual ? 4 : 3;
+    const triggerConnected = inputs.has(triggerIndex);
+    const triggerNow = truthyTrigger(inputs.get(triggerIndex));
+    const memory = nodeMemory(ctx);
+    const key = `ai-media:${kind}:${node.id}`;
+    const prev = memory.get(key) || { status:"IDLE", trigger:false, pending:false, signature:"", value:null };
+    const ref = isVisual ? inputs.get(1)?.value : null;
+    const refUrl = ref?.url || ref?.src || ref?.el?.currentSrc || ref?.el?.src || "";
+    const signature = [
+      kind,
+      node.params?.protocol || "generic",
+      node.params?.endpoint || "",
+      node.params?.model || "",
+      prompt,
+      refUrl
+    ].join("|");
+    const manualNonce = Number(node.params?.manualRunNonce || 0);
+    const shouldSend = manualNonce !== Number(prev.manualNonce || 0)
+      || (triggerConnected
+        ? (triggerNow && !prev.trigger)
+        : (node.params?.auto === true && prompt && signature !== prev.signature));
+    let current = { ...prev, trigger:triggerNow, manualNonce };
+
+    if (shouldSend && !prev.pending) {
+      if (typeof ctx.aiAssetRequest !== "function") {
+        current = { ...current, status:"UNAVAILABLE", error:"Aucun backend de génération média configuré", signature };
+      } else {
+        current = { ...current, status:"RUNNING", pending:true, error:"", signature };
+        memory.set(key, current);
+        Promise.resolve(ctx.aiAssetRequest({
+          kind,
+          protocol:node.params?.protocol || "generic",
+          endpoint:node.params?.endpoint || "",
+          model:node.params?.model || "",
+          prompt,
+          referenceUrl:refUrl,
+          params:{
+            aspect:node.params?.aspect || "",
+            resolution:node.params?.resolution || "",
+            duration:node.params?.durationSec || "",
+            seed:node.params?.seed ?? null
+          }
+        })).then(result => {
+          const state = memory.get(key) || {};
+          const url = result?.url || result?.outputUrl || result?.fileUrl || result?.dataUrl || "";
+          let value = result?.value || null;
+          if (!value && url && kind === "image" && typeof Image !== "undefined") {
+            const img = new Image();
+            img.decoding = "async";
+            img.src = url;
+            value = { kind:"video", el:img, url };
+          } else if (!value && url && kind === "video" && typeof document !== "undefined") {
+            const video = document.createElement("video");
+            video.playsInline = true;
+            video.muted = true;
+            video.loop = true;
+            video.src = url;
+            video.play?.().catch?.(() => {});
+            value = { kind:"video", el:video, url };
+          } else if (!value && url && kind === "audio") {
+            value = { kind:"audio", url };
+          } else if (!value && url) {
+            value = { kind:"asset", assetType:kind, url };
+          }
+          memory.set(key, {
+            ...state,
+            value,
+            status:result?.ok === false ? "ERROR" : (value ? "READY" : "DONE"),
+            pending:false,
+            error:result?.error || (!value ? "Réponse reçue sans média exploitable" : "")
+          });
+        }).catch(error => {
+          const state = memory.get(key) || {};
+          memory.set(key, {
+            ...state,
+            status:"ERROR",
+            pending:false,
+            error:error?.message || String(error)
+          });
+        });
+      }
+    }
+
+    memory.set(key, current);
+    const state = memory.get(key) || current;
+    const out = new Map();
+    if (state.value) out.set(outputIndex, state.value);
+    out.set(statusIndex, textOut(state.error ? `${state.status} · ${state.error}` : state.status || "IDLE"));
+    return out;
+  }
+
+  fns.set("ai-image", (node, inputs, ctx) => aiMediaNode("image", node, inputs, ctx));
+  fns.set("ai-video", (node, inputs, ctx) => aiMediaNode("video", node, inputs, ctx));
+  fns.set("ai-audio", (node, inputs, ctx) => aiMediaNode("audio", node, inputs, ctx));
+  fns.set("ai-3d", (node, inputs, ctx) => aiMediaNode("3d", node, inputs, ctx));
+
   fns.set("timer", (node, inputs, ctx) => {
     const memory = nodeMemory(ctx);
     const key = `timer:${node.id}`;
@@ -815,6 +980,17 @@ export function createNodeProcessors() {
     const dx = Number(node.params?.dx ?? 0);
     const dy = Number(node.params?.dy ?? 0);
     if (dx || dy) frame = offsetFrame(frame, { dx, dy });
+
+    if (node.params?.mappingV3 || Array.isArray(node.params?.corners)) {
+      const check = validateQuad(node.params?.corners);
+      if (check.ok) {
+        frame = warpPerspectiveFrame(frame, check.quad);
+        frame.mappingSource = node.params?.calibrationSource || "designer";
+      } else {
+        ctx.warnings?.push?.(`Mapping ${node.title || node.id} : ${check.errors.join(" · ")}`);
+      }
+    }
+
     frame.source = "mapping";
     return new Map([[2, frame]]);
   });
