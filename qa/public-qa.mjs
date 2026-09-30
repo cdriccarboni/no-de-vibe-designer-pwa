@@ -8,7 +8,7 @@ import { renderThreadCurtain } from "../shared/graphics/interactive-effects.js";
 import { encodeSacnChannel, sacnMulticastAddress } from "../shared/protocols/sacn.js";
 import { createRegiePreset, REGIE_PRESETS } from "../shared/companion-studio/regie-presets.js";
 import { APP_VERSION } from "../shared/version.js";
-import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl } from "../shared/surface-switcher.js";
+import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl, navigateSurface } from "../shared/surface-switcher.js";
 
 function assert(condition, message) {
   if (!condition) throw new Error(`QA FAIL · ${message}`);
@@ -31,6 +31,14 @@ setPreferredSurface("auto", surfaceStorage);
 assert(getPreferredSurface(surfaceStorage) === "", "Auto restores device-default routing");
 assert(/desktop/.test(surfaceUrl("designer", { root: new URL("https://example.test/no-de/") })), "Designer URL is explicit");
 assert(/surface=plateau/.test(surfaceUrl("plateau", { root: new URL("https://example.test/no-de/") })), "Plateau role is explicit and shareable");
+const navCalls = [];
+navigateSurface("mobile", {
+  locationObj: {
+    href: "https://localhost/index.html?chooser=1",
+    assign: value => navCalls.push(value)
+  }
+});
+assert(navCalls[0] === "/mobile/", "Android surface navigation stays inside the app");
 
 const libraryTypes = new Set();
 for (const [, items] of NODE_GROUPS) for (const [, type] of items) libraryTypes.add(type);
