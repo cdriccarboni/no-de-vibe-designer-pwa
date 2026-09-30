@@ -660,11 +660,33 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<p class="hint">Double-clic pour éditer. Maj+clic pour sélectionner plusieurs nodes, puis « Boîte ».</p>`;
     extra += `<button id="addInPort" class="smallbtn">＋ entrée</button><button id="addOutPort" class="smallbtn">＋ sortie</button>`;
   }
+  if (n.type === "presence") {
+    extra += `<div class="field"><label>Interprète / présence</label><input id="nPerson" value="${n.params.person || ""}" placeholder="Maxime, Alexandra, Juliette…"></div>`;
+    extra += `<div class="field"><label>Zone plateau</label><select id="nSourceZone"><option value="jardin">Jardin · gauche</option><option value="centre">Centre</option><option value="cour">Cour · droite</option></select></div>`;
+    extra += `<div class="field"><label>Seuil silhouette</label><input id="nThreshold" type="range" min="0" max="1" step=".01" value="${n.params.threshold ?? .45}"></div>`;
+    extra += `<p class="hint">Cette Présence porte l’identité scénique. La caméra reste une source technique séparée.</p>`;
+  }
+  if (n.type === "livingshadow") {
+    extra += `<div class="field"><label>Interprète</label><input id="nPerson" value="${n.params.person || ""}" placeholder="Maxime"></div>`;
+    extra += `<div class="field"><label>Interprète sur le plateau</label><select id="nSourceZone"><option value="jardin">Jardin · gauche</option><option value="centre">Centre</option><option value="cour">Cour · droite</option></select></div>`;
+    extra += `<div class="field"><label>Ombre projetée</label><select id="nShadowZone"><option value="jardin">Jardin · gauche</option><option value="centre">Centre</option><option value="cour">Cour · droite</option></select></div>`;
+    extra += `<div class="field"><label>Comportement</label><select id="nShadowMode"><option value="mirror">Danse miroir</option><option value="attached">Attachée</option><option value="autonomous">Autonome live</option></select></div>`;
+    extra += `<div class="field"><label>Autonomie</label><input id="nShadowAutonomy" type="range" min="0" max="1" step=".01" value="${n.params.autonomy ?? .58}"></div>`;
+    extra += `<div class="field"><label>Seuil silhouette</label><input id="nThreshold" type="range" min="0" max="1" step=".01" value="${n.params.threshold ?? .45}"></div>`;
+    extra += `<div class="camera-actions"><button id="shadowMirrorBtn" type="button">Danse miroir</button><button id="shadowDetachBtn" type="button">Décrocher l’ombre</button><button id="shadowAttachBtn" type="button">Rattacher</button></div>`;
+    extra += `<p class="hint">Décrocher mémorise la silhouette du moment. Elle peut ensuite vivre en autonomie dans sa zone.</p>`;
+  }
+  if (n.type === "stage-output") {
+    extra += `<div class="field"><label>Surface / destination</label><input id="nSurfaceName" value="${n.params.surfaceName || ""}" placeholder="Rideau de fils, cyclo, écran fond…"></div>`;
+    extra += `<p class="hint">Nom scénique de la destination. Le node reste une sortie vidéo locale et ne déclenche aucun matériel externe.</p>`;
+  }
+
   const channelDefs = channelCandidatesForNode(n);
   if (channelDefs.length) {
     extra += `<div class="channel-expose"><select id="channelParam">${channelDefs.map(([key,label]) => `<option value="${key}">${label}</option>`).join("")}</select><button id="exposeChannelBtn" class="smallbtn" type="button">Exposer</button></div>`;
   }
   $("#inspectorBody").innerHTML = `
+    <div class="field"><label>Nom du node</label><input id="nTitle" value="${n.title || ""}"></div>
     <div class="field"><label>Durée</label><input id="nDur" type="number" min=".1" step=".1" value="${n.params.duration}"></div>
     <div class="field"><label>Opacité</label><input id="nOpa" type="range" min="0" max="1" step=".01" value="${n.params.opacity}"></div>
     <div class="field"><label>Actif</label><select id="nEnabled"><option value="true">Oui</option><option value="false">Non</option></select></div>
@@ -673,6 +695,12 @@ function selectNode(id, { additive = false } = {}) {
     <button id="dupNodeBtn" class="smallbtn">Dupliquer</button>
     <button id="delNodeBtn" class="smallbtn danger">Supprimer</button>`;
   $("#nEnabled").value = String(n.params.enabled);
+  $("#nTitle").onchange = e => {
+    n.title = e.target.value.trim() || spec(n.type)[0];
+    const head = document.querySelector(`.node[data-id="${n.id}"] .nh`);
+    if (head) head.textContent = n.title;
+    autosave(); commitHistory(); log(`Node renommé · ${n.title}`);
+  };
   $("#nDur").onchange = e => { n.params.duration = +e.target.value; autosave(); commitHistory(); };
   $("#nOpa").oninput = e => { n.params.opacity = +e.target.value; runtime.render(); autosave(); };
   $("#nEnabled").onchange = e => {
@@ -781,6 +809,42 @@ function selectNode(id, { additive = false } = {}) {
     $("#nBlend").value = n.params.blend || "normal";
     $("#nBlend").onchange = e => { n.params.blend = e.target.value; runtime.render(); autosave(); commitHistory(); };
   }
+  if ($("#nPerson")) $("#nPerson").onchange = e => {
+    n.params.person = e.target.value.trim();
+    if (n.params.person && ["Présence / Interprète","Ombre Vivante"].includes(n.title)) {
+      n.title = n.type === "presence" ? `Présence · ${n.params.person}` : `Ombre Vivante · ${n.params.person}`;
+      const head = document.querySelector(`.node[data-id="${n.id}"] .nh`);
+      if (head) head.textContent = n.title;
+    }
+    runtime.render(); autosave(); commitHistory();
+  };
+  if ($("#nSourceZone")) {
+    $("#nSourceZone").value = n.params.sourceZone || n.params.zone || "jardin";
+    $("#nSourceZone").onchange = e => { n.params.sourceZone = e.target.value; n.params.zone = e.target.value; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#nShadowZone")) {
+    $("#nShadowZone").value = n.params.shadowZone || "cour";
+    $("#nShadowZone").onchange = e => { n.params.shadowZone = e.target.value; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#nShadowMode")) {
+    $("#nShadowMode").value = n.params.mode || "mirror";
+    $("#nShadowMode").onchange = e => { n.params.mode = e.target.value; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#nShadowAutonomy")) $("#nShadowAutonomy").oninput = e => { n.params.autonomy = +e.target.value; runtime.render(); autosave(); };
+  if ($("#shadowMirrorBtn")) $("#shadowMirrorBtn").onclick = () => {
+    n.params.mode = "mirror"; n.params.attachNonce = Date.now(); renderInspector(n.id); runtime.render(); autosave(); commitHistory();
+  };
+  if ($("#shadowDetachBtn")) $("#shadowDetachBtn").onclick = () => {
+    n.params.detachNonce = Date.now(); runtime.render(); autosave(); commitHistory(); log(`Ombre décrochée · ${n.params.person || n.title}`);
+  };
+  if ($("#shadowAttachBtn")) $("#shadowAttachBtn").onclick = () => {
+    n.params.attachNonce = Date.now(); n.params.mode = "mirror"; runtime.render(); autosave(); commitHistory(); log(`Ombre rattachée · ${n.params.person || n.title}`);
+  };
+  if ($("#nSurfaceName")) $("#nSurfaceName").onchange = e => {
+    n.params.surfaceName = e.target.value.trim() || "Sortie Scène";
+    if (!n.title || n.title === "Sortie Scène") n.title = `Sortie · ${n.params.surfaceName}`;
+    runtime.render(); autosave(); commitHistory();
+  };
   if ($("#nThreshold")) $("#nThreshold").oninput = e => { n.params.threshold = +e.target.value; runtime.render(); autosave(); };
   if ($("#nDx")) $("#nDx").onchange = e => { n.params.dx = +e.target.value; runtime.render(); autosave(); commitHistory(); };
   if ($("#nDy")) $("#nDy").onchange = e => { n.params.dy = +e.target.value; runtime.render(); autosave(); commitHistory(); };
