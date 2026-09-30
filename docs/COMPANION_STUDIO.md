@@ -1,63 +1,73 @@
-# Companion Studio
+# Companion Studio — No-de Vibe Designer 1.2.0
 
-Date: 2026-09-29 · Branch `cursor/no-de-2.2-reprise-20260929` · App **1.1.0**
+Date : 2026-09-30 · Source canonique : `main`
 
-## Goal
+## Fonctionnement actuel
 
-Phone/tablet as a customizable show-control surface: connect → customize → test → send → disconnect → play.
-Local First · LAN priority · Action / Binding / Presentation separated.
+Companion Studio transforme un téléphone ou une tablette en surface de régie personnalisable sur le LAN.
 
-## Audit (consolidate)
+- Édition / Test / Plateau.
+- Nom, texte secondaire, couleur, largeur et hauteur des widgets.
+- Ajout / suppression de widgets.
+- Sauvegarde Local First.
+- Synchronisation **live** du layout téléphone/tablette ↔ desktop.
+- Feedback bidirectionnel avec RTT réel du pont WebSocket.
+- Détection automatique du Companion côté desktop.
+- Mode Controller.
+- **Monitor LAN réel** : preview du canvas desktop envoyé en JPEG compressé 480 px, cible 8 fps, via le pont WS existant.
+- Le Monitor est démarré explicitement depuis le desktop ou demandé depuis le Studio, et peut être coupé depuis le Studio.
 
-| Existing | Role | Reuse |
-|---|---|---|
-| `companion/` + PeerJS Remote Camera | Camera only | Keep separate — not a control surface |
-| `bridge/remote-server.mjs` WS :4174 | Project sync host/remote | **Extended** for `companion` role + `studio-*` relay |
-| Desktop Control Surface (channels) | Patch-exposed sliders | Complementary; Studio layouts are freer |
-| Ultimate `shared/companion/*` (checkpoint) | Camera/WebRTC/sensors | Reference only — not reintroduced as competing stack |
-| ART Intercom / profile-sync | PeerJS media + QR | Camera path; Studio uses WS first |
+## Bindings réellement câblés
 
-## Architecture
+- Action / ping.
+- Stage : GO / Prev / Next.
+- Channel.
+- OSC.
+- Serial.
+- MIDI.
+- Caméra.
+- Transport vidéo : play / pause / stop / toggle.
 
-```
-shared/companion-studio/
-  schema.js       .nodecompanion (nvd.companion v1)
-  protocol.js     studio-hello/action/feedback/layout/ping
-  transport.js    USB→LAN→WebRTC→WS abstraction
-  transport-ws.js WS impl (LAN / localhost)
-  store.js        localStorage + export
-  bindings.js     Action/Binding apply on host
-  widgets.js      catalog (P0 button/momentary + P1 list)
-  detect.js       desktop detect preferences
-studio/           Companion Studio UI (Édition / Test / Plateau)
-```
+Les actions externes passent par les transports réels du desktop. Une absence de transport produit une erreur explicite.
 
-## Run
+## Monitor
+
+Le Monitor WS privilégie la fiabilité et l’absence de dépendance supplémentaire. Il ne doit pas être présenté comme « zéro milliseconde ».
+
+Le Studio affiche le RTT du transport ; la recette terrain doit vérifier la latence sur le Wi‑Fi réellement utilisé au spectacle.
+
+Une optimisation WebRTC DataChannel / MediaStream pourra remplacer ou compléter ce flux plus tard sans modifier le schéma Companion.
+
+## Démarrage
 
 ```bash
-npm run remote:bridge          # WS :4174
-npm run serve:companion        # Camera / + Studio at /studio/
-# Desktop with host: open desktop/?companionHost=1 (or Electron)
-# Phone: http://<lan>:4177/studio/ → Connect ws://<lan>:4174
+npm start
+npm run serve:companion
 ```
 
-## What works (proven in tests / local code)
+Electron démarre déjà son pont hôte sur le port 4174. Le Studio est servi sur :
 
-- Schema validate/export/local save-load
-- Seed layout with GO + PING buttons
-- Bidirectional ping binding → feedback with measured rttMs (≥0, not invented absent)
-- USB/WebRTC transports report PLATFORM-LIMITED honestly
-- Detect banner actions (Open Studio / Sync / Monitor / Controller / Ignore)
-- Bridge relays studio messages host ↔ companion
+```
+http://<IP-DU-MAC>:4177/studio/
+```
 
-## Not Done / PLATFORM-LIMITED
+Sur le téléphone, renseigner le pont :
 
-- Physical Mac↔phone button field proof
-- Live layout sync Desktop↔device editor (Sync sends layout; full live edit sync P1)
-- Use as Monitor (P2)
-- USB WebUSB, WebRTC datachannel Studio
-- Full widget set editing (fader/XY/VU/…) — catalog listed, UI P0 = buttons
-- Multi-companion roles / Drive compare
-- Measured LAN RTT on real Wi-Fi (protocol ready; hardware proof pending)
+```
+ws://<IP-DU-MAC>:4174
+```
 
-Do **not** claim Companion Studio product Done until hardware scenarios 1–2 pass.
+## Remote Camera
+
+Remote Camera reste un chemin PeerJS séparé du contrôle Companion. Cela évite de mélanger le flux caméra téléphone → Mac avec la surface de commandes.
+
+## Limites terrain
+
+À valider physiquement :
+- RTT LAN sur le routeur de régie ;
+- stabilité Monitor pendant une conduite longue ;
+- comportements après perte/récupération Wi‑Fi ;
+- bindings MIDI / Serial / OSC avec les vrais périphériques ;
+- Remote Camera sur le téléphone réellement utilisé.
+
+USB Companion et WebRTC Studio restent des optimisations de transport, pas des prérequis au fonctionnement LAN actuel.
