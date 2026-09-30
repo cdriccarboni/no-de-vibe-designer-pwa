@@ -88,6 +88,13 @@ export function normalizeWidget(w = {}) {
       nodeId: w.binding?.nodeId || null,
       param: w.binding?.param || null,
       oscAddress: w.binding?.oscAddress || null,
+      oscHost: w.binding?.oscHost || "127.0.0.1",
+      oscPort: Number(w.binding?.oscPort) || 9000,
+      midiOutputId: w.binding?.midiOutputId || null,
+      midiData: Array.isArray(w.binding?.midiData) ? w.binding.midiData.slice(0, 3).map(Number) : null,
+      serialText: w.binding?.serialText || null,
+      cameraAction: w.binding?.cameraAction || null,
+      videoAction: w.binding?.videoAction || null,
       valueOn: w.binding?.valueOn ?? true,
       valueOff: w.binding?.valueOff ?? false,
       momentary: !!w.binding?.momentary
