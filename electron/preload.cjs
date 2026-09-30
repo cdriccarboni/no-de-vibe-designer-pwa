@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld("nvdDesktop", {
   async sendArtNetUdp(message) {
     return ipcRenderer.invoke("nvd:artnet-udp", message);
   },
+  async sendSacnUdp(message) {
+    return ipcRenderer.invoke("nvd:sacn-udp", message);
+  },
   async getHostCard() {
     return ipcRenderer.invoke("nvd:host-card");
   },
