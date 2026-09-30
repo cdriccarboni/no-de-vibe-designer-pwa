@@ -1,6 +1,8 @@
 import { APP_NAME, APP_VERSION } from "./version.js";
 import { isExecutable } from "./ports.js";
 import { validateEdge } from "./graph-engine.js";
+import { deterministicVibePlan } from "./vibe-planner.js";
+import { secureVibePlan } from "./vibe-safety.js";
 import { buildLocalAiPrompt, directOllamaChat, directOllamaProbe, normalizeLocalAiConfig, sanitizeLocalAiResponse, selectLocalModel } from "./local-ai-core.js";
 
 /**
@@ -62,167 +64,7 @@ function norm(text) {
  * Parse local déterministe → ops IR.
  */
 export function localVibeParse(text, project) {
-  const t = norm(text);
-  const ops = [];
-  const has = (type) => project.nodes.some(n => n.type === type);
-
-  const backCam = t.includes("camera arriere") || t.includes("camera back");
-  const frontCam = t.includes("camera avant") || t.includes("camera front");
-  if (backCam && !has("phone-camera-back")) {
-    ops.push({ op: "addNode", type: "phone-camera-back", x: 40, y: 60 });
-  } else if (frontCam && !has("phone-camera-front")) {
-    ops.push({ op: "addNode", type: "phone-camera-front", x: 40, y: 60 });
-  } else if ((t.includes("camera") || t.includes("webcam") || /\bvideo\b/.test(t)) && !has("camera")) {
-    ops.push({ op: "addNode", type: "camera", x: 40, y: 60 });
-  }
-  if ((t.includes("gyro") || t.includes("gyroscope")) && !has("gyro")) {
-    ops.push({ op: "addNode", type: "gyro", x: 40, y: 320 });
-  }
-  if ((/\bnombre\b/.test(t) || t.includes("number")) && !has("number")) {
-    ops.push({ op: "addNode", type: "number", x: 40, y: 40 });
-  }
-  if ((t.includes("multipl") || t.includes("fois")) && !has("multiply")) {
-    ops.push({ op: "addNode", type: "multiply", x: 260, y: 40 });
-  }
-  if ((t.includes("addition") || t.includes("additionne")) && !has("add")) {
-    ops.push({ op: "addNode", type: "add", x: 260, y: 160 });
-  }
-  if (t.includes("lissage") && !has("smooth")) {
-    ops.push({ op: "addNode", type: "smooth", x: 480, y: 40 });
-  }
-  if ((t.includes("compar") || t.includes("compare")) && !has("compare")) {
-    ops.push({ op: "addNode", type: "compare", x: 480, y: 160 });
-  }
-  if ((t.includes("trou noir") || t.includes("blackhole")) && !has("blackhole")) {
-    ops.push({ op: "addNode", type: "blackhole", x: 40, y: 200 });
-  }
-  if ((t.includes("addition") || t.includes("additionne")) && !has("add")) {
-    ops.push({ op: "addNode", type: "add", x: 260, y: 160 });
-  }
-  if (t.includes("lissage") && !has("smooth")) {
-    ops.push({ op: "addNode", type: "smooth", x: 480, y: 40 });
-  }
-  if ((t.includes("compar") || t.includes("plus grand")) && !has("compare")) {
-    ops.push({ op: "addNode", type: "compare", x: 480, y: 160 });
-  }
-  if ((t.includes("trou noir") || t.includes("blackhole")) && !has("blackhole")) {
-    ops.push({ op: "addNode", type: "blackhole", x: 40, y: 200 });
-  }
-  if ((t.includes("shader") || t.includes("glsl")) && !has("shader")) {
-    ops.push({ op: "addNode", type: "shader", x: 280, y: 120 });
-  }
-  if (t.includes("midi") && !has("midi")) {
-    ops.push({ op: "addNode", type: "midi", x: 40, y: 220 });
-  }
-  if (/\bosc\b/.test(t) && !has("osc")) {
-    ops.push({ op: "addNode", type: "osc", x: 280, y: 220 });
-  }
-  if ((t.includes("tracking") || t.includes("point")) && !has("tracking")) {
-    ops.push({ op: "addNode", type: "tracking", x: 500, y: 60 });
-  }
-
-  // Intentions créatives locales : résultat rapide, nodes standards, aucun code opaque.
-  const wantsWhale = t.includes("baleine") || t.includes("whale");
-  const wantsBlob = /\bblob\b/.test(t) || t.includes("metaball") || t.includes("forme organique");
-  const wantsGhost = t.includes("fantom") || /\bghost\b/.test(t) || t.includes("trainee") || t.includes("traînee") || t.includes("trail");
-  const wantsThreshold = t.includes("threshold") || t.includes("seuil") || t.includes("silhouette") || t.includes("supprime le fond") || t.includes("enleve le fond");
-  const wantsMirror = t.includes("miroir") || /\bmirror\b/.test(t);
-  const wantsClone = t.includes("dedouble") || t.includes("dédouble") || t.includes("double-moi") || t.includes("clone") || t.includes("body clone");
-
-  if (wantsWhale && !has("whale")) {
-    if (!has("pointer")) ops.push({ op: "addNode", type: "pointer", x: 40, y: 60 });
-    ops.push({ op: "addNode", type: "whale", x: 310, y: 80 });
-  }
-  if (wantsBlob && !has("blob")) {
-    ops.push({ op: "addNode", type: "blob", x: 330, y: 220 });
-  }
-
-  const sourcePreference = () => {
-    for (const type of ["transform", "whale", "blob", "videofile", "camera", "phone-camera-back", "phone-camera-front"]) {
-      if (has(type) || ops.some(o => o.op === "addNode" && o.type === type)) return type;
-    }
-    return null;
-  };
-
-  if (wantsGhost && !has("ghost")) {
-    const src = sourcePreference();
-    ops.push({ op: "addNode", type: "ghost", x: 620, y: 110 });
-    if (src) ops.push({ op: "connect", fromType: src, fromPort: src === "transform" ? 3 : (src === "whale" || src === "blob" ? 3 : 0), toType: "ghost", toPort: 0 });
-  }
-  if (wantsThreshold && !has("threshold")) {
-    let src = sourcePreference();
-    if (!src && (t.includes("moi") || t.includes("personne") || t.includes("corps"))) {
-      ops.push({ op: "addNode", type: "camera", x: 40, y: 80 });
-      src = "camera";
-    }
-    ops.push({ op: "addNode", type: "threshold", x: 590, y: 180 });
-    if (src) ops.push({ op: "connect", fromType: src, fromPort: src === "transform" ? 3 : (src === "whale" || src === "blob" ? 3 : 0), toType: "threshold", toPort: 0 });
-  }
-  if (wantsMirror && !has("mirror")) {
-    const src = sourcePreference();
-    ops.push({ op: "addNode", type: "mirror", x: 620, y: 260 });
-    if (src) ops.push({ op: "connect", fromType: src, fromPort: src === "transform" ? 3 : (src === "whale" || src === "blob" ? 3 : 0), toType: "mirror", toPort: 0 });
-  }
-  if (wantsClone && !has("bodyclone")) {
-    let src = sourcePreference();
-    if (!src || (!["camera","phone-camera-back","phone-camera-front","videofile"].includes(src) && (t.includes("moi") || t.includes("corps") || t.includes("personne")))) {
-      if (!has("camera")) ops.push({ op: "addNode", type: "camera", x: 40, y: 80 });
-      src = "camera";
-    }
-    ops.push({ op: "addNode", type: "bodyclone", x: 600, y: 330 });
-    if (src) ops.push({ op: "connect", fromType: src, fromPort: 0, toType: "bodyclone", toPort: 0 });
-  }
-
-  if ((t.includes("plus lent") || t.includes("ralenti")) && has("whale")) {
-    ops.push({ op: "setParam", type: "whale", key: "motionSpeed", value: 0.55 });
-  }
-  if ((t.includes("plus vite") || t.includes("accelere") || t.includes("accélère")) && has("whale")) {
-    ops.push({ op: "setParam", type: "whale", key: "motionSpeed", value: 1.55 });
-  }
-  if ((t.includes("gross") || t.includes("plus grande")) && has("whale")) {
-    ops.push({ op: "setParam", type: "whale", key: "scale", value: 1.35 });
-  }
-  if ((t.includes("respir") || t.includes("vivant")) && has("whale")) {
-    ops.push({ op: "setParam", type: "whale", key: "breathe", value: 0.065 });
-  }
-  if ((t.includes("trainee") || t.includes("traînee") || t.includes("trail")) && has("whale")) {
-    ops.push({ op: "setParam", type: "whale", key: "trail", value: 0.42 });
-  }
-
-  const willHaveCam = has("camera") || ops.some(o => o.type === "camera");
-  const willHaveShader = has("shader") || ops.some(o => o.type === "shader");
-  const willHaveMidi = has("midi") || ops.some(o => o.type === "midi");
-  const willHaveOsc = has("osc") || ops.some(o => o.type === "osc");
-
-  if (willHaveCam && willHaveShader) {
-    ops.push({ op: "connect", fromType: "camera", fromPort: 0, toType: "shader", toPort: 0 });
-  }
-  if (willHaveMidi && willHaveShader) {
-    ops.push({ op: "connect", fromType: "midi", fromPort: 1, toType: "shader", toPort: 1 });
-  }
-  if (willHaveMidi && willHaveOsc) {
-    ops.push({ op: "connect", fromType: "midi", fromPort: 1, toType: "osc", toPort: 2 });
-  }
-  const willHaveNumber = has("number") || ops.some(o => o.type === "number");
-  const willHaveMul = has("multiply") || ops.some(o => o.type === "multiply");
-  if (willHaveNumber && willHaveMul) {
-    ops.push({ op: "connect", fromType: "number", fromPort: 0, toType: "multiply", toPort: 0 });
-  }
-
-  if (t.includes("5 seconde") || t.includes("5s") || t.includes("5 sec")) {
-    ops.push({ op: "addClip", track: 1, start: 12, duration: 5, label: "Anim points", kind: "points" });
-  }
-  if (t.includes("top") || t.includes("cue")) {
-    ops.push({ op: "addClip", track: 4, start: 10, duration: 1.5, label: "Top", kind: "cue" });
-  }
-
-  if ((t.includes("demo") || t.includes("chaine") || t.includes("patch video")) && !ops.some(o => o.op === "addNode")) {
-    if (!has("camera")) ops.push({ op: "addNode", type: "camera", x: 40, y: 60 });
-    if (!has("shader")) ops.push({ op: "addNode", type: "shader", x: 280, y: 120 });
-    ops.push({ op: "connect", fromType: "camera", fromPort: 0, toType: "shader", toPort: 0 });
-  }
-
-  return { engine: "local-rules", ops, note: "Moteur local déterministe (règles)." };
+  return deterministicVibePlan(text, project);
 }
 
 function buildVibePrompt(text, project) {
@@ -345,55 +187,64 @@ export async function probeLocalAi(cfg = readAiConfig(), { fresh = false } = {})
   }
 }
 
+function finalizeVibeResult(result, project, source = result?.engine || "unknown") {
+  const secured = secureVibePlan(project, result?.ops || [], { source });
+  const securityNotes = [
+    ...(secured.security?.rewrites || []),
+    ...(secured.security?.dropped || []).map(x => `Refusé : ${x}`)
+  ];
+  return {
+    ...result,
+    ok: secured.ops.length > 0,
+    ops: secured.ops,
+    security: secured.security,
+    note: [result?.note, securityNotes.length ? `Safety Engine · ${securityNotes.length} correction(s)` : "Safety Engine · OK"].filter(Boolean).join(" · ")
+  };
+}
+
 export async function runVibe(text, project, { forceLocal = false } = {}) {
   const cfg = readAiConfig();
-  let localAiError = "";
+  const localGenerativeEnabled = cfg.localEnabled !== false;
 
-  if (!forceLocal && cfg.localEnabled !== false) {
+  if (!forceLocal && localGenerativeEnabled) {
     const localAi = await callLocalAi(text, project, cfg);
-    if (localAi.ok) return localAi;
-    localAiError = localAi.error || "Local AI Core indisponible";
+    if (localAi.ok) return finalizeVibeResult(localAi, project, "local-ai");
+
+    if (cfg.enabled === true && cfg.endpoint) {
+      const remote = await callRemoteAi(text, project, cfg);
+      if (remote.ok) {
+        return finalizeVibeResult({ ...remote, localAiError: localAi.error }, project, "remote-ai");
+      }
+    }
+
+    const rules = localVibeParse(text, project);
+    return finalizeVibeResult({
+      ok: rules.ops.length > 0,
+      engine: "local-planner-fallback",
+      ops: rules.ops,
+      summary: rules.note,
+      planner: rules.diagnostics,
+      aiError: localAi.error,
+      note: `IA locale indisponible — ${localAi.error} · repli Planner déterministe`,
+      aiUnavailable: true
+    }, project, "local-planner-fallback");
   }
 
-  // Zero-latency offline fallback: useful even if Ollama is stopped.
-  const rules = localVibeParse(text, project);
-  if (rules.ops.length > 0) {
-    return {
-      ok:true,
-      engine:"local-rules",
-      ops:rules.ops,
-      summary:rules.note,
-      aiError:localAiError || undefined,
-      note:localAiError
-        ? "Local AI indisponible · repli règles offline"
-        : "Moteur de règles offline"
-    };
-  }
-
-  // Cloud is never automatic: it requires enabled === true AND an explicit endpoint.
   if (!forceLocal && cfg.enabled === true && cfg.endpoint) {
     const remote = await callRemoteAi(text, project, cfg);
-    if (remote.ok) return { ...remote, engine:"cloud-ai", localAiError:localAiError || undefined };
-    return {
-      ok:false,
-      engine:"none",
-      ops:[],
-      aiError:[localAiError, remote.error].filter(Boolean).join(" · "),
-      note:"Local AI, règles et fallback cloud n'ont rien produit",
-      aiUnavailable:true
-    };
+    if (remote.ok) return finalizeVibeResult(remote, project, "remote-ai");
   }
 
-  return {
-    ok:false,
-    engine:"none",
-    ops:[],
-    aiError:localAiError || undefined,
-    note:localAiError
-      ? "Local AI indisponible et aucune règle locale correspondante"
-      : "Aucune opération locale trouvée",
-    aiUnavailable:true
-  };
+  const local = localVibeParse(text, project);
+  return finalizeVibeResult({
+    ok: local.ops.length > 0,
+    engine: "local-planner",
+    ops: local.ops,
+    summary: local.note,
+    planner: local.diagnostics,
+    note: "Planner local déterministe.",
+    aiUnavailable: true
+  }, project, "local-planner");
 }
 
 const AI_PROTECTED_EXTERNAL_TYPES = new Set(["arduino","esp","servo","dmx","osc","twozero","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
@@ -402,11 +253,15 @@ const ALLOWED_TYPES = new Set(["camera", "pointer", "whale", "blob", "threshold"
 
 export function applyVibeOps(project, ops, helpers) {
   const { addNode, addClip, ensureEdges, nodeById } = helpers;
-  const errors = [];
+  const secured = secureVibePlan(project, ops || [], { source: "apply", maxOps: 64, maxNewNodes: 16 });
+  const errors = [
+    ...(secured.security?.dropped || []).map(x => `Safety Engine · ${x}`),
+    ...(secured.security?.rewrites || []).map(x => `Safety Engine · ${x}`)
+  ];
   const applied = [];
   const findByType = (type) => project.nodes.filter(n => n.type === type);
 
-  for (const op of ops || []) {
+  for (const op of secured.ops) {
     try {
       if (op.op === "addNode") {
         if (!ALLOWED_TYPES.has(op.type) && !isExecutable(op.type)) {
