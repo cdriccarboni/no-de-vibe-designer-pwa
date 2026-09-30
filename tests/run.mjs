@@ -471,6 +471,55 @@ for (const type of ["anaglyph", "creativefx", "storm", "bending", "transmute"]) 
   assert(out.get(2)?.pixels?.length === 16 * 16 * 4, `${type} raster processor`);
 }
 
+function numOutForTest(value) { return { kind: "number", value }; }\n\nconsole.log("stage-control-1.2");
+for (const type of ["surface","inputmapper","arduino","esp","servo","rfid","sensors","twozero","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider","automation","datalab","universal","connectors"]) {
+  assert(isExecutable(type), `${type} is executable`);
+}
+const surfaceValue = { kind: "number", value: 0.42 };
+const surfaceOut = logicFns.get("surface")({ id: "surface", params: {} }, new Map([[0, { value: surfaceValue }]]), {});
+assert(surfaceOut.get(2) === surfaceValue && surfaceOut.get(1)?.value === "CONTROL READY", "surface pass-through");
+const mapperOut = logicFns.get("inputmapper")({ id: "map-num", params: { inMin: 0, inMax: 10, outMin: -1, outMax: 1 } }, new Map([[0, { value: numOutForTest(5) }]]), {});
+assert(Math.abs(mapperOut.get(3)?.value) < 0.0001, "input mapper midpoint");
+
+const serialSent = [];
+const serialCtx = {
+  deviceBus: { serialState: "online", lastSerial: "RFID:ABC123" },
+  serialSend: text => { serialSent.push(text); return Promise.resolve(); },
+  warnings: [], nodeState: new Map()
+};
+logicFns.get("arduino")({ id: "ard", params: { command: "LED 1" } }, new Map(), serialCtx);
+assert(serialSent.length === 0, "arduino never auto-sends by default");
+logicFns.get("arduino")({ id: "ard", params: { command: "LED 1" } }, new Map([[1, { value: { kind: "trigger", value: 1 } }]]), serialCtx);
+assert(serialSent[0] === "LED 1", "arduino sends on trigger");
+logicFns.get("servo")({ id: "srv", params: { channel: 1, angle: 45, speed: 2 } }, new Map([[3, { value: { kind: "trigger", value: 1 } }]]), serialCtx);
+assert(serialSent.some(x => /SERVO 1 45 2/.test(x)), "servo sends explicit triggered command");
+const rfidOut = logicFns.get("rfid")({ id: "rf", params: { prefix: "RFID:" } }, new Map(), serialCtx);
+assert(rfidOut.get(0)?.value === "ABC123" && rfidOut.get(1)?.value === true, "rfid parses serial tag");
+
+const sensorCtx = { sensorBus: { get: key => key === "gyro" ? { available: true, value: { alpha: 12, beta: 2 } } : null } };
+const sensorOut = logicFns.get("sensors")({ id: "sensor", params: { sensor: "gyro" } }, new Map(), sensorCtx);
+assert(sensorOut.get(1)?.value === 12 && sensorOut.get(2)?.value === "LIVE", "generic sensor reads first numeric value");
+
+const oscSent = [];
+const bridgeCtx = {
+  oscUdpSend: msg => { oscSent.push(msg); return Promise.resolve(); },
+  warnings: [], nodeState: new Map()
+};
+logicFns.get("millumin")(
+  { id: "mill", title: "Millumin", params: { host: "127.0.0.1", port: 5000, address: "/test" } },
+  new Map([[0, { value: numOutForTest(0.7) }], [1, { value: { kind: "trigger", value: 1 } }]]),
+  bridgeCtx
+);
+assert(oscSent.length === 1 && oscSent[0].port === 5000 && oscSent[0].address === "/test", "bridge sends only on trigger");
+
+const autoOut = logicFns.get("automation")({ id: "auto", params: { speed: 1, phase: 0, shape: "sine" } }, new Map(), { time: 0.25 });
+assert(autoOut.get(2)?.value > 0.99, "automation sine output");
+const dataOut = logicFns.get("datalab")({ id: "data", params: { scale: 2, bias: 1 } }, new Map([[0, { value: numOutForTest(3) }]]), {});
+assert(dataOut.get(2)?.value === 7, "data lab scale+bias");
+const uniValue = { kind: "text", value: "go" };
+assert(logicFns.get("universal")({ id: "u", params: {} }, new Map([[0, { value: uniValue }]]), {}).get(1) === uniValue, "universal preserves value");
+assert(logicFns.get("connectors")({ id: "c", params: {} }, new Map([[0, { value: uniValue }]]), {}).get(2) === uniValue, "connectors preserve value");
+
 console.log("wrap-box-ports");
 const wrapGraph = {
   nodes: [
