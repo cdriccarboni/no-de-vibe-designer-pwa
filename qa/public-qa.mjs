@@ -83,3 +83,5 @@ assert(lightPage?.widgets.filter(w => w.type === "fader").length >= 4, "Lumière
 assert(lightPage?.widgets.some(w => w.binding?.kind === "sacn" && w.binding?.universe === 1), "Lumière preset has real sACN binding");
 
 console.log("PUBLIC QA OK");
+
+// QA trigger 1.3.0
