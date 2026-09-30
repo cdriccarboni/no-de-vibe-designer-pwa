@@ -210,3 +210,20 @@ https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/down
 ### CI canonique
 
 Les workflows automatiques du dépôt privé sont désormais manuels car GitHub n'y attribue actuellement aucun runner (jobs à 0 étape). La validation automatisée réelle et la distribution sont exécutées sur le dépôt public, sans exposer le source privé.
+
+## Publication finale 1.4.0
+
+État vérifié après publication :
+- PWA publique servie : `1.4.0`.
+- GitHub Pages : **SUCCESS**.
+- Runtime QA public : **SUCCESS**.
+- GitHub Release : `v1.4.0`.
+- APK Capacitor Android : `No-de-Vibe-Designer-1.4.0-Android-debug.apk` — SHA-256 `4da73cf55fd32a955b6ef5e57c7bdcbffad7d6820eef7169164279066be2d0d8`.
+- macOS ARM64 : `No-de-Vibe-Designer-1.4.0-macOS-arm64.zip` — SHA-256 `1e4734b55b4034ea87093b5c41397e8526f5c565bd55542ace0dd883f1de8088`.
+- AAB de contrôle généré : non signé pour Play.
+- Signature / publication Google Play : non exécutée car les secrets Play ne sont pas configurés.
+
+Liens stables :
+- PWA : https://cdriccarboni.github.io/no-de-vibe-designer-pwa/
+- Téléchargements : https://cdriccarboni.github.io/no-de-vibe-designer-pwa/downloads/
+- Release : https://github.com/cdriccarboni/no-de-vibe-designer-pwa/releases/tag/v1.4.0

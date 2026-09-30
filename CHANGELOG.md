@@ -11,7 +11,10 @@
 - Compilation/validation avant application, raccourci Ctrl/Cmd+Entrée, reset vers le shader par défaut et cache des programmes WebGL par source.
 
 ### Distribution
-- Version source, Desktop et Android alignée en 1.4.0 ; préparation de la publication publique PWA/Android/macOS consolidée.
+- Version source, Desktop et Android alignée en 1.4.0.
+- PWA 1.4.0 publiée et QA publique verte.
+- Release `v1.4.0` publiée avec APK Android, build macOS ARM64, AAB de contrôle et checksums.
+- Google Play reste le seul jalon externe : signature et publication sautées tant que les secrets Play ne sont pas configurés.
 
 
 ## 1.3.6 — 2026-09-30

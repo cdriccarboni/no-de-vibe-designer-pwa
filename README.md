@@ -58,6 +58,9 @@ npm run android:aab
 APK de test courant :
 https://cdriccarboni.github.io/no-de-vibe-designer-pwa/downloads/
 
+Release 1.4.0 :
+https://github.com/cdriccarboni/no-de-vibe-designer-pwa/releases/tag/v1.4.0
+
 Rapport package/version/signature :
 https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/android-verification.txt
 
