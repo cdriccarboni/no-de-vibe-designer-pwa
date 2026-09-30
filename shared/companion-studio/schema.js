@@ -53,6 +53,8 @@ export function validateCompanionDocument(raw) {
   for (const page of doc.pages) {
     page.id ||= `page-${Math.random().toString(36).slice(2, 7)}`;
     page.name ||= "Page";
+    page.role ||= "custom";
+    page.icon ||= "";
     page.cols = Math.max(1, Number(page.cols) || 4);
     page.rows = Math.max(1, Number(page.rows) || 6);
     page.widgets = Array.isArray(page.widgets) ? page.widgets.map(normalizeWidget) : [];
@@ -90,6 +92,15 @@ export function normalizeWidget(w = {}) {
       oscAddress: w.binding?.oscAddress || null,
       oscHost: w.binding?.oscHost || "127.0.0.1",
       oscPort: Number(w.binding?.oscPort) || 9000,
+      artnetHost: w.binding?.artnetHost || "255.255.255.255",
+      artnetPort: Number(w.binding?.artnetPort) || 6454,
+      sacnHost: w.binding?.sacnHost || "",
+      sacnPort: Number(w.binding?.sacnPort) || 5568,
+      universe: Math.max(0, Number(w.binding?.universe) || 0),
+      channel: Math.max(1, Math.min(512, Number(w.binding?.channel) || 1)),
+      priority: Math.max(0, Math.min(200, Number(w.binding?.priority) || 100)),
+      profileId: w.binding?.profileId || null,
+      profileName: w.binding?.profileName || null,
       midiOutputId: w.binding?.midiOutputId || null,
       midiData: Array.isArray(w.binding?.midiData) ? w.binding.midiData.slice(0, 3).map(Number) : null,
       serialText: w.binding?.serialText || null,
