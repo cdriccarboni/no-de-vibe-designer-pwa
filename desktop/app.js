@@ -39,6 +39,8 @@ import { STUDIO_MSG } from "../shared/companion-studio/protocol.js";
 import { applyCompanionBinding, findWidget } from "../shared/companion-studio/bindings.js";
 import { loadCompanionLayout, ensureCompanionLayout } from "../shared/companion-studio/store.js";
 import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref } from "../shared/companion-studio/detect.js";
+import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT } from "../shared/graphics/sketch-engine.js";
+import { applyShowManifest, showManifestSummary } from "../shared/show-importer.js";
 
 const $ = s => document.querySelector(s);
 const qall = s => [...document.querySelectorAll(s)];
@@ -110,7 +112,7 @@ ensureRouting(project);
 
 /** Catalogue UI — mêmes groupes ; marque visuelle des nodes exécutables. */
 const LIB = NODE_GROUPS.map(([title, items]) => [title, items]);
-const OSC_BRIDGE_TYPES = new Set(["twozero","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
+const OSC_BRIDGE_TYPES = new Set(["twozero","td","isadora","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
 const SERIAL_NODE_TYPES = new Set(["arduino","esp","servo","rfid"]);
 let showExperimental = localStorage.getItem("nvd.showExperimental") === "1";
 
@@ -557,6 +559,28 @@ function selectNode(id, { additive = false } = {}) {
   }
   if (n.type === "surface") extra += `<p class="hint">Passage de valeur vers le Control Surface. Expose ensuite les paramètres utiles depuis l'inspecteur des nodes concernés.</p>`;
   if (n.type === "connectors") extra += `<p class="hint">Lien local typé pour organiser le patch sans conversion de valeur.</p>`;
+  if (n.type === "p5" || n.type === "sketch") {
+    const isP5 = n.type === "p5";
+    const script = n.params.script || (isP5 ? DEFAULT_P5_SCRIPT : DEFAULT_SKETCH_SCRIPT);
+    extra += `<div class="field"><label>Seed</label><input id="nGenSeed" type="number" step="1" value="${n.params.seed ?? 1}"></div>`;
+    extra += `<div class="field"><label>Énergie</label><input id="nGenEnergy" type="range" min="0" max="1" step=".01" value="${n.params.energy ?? .6}"></div>`;
+    extra += `<div class="field"><label>Script offline</label><textarea id="nSketchScript" rows="8" spellcheck="false">${script.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</textarea></div>`;
+    extra += `<div class="camera-actions"><button id="resetSketchScript" type="button">Preset par défaut</button></div>`;
+    extra += `<p class="hint">Sous-ensemble offline sûr : background(), fill(), circle(), rect(), line(), wave(). Variables : width, height, time, frameCount, mouseX, mouseY. Pas de JavaScript arbitraire.</p>`;
+  }
+  if (n.type === "dream") {
+    extra += `<div class="field"><label>Seed</label><input id="nGenSeed" type="number" step="1" value="${n.params.seed ?? 1}"></div>`;
+    extra += `<div class="field"><label>Intensité</label><input id="nDreamIntensity" type="range" min="0" max="1" step=".01" value="${n.params.intensity ?? .72}"></div>`;
+    extra += `<p class="hint">Moteur visuel génératif local, déterministe par seed, sans réseau.</p>`;
+  }
+  if (n.type === "showimport") {
+    const summary = n.params.manifest ? showManifestSummary(n.params.manifest) : { ok:true, count:0, name:"" };
+    extra += `<div class="field"><label>Conduite JSON</label><input id="nShowFile" type="file" accept=".json,.cvd.json,application/json"></div>`;
+    extra += `<div class="field"><label>Mode</label><select id="nShowMode"><option value="append">Ajouter aux cues existants</option><option value="replace">Remplacer les cues existants</option></select></div>`;
+    extra += `<div class="camera-actions"><button id="applyShowImport" type="button">Importer la conduite</button></div>`;
+    extra += `<p id="showImportStatus" class="hint">${summary.ok ? `${summary.count} cue(s) prêt(s) ${summary.name ? "· "+summary.name : ""}` : "Manifest invalide · "+summary.error}</p>`;
+    extra += `<p class="hint">Formats : projet .cvd.json ou {"name":"Spectacle","cues":[{"label":"TOP","time":12.5,"actions":[]}]}.</p>`;
+  }
   if (n.type === "midi") {
     extra += `<div class="field"><label>Fallback CC (0–1)</label><input id="nFb" type="range" min="0" max="1" step=".01" value="${n.params.fallback ?? 0}"></div>`;
     extra += `<p class="hint">Matériel MIDI : à vérifier sur périphérique réel. Test logiciel = bus interne.</p>`;
@@ -688,6 +712,49 @@ function selectNode(id, { additive = false } = {}) {
   if ($("#serialReconnectBtn")) $("#serialReconnectBtn").onclick = async () => {
     try { const port = await devices.serial.reconnect(); log(port ? "SERIAL · reconnecté" : "SERIAL · aucun port autorisé"); runtime.render(); }
     catch (e) { log("SERIAL · " + (e?.message || e)); }
+  };
+  if ($("#nGenSeed")) $("#nGenSeed").onchange = e => { n.params.seed = +e.target.value || 1; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nGenEnergy")) $("#nGenEnergy").oninput = e => { n.params.energy = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nDreamIntensity")) $("#nDreamIntensity").oninput = e => { n.params.intensity = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nSketchScript")) $("#nSketchScript").oninput = e => { n.params.script = e.target.value; runtime.render(); autosave(); };
+  if ($("#resetSketchScript")) $("#resetSketchScript").onclick = () => {
+    n.params.script = n.type === "p5" ? DEFAULT_P5_SCRIPT : DEFAULT_SKETCH_SCRIPT;
+    renderInspector(n.id);
+    runtime.render();
+    autosave();
+    commitHistory();
+  };
+  if ($("#nShowFile")) $("#nShowFile").onchange = async e => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try {
+      n.params.manifest = await f.text();
+      n.params.manifestName = f.name;
+      const summary = showManifestSummary(n.params.manifest);
+      const status = $("#showImportStatus");
+      if (status) status.textContent = summary.ok ? `${summary.count} cue(s) prêt(s) · ${summary.name}` : `Manifest invalide · ${summary.error}`;
+      runtime.render();
+      autosave();
+      commitHistory();
+    } catch (err) {
+      log(`Show Importer · ${err?.message || err}`);
+    }
+  };
+  if ($("#applyShowImport")) $("#applyShowImport").onclick = () => {
+    if (!n.params.manifest) return log("Show Importer · choisis d’abord un JSON");
+    try {
+      const replaceCues = $("#nShowMode")?.value === "replace";
+      const { added, manifest } = applyShowManifest(project, n.params.manifest, { replaceCues });
+      n.params.lastImportCount = added.length;
+      redraw();
+      runtime.render();
+      autosave();
+      commitHistory();
+      log(`Show Importer · ${added.length} cue(s) importé(s) · ${manifest.name}`);
+      renderInspector(n.id);
+    } catch (err) {
+      log(`Show Importer ÉCHEC · ${err?.message || err}`);
+    }
   };
   if ($("#nFb")) $("#nFb").oninput = e => { n.params.fallback = +e.target.value; runtime.render(); autosave(); };
   if ($("#nFreq")) $("#nFreq").onchange = e => { n.params.freq = +e.target.value; runtime.render(); autosave(); commitHistory(); };
