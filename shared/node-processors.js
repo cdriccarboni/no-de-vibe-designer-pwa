@@ -11,6 +11,8 @@ import { renderWhale } from "./graphics/whale.js";
 import { renderBlob } from "./graphics/blob.js";
 import { ndiStatusMessage } from "./remote-camera/ndi.js";
 import { anaglyphFrame, bendFrame, creativeFxFrame, stormFrame, transmuteFrame } from "./graphics/stage-fx.js";
+import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT, renderDream, renderSketch } from "./graphics/sketch-engine.js";
+import { showManifestSummary } from "./show-importer.js";
 
 function videoVal(el, opacity = 1) {
   return { kind: "video", el, opacity };
@@ -698,6 +700,61 @@ export function createNodeProcessors() {
   });
 
 
+
+  fns.set("p5", (node, inputs, ctx) => {
+    const seed = inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.seed ?? 1);
+    const energy = Math.max(0, Math.min(1, inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.energy ?? 0.65)));
+    const frame = renderSketch({
+      width: Math.min(Number(ctx.width) || 640, Number(node.params?.renderWidth ?? 640)),
+      height: Math.min(Number(ctx.height) || 360, Number(node.params?.renderHeight ?? 360)),
+      time: (Number(ctx.time) || 0) * (0.35 + energy * 2),
+      pointer: ctx.pointer,
+      script: node.params?.script || DEFAULT_P5_SCRIPT,
+      seed
+    });
+    frame.source = "p5-subset";
+    return new Map([[2, frame]]);
+  });
+
+  fns.set("sketch", (node, inputs, ctx) => {
+    const seed = inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.seed ?? 1);
+    const energy = Math.max(0, Math.min(1, inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.energy ?? 0.5)));
+    const frame = renderSketch({
+      width: Math.min(Number(ctx.width) || 640, Number(node.params?.renderWidth ?? 640)),
+      height: Math.min(Number(ctx.height) || 360, Number(node.params?.renderHeight ?? 360)),
+      time: (Number(ctx.time) || 0) * (0.4 + energy * 1.8),
+      pointer: ctx.pointer,
+      script: node.params?.script || DEFAULT_SKETCH_SCRIPT,
+      seed
+    });
+    frame.source = "sketch";
+    return new Map([[2, frame]]);
+  });
+
+  fns.set("dream", (node, inputs, ctx) => {
+    const seed = inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.seed ?? 1);
+    const intensity = Math.max(0, Math.min(1, inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.intensity ?? 0.72)));
+    const frame = renderDream({
+      width: Math.min(Number(ctx.width) || 640, Number(node.params?.renderWidth ?? 640)),
+      height: Math.min(Number(ctx.height) || 360, Number(node.params?.renderHeight ?? 360)),
+      time: Number(ctx.time) || 0,
+      pointer: ctx.pointer,
+      seed,
+      intensity
+    });
+    return new Map([[2, frame]]);
+  });
+
+  fns.set("showimport", (node, inputs) => {
+    const raw = readText(inputs.get(0), node.params?.manifest || "");
+    if (!raw) return new Map([[1, numOut(0)], [2, textOut("NO MANIFEST")]]);
+    const summary = showManifestSummary(raw);
+    return new Map([
+      [1, numOut(summary.count || 0)],
+      [2, textOut(summary.ok ? `READY · ${summary.count} cue(s)` : `ERROR · ${summary.error || "manifest invalide"}`)]
+    ]);
+  });
+
   fns.set("surface", (_node, inputs) => {
     const out = new Map();
     const value = inputs.get(0)?.value;
@@ -761,6 +818,8 @@ export function createNodeProcessors() {
 
   const bridgeDefaults = {
     twozero: { address: "/nvd/twozero", port: 9000 },
+    td: { address: "/nvd/td/tool", port: 9000 },
+    isadora: { address: "/nvd/isadora/tool", port: 9000 },
     chataigne: { address: "/nvd/chataigne", port: 9000 },
     millumin: { address: "/nvd/millumin", port: 5000 },
     touchdesigner: { address: "/nvd/touchdesigner", port: 9000 },
