@@ -150,7 +150,11 @@ export class AudioEngine {
       const v = Math.max(0, Math.min(1.5, Number(value) || 0));
       n.gain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.015);
     } else if (a === "pan") {
-      if (n.pan) n.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, Number(value) || 0)), this.ctx.currentTime, 0.015);
+      let v = Number(value);
+      if (!Number.isFinite(v)) v = 0;
+      // Companion faders are normalized 0..1; map them to stereo -1..1.
+      if (v >= 0 && v <= 1) v = v * 2 - 1;
+      if (n.pan) n.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, v)), this.ctx.currentTime, 0.015);
     } else if (a === "seek") {
       n.el.currentTime = Math.max(0, Math.min(Number(n.el.duration)||Infinity, Number(value)||0));
     } else if (a === "in") {
@@ -276,12 +280,18 @@ export class AudioEngine {
     try { n.osc?.stop(); } catch { /* */ }
     try { n.osc?.disconnect(); } catch { /* */ }
     try { n.mic?.disconnect(); } catch { /* */ }
+    try { n.el?.pause?.(); } catch { /* */ }
+    try { n.source?.disconnect(); } catch { /* */ }
     try { n.gain?.disconnect(); } catch { /* */ }
+    try { n.pan?.disconnect(); } catch { /* */ }
     try { n.filter?.disconnect(); } catch { /* */ }
     try { n.delay?.disconnect(); } catch { /* */ }
     try { n.feedback?.disconnect(); } catch { /* */ }
     try { n.analyser?.disconnect(); } catch { /* */ }
     if (n.stream) n.stream.getTracks().forEach(t => t.stop());
+    if (n.objectUrl) {
+      try { URL.revokeObjectURL(n.objectUrl); } catch { /* */ }
+    }
     this.nodes.delete(nodeId);
   }
 
