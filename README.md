@@ -1,7 +1,7 @@
 # No-de Vibe Designer
 
-**Source canonique : `main` @ 1.1.0** (`3bf92ff` / PR #5).  
-Work **2.2** : `cursor/no-de-2.2-reprise-20260929` — package stays **1.1.0** until DoD.  
+**Source canonique : `main` · package 1.1.0 tant que la DoD 2.2 n’est pas validée.**  
+La consolidation 2.2 provient de `cursor/no-de-2.2-reprise-20260929` (PR #6).  
 Docs : `docs/V2.2_STATUS.md`, `docs/V2.2_TODO.md`, `docs/V2.2_TEST_MATRIX.md`, `docs/FANTASY.md`.  
 Recovery only : `cursor/no-de-ultimate-20260928` / checkpoints — never overwrite main.  
 Checkpoint 0.10.1 intact : `cursor/mobile-pwa-reprise-a257`.
