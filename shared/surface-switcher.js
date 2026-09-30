@@ -33,7 +33,7 @@ export function setPreferredSurface(id,storage=globalThis.localStorage){
 }
 
 export function surfaceUrl(id,{root=pwaRootUrl()}={}){
-  if(id==="auto") return new URL("./?auto=1",root).href;
+  if(id==="auto") return new URL("index.html?auto=1",root).href;
   const s=SURFACES.find(x=>x.id===id)||SURFACES[0];
   return new URL(s.path,root).href;
 }
