@@ -67,8 +67,8 @@ assert(/index\.html\?auto=1$/.test(autoFileCalls[0]), "native Auto routes throug
 const libraryTypes = new Set();
 for (const [, items] of NODE_GROUPS) for (const [, type] of items) libraryTypes.add(type);
 const executable = [...libraryTypes].filter(type => EXECUTABLE_TYPES.has(type));
-assert(libraryTypes.size === 105, `Library has 105 nodes (got ${libraryTypes.size})`);
-assert(executable.length === 105, `105/105 Library nodes are executable (got ${executable.length})`);
+assert(libraryTypes.size >= 105, `Library has at least 105 nodes (got ${libraryTypes.size})`);
+assert(executable.length === libraryTypes.size, `${executable.length}/${libraryTypes.size} Library nodes are executable`);
 
 const processors = createNodeProcessors();
 const bridgeBacked = new Set(["twozero","td","isadora","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
