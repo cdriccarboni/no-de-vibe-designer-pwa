@@ -22,6 +22,7 @@ let transport = null;
 let layoutRevision = 0;
 let monitorLastAt = 0;
 let swipeStart = null;
+let cueState = { cues:[], playheadId:null, lastCueId:null, projectName:"" };
 const clientId = `studio-${Math.random().toString(36).slice(2, 7)}`;
 const requestedSurface = new URLSearchParams(location.search).get("surface") || "";
 installSurfaceSwitcher({ current: requestedSurface === "plateau" ? "plateau" : "regie" });
@@ -34,6 +35,52 @@ function log(msg) {
 
 function escapeHtml(s) {
   return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderCueState(state = cueState) {
+  cueState = state && typeof state === "object" ? state : cueState;
+  const cues = Array.isArray(cueState.cues) ? cueState.cues : [];
+  const standby = cues.find(c => c.id === cueState.playheadId) || null;
+  const last = cues.find(c => c.id === cueState.lastCueId) || null;
+
+  if ($("cueProjectName")) $("cueProjectName").textContent = cueState.projectName || "Conduite";
+  if ($("cueStandby")) $("cueStandby").textContent = standby ? `${standby.number || ""} · ${standby.label || "Cue"}` : "Fin de conduite";
+  if ($("cueLast")) $("cueLast").textContent = last ? `${last.number || ""} · ${last.label || "Cue"}` : "—";
+
+  const list = $("cueListRemote");
+  if (!list) return;
+  list.innerHTML = cues.length ? cues.map(cue => {
+    const status = cue.status || (cue.id === cueState.playheadId ? "standby" : cue.id === cueState.lastCueId ? "last" : "idle");
+    const waits = [
+      cue.preWait > 0 ? `pre ${cue.preWait.toFixed(1)}s` : "",
+      cue.duration > 0 ? `${cue.duration.toFixed(1)}s` : "",
+      cue.continueMode && cue.continueMode !== "manual" ? cue.continueMode.replace("auto-","auto ") : ""
+    ].filter(Boolean).join(" · ");
+    return `<button type="button" class="cue-row ${escapeHtml(status)}" data-cue-id="${escapeHtml(cue.id)}">
+      <span class="num">${escapeHtml(cue.number || "")}</span>
+      <span class="name">${escapeHtml(cue.label || "Cue")}</span>
+      <span class="meta">${escapeHtml(waits)}</span>
+    </button>`;
+  }).join("") : `<div class="hint" style="padding:12px">Aucune cue dans ce spectacle.</div>`;
+
+  list.querySelectorAll("[data-cue-id]").forEach(btn => {
+    btn.onclick = () => sendCueAction("select", btn.dataset.cueId || "");
+  });
+  requestAnimationFrame(() => list.querySelector(".cue-row.standby")?.scrollIntoView({ block:"nearest", behavior:"smooth" }));
+}
+
+function sendCueAction(action, cueId = "") {
+  if (!transport || transport.state !== "CONNECTED") {
+    log("Conduite · pas de lien hôte");
+    return false;
+  }
+  try {
+    transport.send({ type: STUDIO_MSG.CUE_ACTION, action, cueId: cueId || undefined, clientId, t: Date.now() });
+    return true;
+  } catch (e) {
+    log(`Conduite · ${e?.message || e}`);
+    return false;
+  }
 }
 
 function currentPage() {
@@ -383,6 +430,10 @@ grid.addEventListener("pointerup", (e) => {
   }
 });
 
+$("cueGoRemote").onclick = () => sendCueAction("go");
+$("cuePrevRemote").onclick = () => sendCueAction("prev");
+$("cueNextRemote").onclick = () => sendCueAction("next");
+
 $("btnRegie").onclick = openRegieDialog;
 $("btnGenerateRegie").onclick = generateRegie;
 
@@ -450,6 +501,10 @@ $("btnConnect").onclick = async () => {
       clientId,
       pairCode: ($("pairCode").value || "").trim(),
       onMessage: (msg) => {
+        if (msg.type === STUDIO_MSG.CUE_STATE && msg.state) {
+          renderCueState(msg.state);
+          return;
+        }
         if (msg.type === STUDIO_MSG.LAYOUT && msg.layout) {
           try {
             doc = validateCompanionDocument(msg.layout);
@@ -557,4 +612,5 @@ try {
 setMode(requestedSurface === "plateau" ? STUDIO_MODES.PLATEAU : STUDIO_MODES.EDITION);
 renderPageNav();
 renderGrid();
+renderCueState();
 log("Companion Studio prêt · Régie universelle · swipe horizontal entre pages");
