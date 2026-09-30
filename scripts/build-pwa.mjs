@@ -14,6 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = path.join(root, "dist", "pwa");
@@ -105,8 +106,16 @@ const assets = walk(dist)
   .map((rel) => "./" + rel)
   .sort();
 
+const cacheHash = crypto.createHash("sha256");
+for (const rel of assets) {
+  const clean = rel.replace(/^\.\//, "");
+  cacheHash.update(rel);
+  cacheHash.update(fs.readFileSync(path.join(dist, clean)));
+}
+const cacheRevision = cacheHash.digest("hex").slice(0, 10);
+
 let sw = read("mobile/sw.js")
-  .replaceAll("__CACHE__", "nvd-" + version + "-multi")
+  .replaceAll("__CACHE__", "nvd-" + version + "-multi-" + cacheRevision)
   .replaceAll("__ASSETS__", JSON.stringify(assets, null, 2));
 write("sw.js", sw);
 
@@ -115,6 +124,7 @@ const stamp = {
   version,
   builtAt: new Date().toISOString(),
   files: assets.length,
+  cacheRevision,
   surfaces: ["designer", "mobile", "regie", "plateau", "camera"]
 };
 write("build-info.json", JSON.stringify(stamp, null, 2) + "\n");
