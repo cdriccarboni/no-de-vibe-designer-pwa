@@ -145,3 +145,9 @@ html.electron-macos .topbar{padding-left:84px}
 .companion-detect-actions{display:flex;flex-wrap:wrap;gap:6px}
 .companion-detect-actions button{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:7px 10px;font-size:11px;cursor:pointer}
 .companion-detect-actions button.ghost{background:transparent;color:var(--muted)}
+
+
+/* Library production mode */
+.library-mode{display:flex;align-items:center;gap:7px;padding:6px 10px;color:var(--muted,#8b949e);font-size:11px;border-bottom:1px solid rgba(255,255,255,.06)}
+.library-mode input{accent-color:var(--accent,#d7b86a)}
+.lib-item.unavailable{opacity:.58}
