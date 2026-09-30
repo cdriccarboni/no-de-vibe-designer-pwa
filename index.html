@@ -24,14 +24,14 @@ main{width:min(980px,94vw);padding:30px;border:1px solid #2a3036;border-radius:2
   <div class="tag">VIBE · PATCH · STAGE</div>
   <p id="status" class="status">Choix automatique de l’interface…</p>
   <div class="grid">
-    <a class="card" href="./desktop/?surface=designer" data-surface="designer"><b>Designer</b><span>Canvas, Library, Inspector, Timeline, Preview et Vibe complets.</span></a>
-    <a class="card" href="./mobile/?surface=mobile" data-surface="mobile"><b>Mobile</b><span>Interface compacte, capteurs, patch et conduite.</span></a>
-    <a class="card" href="./studio/?surface=regie" data-surface="regie"><b>Régie</b><span>Companion Studio · pages Son, Lumière, Vidéo, Plateau.</span></a>
-    <a class="card" href="./studio/?surface=plateau" data-surface="plateau"><b>Plateau</b><span>Companion directement en mode jeu, utilisable sur tablette ou deuxième ordinateur.</span></a>
-    <a class="card" href="./companion/?surface=camera" data-surface="camera"><b>Caméra</b><span>Remote Camera WebRTC · n’importe quel appareil avec caméra.</span></a>
+    <a class="card" href="./desktop/index.html?surface=designer" data-surface="designer"><b>Designer</b><span>Canvas, Library, Inspector, Timeline, Preview et Vibe complets.</span></a>
+    <a class="card" href="./mobile/index.html?surface=mobile" data-surface="mobile"><b>Mobile</b><span>Interface compacte, capteurs, patch et conduite.</span></a>
+    <a class="card" href="./studio/index.html?surface=regie" data-surface="regie"><b>Régie</b><span>Companion Studio · pages Son, Lumière, Vidéo, Plateau.</span></a>
+    <a class="card" href="./studio/index.html?surface=plateau" data-surface="plateau"><b>Plateau</b><span>Companion directement en mode jeu, utilisable sur tablette ou deuxième ordinateur.</span></a>
+    <a class="card" href="./companion/index.html?surface=camera" data-surface="camera"><b>Caméra</b><span>Remote Camera WebRTC · n’importe quel appareil avec caméra.</span></a>
     <a id="autoLink" class="card auto" href="./?auto=1&chooser=1"><b>Auto</b><span>Ordinateur → Designer · téléphone/tablette → Mobile. Le choix manuel reste toujours disponible.</span></a>
   </div>
-  <div class="note">Une même machine peut prendre n’importe quel rôle. Ajoute <code>?chooser=1</code> à l’URL pour afficher ce sélecteur sans redirection.</div>
+  <div class="note">Une même machine peut prendre n’importe quel rôle. Choisis simplement l’interface à ouvrir.</div>
 </main>
 <script>
 const KEY="nvd.surface.preference";
@@ -47,7 +47,7 @@ let preferred="";
 try{preferred=localStorage.getItem(KEY)||""}catch{}
 if(!valid.includes(preferred))preferred="";
 let surface=valid.includes(forced)?forced:preferred||(mobileDevice?"mobile":"designer");
-const routes={designer:"./desktop/?surface=designer",mobile:"./mobile/?surface=mobile",regie:"./studio/?surface=regie",plateau:"./studio/?surface=plateau",camera:"./companion/?surface=camera"};
+const routes={designer:"./desktop/index.html?surface=designer",mobile:"./mobile/index.html?surface=mobile",regie:"./studio/index.html?surface=regie",plateau:"./studio/index.html?surface=plateau",camera:"./companion/index.html?surface=camera"};
 document.querySelector("#status").textContent=preferred&&!forced?`Préférence mémorisée · ${surface}`:`Interface proposée · ${surface}`;
 function openInternalRoute(target,{replace=false}={}){
   const url=new URL(target,location.href);
