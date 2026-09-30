@@ -331,6 +331,43 @@ function ensurePatchWorld() {
   return world;
 }
 
+const NODE_RUNTIME_REQUIREMENTS = new Map([
+  ["ndi-out", "relais natif requis à l’usage"],
+  ["midi", "périphérique MIDI requis à l’usage"],
+  ["arduino", "périphérique série requis à l’usage"],
+  ["esp", "ESP/Wemos + liaison série requis à l’usage"],
+  ["servo", "servo + contrôleur série requis à l’usage"],
+  ["rfid", "lecteur RFID/QR requis à l’usage"],
+  ["sensors", "capteur compatible requis à l’usage"],
+  ["td", "TouchDesigner + OSC requis à l’usage"],
+  ["twozero", "TWOZERO / TouchDesigner + OSC requis à l’usage"],
+  ["chataigne", "Chataigne + OSC requis à l’usage"],
+  ["millumin", "Millumin + OSC requis à l’usage"],
+  ["touchdesigner", "TouchDesigner + OSC requis à l’usage"],
+  ["isadora", "Isadora + OSC requis à l’usage"],
+  ["isadorabridge", "Isadora + OSC requis à l’usage"],
+  ["max", "Max/MSP + OSC requis à l’usage"],
+  ["pd", "Pure Data + OSC requis à l’usage"],
+  ["supercollider", "SuperCollider + OSC requis à l’usage"],
+  ["remote-camera", "caméra distante et réseau requis à l’usage"],
+  ["videoreturn", "source vidéo distante requise à l’usage"],
+  ["phone-camera-front", "permission caméra requise à l’usage"],
+  ["phone-camera-back", "permission caméra requise à l’usage"],
+  ["phone-mic", "permission micro requise à l’usage"],
+  ["gyro", "capteur appareil requis à l’usage"],
+  ["accelerometer", "capteur appareil requis à l’usage"],
+  ["orientation", "capteur appareil requis à l’usage"],
+  ["gps", "permission localisation requise à l’usage"],
+  ["haptics", "haptique appareil requis à l’usage"],
+  ["bluetooth", "Bluetooth appareil requis à l’usage"]
+]);
+
+function nodeReadiness(type) {
+  if (!isExecutable(type)) return "Indisponible · moteur non câblé";
+  const requirement = NODE_RUNTIME_REQUIREMENTS.get(type);
+  return requirement ? `Prêt · ${requirement}` : "Prêt";
+}
+
 function buildLibrary() {
   const q = $("#search")?.value?.trim?.().toLowerCase?.() || "";
   $("#libraryList").innerHTML = LIB.map(([title, items], groupIndex) => {
@@ -338,12 +375,12 @@ function buildLibrary() {
     if (!visible.length) return "";
     const expanded = Boolean(q) || expandedLibraryGroups.has(groupIndex);
     return `<div class="lib-section ${expanded ? "expanded" : "collapsed"}" data-lib-group="${groupIndex}">
-      <button type="button" class="lib-title" data-lib-toggle="${groupIndex}" aria-expanded="${expanded ? "true" : "false"}">
+      <button type="button" class="lib-title" data-lib-toggle="${groupIndex}" aria-expanded="${expanded ? "true" : "false"}" title="${expanded ? "Replier" : "Déplier"} · ${title}">
         <span>${title}</span><span class="lib-chevron" aria-hidden="true">▾</span>
       </button>
       <div class="lib-items">${visible.map(([n, t]) => {
         const ok = isExecutable(t);
-        return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${ok ? "Exécutable" : "Expérimental — moteur incomplet ou backend externe requis"}"><span>${n}${ok ? "" : " · expérimental"}</span><span>${ok ? "＋" : "○"}</span></div>`;
+        return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${nodeReadiness(t)}"><span>${n}${ok ? "" : " · expérimental"}</span><span>${ok ? "＋" : "○"}</span></div>`;
       }).join("")}</div>
     </div>`;
   }).join("");
@@ -587,6 +624,7 @@ function drawNode(n) {
   const el = document.createElement("div");
   el.className = "node" + (isExecutable(n.type) ? " executable" : " unavailable");
   el.dataset.id = n.id;
+  el.title = nodeReadiness(n.type);
   el.style.left = n.x + "px";
   el.style.top = n.y + "px";
   const ports = portLabels(n.type, n) || spec(n.type)[1];
