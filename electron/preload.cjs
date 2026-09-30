@@ -16,5 +16,11 @@ contextBridge.exposeInMainWorld("nvdDesktop", {
   },
   async getHostCard() {
     return ipcRenderer.invoke("nvd:host-card");
+  },
+  async probeLocalAi(options = {}) {
+    return ipcRenderer.invoke("nvd:local-ai-probe", options);
+  },
+  async localAiChat(options = {}) {
+    return ipcRenderer.invoke("nvd:local-ai-chat", options);
   }
 });
