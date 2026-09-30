@@ -45,7 +45,7 @@ function widgetFromAction(profile,action,index,settings={}){
 
 function coreShowWidgets(){
   return [
-    normalizeWidget({id:"show-go",type:"button",presentation:{label:"GO",secondary:"Conduite",w:2,h:2,color:"#d7b86a"},binding:{kind:"stage",action:"go"}}),
+    normalizeWidget({id:"show-go",type:"button",presentation:{label:"GO",secondary:"Conduite",w:2,h:1,color:"#d7b86a"},binding:{kind:"stage",action:"go"}}),
     normalizeWidget({id:"show-prev",type:"button",presentation:{label:"PREV",secondary:"Cue précédent",w:1,h:1,color:"#8fa79d"},binding:{kind:"stage",action:"prev"}}),
     normalizeWidget({id:"show-next",type:"button",presentation:{label:"NEXT",secondary:"Cue suivant",w:1,h:1,color:"#8fa79d"},binding:{kind:"stage",action:"next"}}),
     normalizeWidget({id:"show-panic",type:"momentary",presentation:{label:"STOP / PANIC",secondary:"Arrêt scène",w:2,h:1,color:"#c97868"},binding:{kind:"stage",action:"panic",momentary:true}})
