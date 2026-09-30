@@ -1,30 +1,61 @@
-# PWA Deploy Status — honest
+# PWA Deploy — No-de Vibe Designer 1.3.0
 
-Date: 2026-09-29 · Branch `cursor/no-de-2.2-reprise-20260929` · App still **1.1.0**
+Date : 2026-09-30 · Source : `main`
 
-## Chain
+## Chaîne
 
-| Step | Status | Notes |
+| Étape | État | Notes |
 |---|---|---|
-| PWA **code** | REAL | `mobile/` + `npm run build:pwa` → `dist/pwa/` |
-| PWA **build** | REAL | `build-info.json`, manifest, SW, icons |
-| PWA **deploy** | REAL | Public publish repo `cdriccarboni/no-de-vibe-designer-pwa` (source repo is **private** → GitHub Pages unavailable there) |
-| PWA **public URL** | REAL | https://cdriccarboni.github.io/no-de-vibe-designer-pwa/ |
-| Phone **install** | UNTESTED on device | Desktop browser: HTTPS + manifest `standalone` + SW controlling verified |
-| Offline **prod** | PARTIAL | SW caches shell; full offline field proof pending phone |
+| Code PWA | REAL | `mobile/` + `shared/` |
+| Build | REAL | `npm run build:pwa` → `dist/pwa/` |
+| Service Worker | REAL | cache versionné `nvd-1.3.0` |
+| Dépôt public | REAL | `cdriccarboni/no-de-vibe-designer-pwa` |
+| URL HTTPS | REAL | https://cdriccarboni.github.io/no-de-vibe-designer-pwa/ |
+| Android webDir | REAL | même `dist/pwa` via Capacitor |
+| Install téléphone | À recetter | doit être vérifié sur le téléphone de spectacle |
+| Offline terrain | À recetter | shell offline présent ; recette longue nécessaire |
 
-## How to redeploy
+## Publication
+
+Voie locale :
 
 ```bash
-npm run deploy:pwa   # build + push artifacts to publish repo
+npm run deploy:pwa
 ```
 
-Cloudflare Pages (ART pattern) is ready in `.github/workflows/deploy-pwa.yml` but needs repo secrets `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` — until then, GitHub Pages publish repo is the public HTTPS path.
+Le script :
+1. reconstruit `dist/pwa` ;
+2. vérifie index / SW / manifest / build-info ;
+3. pousse les artefacts dans le dépôt Pages public.
 
-## ART wiring
+## GitHub Actions
 
-`NEXT_PUBLIC_NO_DE_VIBE_DESIGNER_PWA_URL` must point at the URL above **only after** phone install is confirmed. Do not claim ART→No-de Done until ART rebuild with that env is verified.
+`.github/workflows/deploy-pwa.yml` :
+- build + tests ;
+- artefact PWA ;
+- Cloudflare Pages uniquement si les secrets existent.
 
-## Not “in PWA” until
+GitHub interdit les secrets directement dans un `if:`. Le workflow 1.3.0 utilise donc les secrets en variables d'environnement puis conditionne uniquement l'étape de déploiement.
 
-Phone can open the public URL and install standalone. Until then: code+build+deploy+URL are real; install/offline-prod are not Done.
+Si GitHub retourne `runner_id: 0` et aucune étape, le blocage vient du runner Actions et non du build applicatif.
+
+## Cloudflare
+
+Optionnel. Secrets :
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+Sans eux, GitHub Pages reste l'URL publique de référence.
+
+## ART
+
+ART peut pointer vers l'URL publique No-de une fois l'installation téléphone recettée. Les deux projets restent séparés : ART fournit ses outils compagnie/régie, No-de son moteur nodal/Companion.
+
+## Critère Done PWA
+
+- URL publique répond ;
+- `build-info.json` annonce 1.3.0 ;
+- manifest standalone ;
+- service worker actif ;
+- installation sur téléphone ;
+- relance offline validée.
