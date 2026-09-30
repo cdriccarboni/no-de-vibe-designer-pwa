@@ -44,6 +44,8 @@
       "docs/**/*",
       "examples/**/*",
       "mobile/**/*",
+      "studio/**/*",
+      "companion/**/*",
       "bridge/**/*",
       "index.html",
       "package.json"
