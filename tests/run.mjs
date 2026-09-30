@@ -10,6 +10,10 @@ import { APP_VERSION } from "../shared/version.js";
 import { createHistory } from "../shared/history.js";
 import { ensureSubGraph, evaluateSubGraph, addBoxPort, wrapNodesInSubpatch, MAX_SUBPATCH_DEPTH } from "../shared/subpatch.js";
 import { renderBlackhole } from "../shared/graphics/blackhole.js";
+import { renderLivingShadow } from "../shared/graphics/living-shadow.js";
+import { renderThreadCurtain } from "../shared/graphics/interactive-effects.js";
+import { encodeSacnChannel, sacnMulticastAddress } from "../shared/protocols/sacn.js";
+import { createRegiePreset } from "../shared/companion-studio/regie-presets.js";
 import { transformRaster } from "../shared/graphics/transform.js";
 import { createPipeline, validatePipeline, orderPasses } from "../shared/graphics/pass-graph.js";
 import { WebGL2Backend } from "../shared/graphics/webgl2.js";
@@ -125,6 +129,71 @@ const applied = applyVibeOps(p2, parsed.ops, {
 });
 assert(applied.applied.filter(a => a.op === "addNode" && !a.skipped).length >= 2, "vibe applied addNode");
 assert(p2.edges.length >= 1, "vibe created edge");
+
+// --- theatre language / Living Shadow / interactive engines ---
+console.log("theatre-language-1.3");
+const theatreText = "Maxime se place à jardin devant son retour vidéo. Il est capté en silhouette et son ombre est projetée à cour sur le rideau de fils. Quand il danse avec elle, l'ombre fait le miroir puis peut se décrocher et prendre vie en autonomie.";
+const theatrePlan = localVibeParse(theatreText, newProject());
+assert(theatrePlan.engine === "scene-language", "theatre phrase uses scene-language planner");
+assert(theatrePlan.ops.some(o => o.op === "addNode" && o.type === "presence" && /Maxime/.test(o.title || "")), "scene plan creates named Presence · Maxime");
+assert(theatrePlan.ops.some(o => o.op === "addNode" && o.type === "livingshadow" && o.params?.sourceZone === "jardin" && o.params?.shadowZone === "cour"), "scene plan creates garden→cour Living Shadow");
+assert(theatrePlan.ops.some(o => o.op === "addNode" && o.type === "stage-output" && o.params?.surfaceName === "Rideau de fils"), "scene plan names physical thread-curtain output");
+assert(theatrePlan.ops.some(o => o.op === "connect" && o.fromType === "livingshadow" && o.toType === "mapping"), "scene plan wires Living Shadow to mapping");
+
+const theatreProject = newProject();
+const theatreNodes = [];
+const theatreApplied = applyVibeOps(theatreProject, theatrePlan.ops, {
+  addNode: (type, x, y) => {
+    const id = `scene-${theatreNodes.length + 1}`;
+    const n = { id, type, title: type, x, y, params: { enabled: true } };
+    theatreProject.nodes.push(n); theatreNodes.push(n); return n;
+  },
+  addClip: () => {},
+  ensureEdges: () => { theatreProject.edges ||= []; return theatreProject.edges; },
+  nodeById: id => theatreProject.nodes.find(n => n.id === id)
+});
+assert(theatreApplied.applied.some(a => a.op === "addNode" && a.type === "livingshadow"), "scene plan applies Living Shadow node");
+assert(theatreProject.nodes.some(n => n.type === "presence" && n.params?.person === "Maxime"), "scene apply preserves performer metadata");
+assert(theatreProject.nodes.some(n => n.type === "stage-output" && n.params?.surfaceName === "Rideau de fils"), "scene apply preserves named stage surface");
+assert(theatreProject.edges.length >= 5, "scene apply builds full camera→presence→shadow→mapping→output chain");
+
+console.log("living-shadow-1.3");
+const shadowPixels = new Uint8ClampedArray(32 * 18 * 4);
+for (let y = 3; y < 16; y++) {
+  for (let x = 3; x < 12; x++) {
+    const i = (y * 32 + x) * 4;
+    shadowPixels[i] = 255; shadowPixels[i + 1] = 255; shadowPixels[i + 2] = 255; shadowPixels[i + 3] = 255;
+  }
+}
+const shadowSource = { kind:"video", source:"test", width:32, height:18, pixels:shadowPixels };
+const mirrorShadow = renderLivingShadow({
+  frame:shadowSource, time:0, mode:"mirror", sourceZone:"jardin", shadowZone:"cour", threshold:.3, autonomy:.6
+});
+assert(mirrorShadow.analysis.visible === true && mirrorShadow.state === "MIRROR", "Living Shadow detects performer and enters mirror mode");
+assert(mirrorShadow.capture?.pixels?.length > 0, "Living Shadow exposes detachable silhouette capture");
+assert(mirrorShadow.frame.pixels.some(v => v > 0), "Living Shadow mirror produces visible output");
+const autoShadow = renderLivingShadow({
+  frame:shadowSource, time:2.5, mode:"autonomous", sourceZone:"jardin", shadowZone:"cour",
+  threshold:.3, autonomy:.8, detachedFrame:mirrorShadow.capture
+});
+assert(autoShadow.state === "AUTONOMOUS" && autoShadow.frame.pixels.some(v => v > 0), "detached Living Shadow remains visible in autonomous mode");
+
+console.log("interactive-fx-1.3");
+const curtain = renderThreadCurtain({ width:96, height:54, time:1.2, pointer:{x:.42,y:.55,speed:.3}, strands:32, force:.8 });
+assert(curtain.kind === "video" && curtain.source === "thread-curtain", "Thread Curtain returns a video frame");
+assert(curtain.pixels.some(v => v > 0), "Thread Curtain renders interactive strands");
+
+console.log("sacn-1.3");
+const sacn = encodeSacnChannel({ universe:1, channel:1, value:255, sequence:7, sourceName:"No-de test" });
+assert(sacn.length === 127 && sacn[126] === 255, "sACN encodes DMX start code + channel value");
+assert(sacn[113] === 0 && sacn[114] === 1, "sACN encodes universe 1");
+assert(sacnMulticastAddress(1) === "239.255.0.1", "sACN multicast address for universe 1");
+
+console.log("companion-presets-1.3");
+const lightPreset = createRegiePreset("lumiere");
+const lightPage = lightPreset.pages.find(p => p.role === "lighting");
+assert(!!lightPage && lightPage.widgets.filter(w => w.type === "fader").length >= 4, "Lumière preset includes compact faders");
+assert(lightPage.widgets.some(w => w.binding?.kind === "sacn" && w.binding?.universe === 1), "Lumière preset uses real sACN binding");
 
 // --- history ---
 console.log("history");
