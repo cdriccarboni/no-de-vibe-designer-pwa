@@ -10,6 +10,7 @@ import { rasterizeVideoValue } from "./graphics/frame-utils.js";
 import { renderWhale } from "./graphics/whale.js";
 import { renderBlob } from "./graphics/blob.js";
 import { ndiStatusMessage } from "./remote-camera/ndi.js";
+import { anaglyphFrame, bendFrame, creativeFxFrame, stormFrame, transmuteFrame } from "./graphics/stage-fx.js";
 
 function videoVal(el, opacity = 1) {
   return { kind: "video", el, opacity };
@@ -463,6 +464,65 @@ export function createNodeProcessors() {
   fns.set("bodyclone", (node, inputs, ctx) => {
     const cloneNode = { ...node, params: { mirror: false, dx: 64, dy: 0, trail: false, ...node.params } };
     return new Map([[2, silhouetteFx(cloneNode, inputs, ctx, "bodyclone")]]);
+  });
+
+
+  fns.set("videoreturn", (_node, inputs) => {
+    const source = inputs.get(0)?.value;
+    const out = new Map();
+    if (!source) {
+      out.set(1, { kind: "text", value: "NO SIGNAL" });
+      return out;
+    }
+    out.set(1, { kind: "text", value: "LIVE" });
+    out.set(2, source);
+    return out;
+  });
+
+  fns.set("mapping", (node, inputs, ctx) => {
+    const visual = inputs.get(0)?.value;
+    const scale = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.scale ?? 1);
+    const raster = fxRaster(visual, node, ctx, "mapping");
+    let frame = transformRaster(raster, {
+      scale: Math.max(0.05, scale || 1),
+      rotation: Number(node.params?.rotation ?? 0),
+      opacity: Number(node.params?.opacity ?? 1)
+    });
+    const dx = Number(node.params?.dx ?? 0);
+    const dy = Number(node.params?.dy ?? 0);
+    if (dx || dy) frame = offsetFrame(frame, { dx, dy });
+    frame.source = "mapping";
+    return new Map([[2, frame]]);
+  });
+
+  fns.set("anaglyph", (node, inputs, ctx) => {
+    const source = fxRaster(inputs.get(0)?.value, node, ctx, "anaglyph");
+    const depth = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.depth ?? 0.035);
+    return new Map([[2, anaglyphFrame(source, { depth })]]);
+  });
+
+  fns.set("creativefx", (node, inputs, ctx) => {
+    const source = fxRaster(inputs.get(0)?.value, node, ctx, "creativefx");
+    const amount = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.amount ?? 0.55);
+    return new Map([[2, creativeFxFrame(source, { amount, time: Number(ctx.time) || 0 })]]);
+  });
+
+  fns.set("storm", (node, inputs, ctx) => {
+    const source = fxRaster(inputs.get(0)?.value, node, ctx, "storm");
+    const amount = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.amount ?? 0.6);
+    return new Map([[2, stormFrame(source, { amount, time: Number(ctx.time) || 0 })]]);
+  });
+
+  fns.set("bending", (node, inputs, ctx) => {
+    const source = fxRaster(inputs.get(0)?.value, node, ctx, "bending");
+    const amount = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.amount ?? 0.18);
+    return new Map([[2, bendFrame(source, { amount, time: Number(ctx.time) || 0 })]]);
+  });
+
+  fns.set("transmute", (node, inputs, ctx) => {
+    const source = fxRaster(inputs.get(0)?.value, node, ctx, "transmute");
+    const amount = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.amount ?? 0.5);
+    return new Map([[2, transmuteFrame(source, { amount })]]);
   });
 
   fns.set("videofile", (node, _inputs, ctx) => {
