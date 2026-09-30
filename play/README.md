@@ -1,10 +1,9 @@
-# Google Play — No-de Vibe Designer 1.3.1
+# Google Play — No-de Vibe Designer
 
 ## Identité Android
 
 - Package : `fr.acousmatic.nodevibedesigner`
-- Version : `1.3.1`
-- versionCode : `131`
+- Version : lue automatiquement depuis `shared/version.js`\n- versionCode : calculé automatiquement (`major × 10000 + minor × 100 + patch`)
 - Target SDK : `36` (Android 16)
 - Format Play : Android App Bundle (`.aab`)
 
@@ -52,4 +51,4 @@ Avant la première soumission publique :
 
 ## Déclaration de données — base technique à vérifier dans Play Console
 
-La version 1.3.1 est conçue local-first et n'intègre ni publicité ni analytics. Les fonctions caméra, micro, capteurs, WebRTC/WebSocket et IA optionnelle sont activées par l'utilisateur. Toute déclaration Play doit rester cohérente avec le comportement réel de la version soumise et être revue si des SDK ou services externes sont ajoutés.
+La version courante est conçue local-first et n'intègre ni publicité ni analytics. Les fonctions caméra, micro, capteurs, WebRTC/WebSocket et IA optionnelle sont activées par l'utilisateur. Toute déclaration Play doit rester cohérente avec le comportement réel de la version soumise et être revue si des SDK ou services externes sont ajoutés.
