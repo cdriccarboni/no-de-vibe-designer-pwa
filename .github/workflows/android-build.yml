@@ -6,8 +6,10 @@ on:
     branches: [main]
     paths:
       - "index.html"
-      - "mobile.js"
-      - "mobile.css"
+      - "desktop/**"
+      - "mobile/**"
+      - "studio/**"
+      - "companion/**"
       - "manifest.webmanifest"
       - "shared/**"
       - "icons/**"
@@ -39,7 +41,7 @@ jobs:
           rm -rf www android
           mkdir -p www
 
-          rsync -a ./ www/             --exclude ".git"             --exclude ".github"             --exclude "node_modules"             --exclude "www"             --exclude "android"             --exclude "package.json"             --exclude "package-lock.json"
+          rsync -a ./ www/             --exclude ".git"             --exclude ".github"             --exclude "node_modules"             --exclude "www"             --exclude "android"             --exclude "downloads"             --exclude "package.json"             --exclude "package-lock.json"
 
           cat > capacitor.config.json <<'EOF'
           {
