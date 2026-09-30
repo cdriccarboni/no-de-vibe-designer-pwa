@@ -1,8 +1,9 @@
 {
   "name": "No-de Vibe Designer",
-  "version": "2.2.0",
-  "builtAt": "2026-09-30T22:08:00.000Z",
-  "files": 107,
+  "version": "3.0.0",
+  "builtAt": "2026-09-30T23:09:52.960Z",
+  "files": 117,
+  "cacheRevision": "d7bf8f4384",
   "surfaces": [
     "designer",
     "mobile",
@@ -10,19 +11,12 @@
     "plateau",
     "camera"
   ],
-  "sourceCommit": "",
-  "cacheRevision": "2.2.0-multi-v1",
-  "rolesFlexible": true,
-  "defaultRouting": {
-    "desktop": "designer",
-    "mobile": "mobile",
-    "manualOverride": true
-  },
+  "sourceCommit": "d7bf8f438497e8b204721d3542339e0de24c80eb",
   "features": {
-    "cueEngine": "2.2",
-    "companionCueList": true,
-    "audioPlayers": 12,
-    "threadCurtainPinch": true,
-    "luminousWaves": true
+    "graphicsEngine": "3",
+    "quickMap": true,
+    "imageVibe": true,
+    "noviceManual": true,
+    "rolesFlexible": true
   }
 }
