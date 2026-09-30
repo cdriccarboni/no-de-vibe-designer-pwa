@@ -287,6 +287,28 @@ export const EXECUTABLE_PORTS = {
     { name: "asset", dir: "out", data: "asset" },
     { name: "status", dir: "out", data: "text" }
   ],
+  "ml5-hand": [
+    { name: "video", dir: "in", data: "video" },
+    { name: "x", dir: "out", data: "number" },
+    { name: "y", dir: "out", data: "number" },
+    { name: "pinch", dir: "out", data: "number" },
+    { name: "out", dir: "out", data: "video" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  "ml5-body": [
+    { name: "video", dir: "in", data: "video" },
+    { name: "x", dir: "out", data: "number" },
+    { name: "y", dir: "out", data: "number" },
+    { name: "activity", dir: "out", data: "number" },
+    { name: "out", dir: "out", data: "video" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  "brain-map": [
+    { name: "a", dir: "in", data: "number" },
+    { name: "b", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" }
+  ],
   timer: [
     { name: "start", dir: "in", data: "trigger" },
     { name: "time", dir: "out", data: "number" },

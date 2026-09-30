@@ -3,6 +3,7 @@ import { evaluateGraph, findVideoOutput } from "./graph-engine.js";
 import { createNodeProcessors } from "./node-processors.js";
 import { evaluateSubGraph } from "./subpatch.js";
 import { sharedAudio } from "./audio-engine.js";
+import { createMlRuntime } from "./ml-runtime.js";
 
 export class Runtime {
   constructor(canvas, { destination = "main-output", onGraphEvent = null } = {}) {
@@ -29,6 +30,7 @@ export class Runtime {
     this.nodeFns = createNodeProcessors();
     this.previousOutputs = new Map();
     this.nodeState = new Map();
+    this.mlRuntime = createMlRuntime({ onUpdate: () => { if (!this.playing && this.project) this.render(); } });
     this.aiRequest = null;
     this.aiAssetRequest = null;
     this.deviceBus = { lastMidi: null, lastSerial: null };
@@ -98,6 +100,7 @@ export class Runtime {
   }
 
   setProject(project) {
+    const previousProject = this.project;
     this.project = project;
     this.honestFlags = new Set();
     this.resize();
@@ -105,6 +108,11 @@ export class Runtime {
     const ids = new Set((project?.nodes || []).map(n => n.id));
     for (const id of [...this.audioEngine.nodes.keys()]) {
       if (!ids.has(id)) this.audioEngine.release(id);
+    }
+    for (const node of previousProject?.nodes || []) {
+      if ((node.type === "ml5-hand" || node.type === "ml5-body" || node.type === "brain-map") && !ids.has(node.id)) {
+        this.mlRuntime?.release?.(node.id);
+      }
     }
     if (!this.needsCamera() && this.mediaStream) this.stopCamera();
     this.render();
@@ -218,6 +226,11 @@ export class Runtime {
     this.stop();
     this.stopCamera();
     this.stopRemoteCameraTracks();
+    for (const node of this.project?.nodes || []) {
+      if (node.type === "ml5-hand" || node.type === "ml5-body" || node.type === "brain-map") {
+        this.mlRuntime?.release?.(node.id);
+      }
+    }
     this.frameScratch.clear();
     await this.audioEngine?.shutdown();
   }
@@ -263,6 +276,8 @@ export class Runtime {
       artnetUdpSend: this.artnetUdpSend,
       controls: this.project.controls || [],
       audioEngine: this.audioEngine,
+      mlRuntime: this.mlRuntime,
+      requestRender: () => { if (!this.playing && this.project) this.render(); },
       sensorBus: this.sensorBus,
       mediaElements: this.mediaElements,
       frameScratch: this.frameScratch,

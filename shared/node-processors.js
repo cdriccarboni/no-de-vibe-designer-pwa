@@ -661,6 +661,90 @@ export function createNodeProcessors() {
   fns.set("ai-audio", (node, inputs, ctx) => aiMediaNode("audio", node, inputs, ctx));
   fns.set("ai-3d", (node, inputs, ctx) => aiMediaNode("3d", node, inputs, ctx));
 
+  function mlTrackerProcessor(kind, node, inputs, ctx) {
+    const out = new Map();
+    const runtime = ctx.mlRuntime;
+    if (!runtime) throw new Error("Runtime ML indisponible");
+
+    const visual = inputs.get(0)?.value;
+    const media = visual?.el || visual?.canvas || null;
+    const statusIndex = 5;
+    if (!media) {
+      out.set(statusIndex, textOut("WAITING VIDEO"));
+      return out;
+    }
+
+    const memory = nodeMemory(ctx);
+    const key = `ml-tracker:${node.id}`;
+    const prev = memory.get(key) || {};
+    const retryNonce = Number(node.params?.retryNonce || 0);
+    const signature = `${kind}|${retryNonce}|${node.params?.model || ""}`;
+    if (prev.media !== media || prev.signature !== signature) {
+      memory.set(key, { media, signature, pending:true, error:"" });
+      Promise.resolve(runtime.ensureTracker(node.id, kind, media, { model:node.params?.model || undefined }))
+        .then(() => {
+          memory.set(key, { media, signature, pending:false, error:"" });
+          ctx.requestRender?.();
+        })
+        .catch(error => {
+          memory.set(key, { media, signature, pending:false, error:error?.message || String(error) });
+          ctx.requestRender?.();
+        });
+    }
+
+    const state = runtime.readTracker(node.id, kind, media);
+    out.set(1, numOut(state.x));
+    out.set(2, numOut(state.y));
+    out.set(3, numOut(kind === "hand" ? state.pinch : state.activity));
+    if (visual) out.set(4, visual);
+    const local = memory.get(key) || {};
+    const status = local.error
+      ? `ERROR · ${local.error}`
+      : (state.status || (local.pending ? "LOADING" : "IDLE"));
+    out.set(statusIndex, textOut(status));
+    return out;
+  }
+
+  fns.set("ml5-hand", (node, inputs, ctx) => mlTrackerProcessor("hand", node, inputs, ctx));
+  fns.set("ml5-body", (node, inputs, ctx) => mlTrackerProcessor("body", node, inputs, ctx));
+
+  fns.set("brain-map", (node, inputs, ctx) => {
+    const out = new Map();
+    const runtime = ctx.mlRuntime;
+    if (!runtime) throw new Error("Runtime ML indisponible");
+
+    const a = readNum(inputs.get(0));
+    const b = readNum(inputs.get(1));
+    const networkJson = node.params?.networkJson ?? node.params?.network ?? node.params?.modelJson ?? "";
+    const signature = JSON.stringify([a, b, networkJson]);
+    const memory = nodeMemory(ctx);
+    const key = `brain-map:${node.id}`;
+    const prev = memory.get(key) || {};
+
+    if (prev.signature !== signature && !prev.pending) {
+      memory.set(key, { ...prev, signature, pending:true, error:"" });
+      Promise.resolve(runtime.runBrain(node.id, [a, b], networkJson))
+        .then(value => {
+          memory.set(key, { signature, pending:false, error:"", value:Number(value) || 0 });
+          ctx.requestRender?.();
+        })
+        .catch(error => {
+          memory.set(key, { signature, pending:false, error:error?.message || String(error), value:0 });
+          ctx.requestRender?.();
+        });
+    }
+
+    const state = runtime.read(node.id);
+    const local = memory.get(key) || {};
+    const value = Number.isFinite(Number(local.value)) ? Number(local.value) : Number(state.output) || 0;
+    out.set(2, numOut(value));
+    const status = local.error
+      ? `ERROR · ${local.error}`
+      : (state.status || (local.pending ? "LOADING" : "IDLE"));
+    out.set(3, textOut(status));
+    return out;
+  });
+
   fns.set("timer", (node, inputs, ctx) => {
     const memory = nodeMemory(ctx);
     const key = `timer:${node.id}`;
