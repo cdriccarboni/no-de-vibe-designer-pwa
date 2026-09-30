@@ -181,3 +181,18 @@ Rapport Android :
 https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/android-verification.txt
 
 Le desktop Electron Mac/Linux reste séparé du dépôt public afin de ne pas exposer le source privé.
+
+
+## Validation publique 1.3.1
+
+- PWA GitHub Pages multi-surface : **success**
+- Runtime QA 1.3.1 : **success**
+- Designer / Mobile / Régie / Plateau / Caméra : **présents et validés**
+- bascule universelle : **validée**
+- cache : `nvd-1.3.1-multi`
+- APK Android 1.3.1 (131) : **build success**
+- signature APK v2 : **verified**
+- AAB 1.3.1 non signé : **build success**
+
+APK :
+https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/No-de-Vibe-Designer-1.3.1-debug.apk
