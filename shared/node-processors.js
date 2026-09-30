@@ -365,7 +365,7 @@ export function createNodeProcessors() {
 
     let shaderCanvas;
     try {
-      shaderCanvas = surface.render(w, h, time, { intensity: Number(uBoost) || 1 });
+      shaderCanvas = surface.render(w, h, time, { intensity: Number(uBoost) || 1, fragment: node.params?.glsl || "" });
     } catch (e) {
       throw new Error(`GLSL : ${e.message || e}`);
     }

@@ -14,7 +14,7 @@
 <div id="companionDetect" class="companion-detect hidden" role="dialog" aria-live="polite">
   <p id="companionDetectText">Companion détecté</p>
   <div class="companion-detect-actions">
-    <button type="button" data-detect="open-studio">Open Studio</button>
+    <button type="button" data-detect="open-studio">Éditer ce Companion</button>
     <button type="button" data-detect="sync">Sync</button>
     <button type="button" data-detect="monitor">Use as Monitor</button>
     <button type="button" data-detect="controller">Use as Controller</button>
@@ -25,11 +25,24 @@
   <div><b>EXEMPLE · WOW INTERACTIF</b><span>Déplace la souris dans le Preview</span></div>
   <button id="demoExitBtn" type="button">EXIT · QUITTER L’EXEMPLE</button>
 </div>
+<dialog id="companionEditorDialog" class="companion-editor-dialog">
+  <div class="companion-editor-shell">
+    <header><div><b>Éditer ce Companion</b><span id="companionEditorStatus">Layout Local First · synchronisation live via l’hôte No-de</span></div><button id="companionEditorClose" type="button" class="btn">Fermer</button></header>
+    <iframe id="companionEditorFrame" title="Companion Studio"></iframe>
+  </div>
+</dialog>
+<dialog id="shaderDialog" class="shader-dialog">
+  <div class="shader-shell">
+    <header><div><b>Shader Lab</b><span>GLSL fragment · Ctrl/Cmd+Entrée applique</span></div><button id="shaderClose" type="button" class="btn">Fermer</button></header>
+    <textarea id="shaderSource" spellcheck="false" aria-label="Code GLSL"></textarea>
+    <div class="shader-actions"><button id="shaderApply" type="button" class="btn primary">Compiler + appliquer</button><button id="shaderReset" type="button" class="btn">Réinitialiser</button><span id="shaderStatus" role="status"></span></div>
+  </div>
+</dialog>
 <div id="app">
   <header class="topbar">
     <div class="brand"><div class="brandmark" title="No-de Vibe Designer">◒</div><div><b>No-de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v1.3.6</span>
-    <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small>Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
+    <span class="badge">v1.4.0</span>
+    <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
     <div class="themes workspace-modes"><button id="modeBureau" class="active">Bureau</button><button id="modePlateau">Plateau</button></div>
     <button id="controlsBtn" class="btn">Controls</button>

@@ -43,6 +43,7 @@ import { validateCompanionDocument } from "../shared/companion-studio/schema.js"
 import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref } from "../shared/companion-studio/detect.js";
 import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT } from "../shared/graphics/sketch-engine.js";
 import { applyShowManifest, showManifestSummary } from "../shared/show-importer.js";
+import { DEFAULT_FRAGMENT } from "../shared/adapters/shader-surface.js";
 
 installSurfaceSwitcher({ current:"designer" });
 
@@ -181,6 +182,17 @@ function renderPnpStatus() {
   }
   const midi = pnpState?.midi;
   const serial = pnpState?.serial;
+  const media = pnpState?.media;
+  const summary = $("#pnpSummary");
+  if (summary) {
+    const parts = [];
+    if (media?.cameras) parts.push(String(media.cameras) + " caméra" + (media.cameras > 1 ? "s" : ""));
+    if (midi?.connected) parts.push("MIDI " + (midi.inputs || 0) + " IN / " + (midi.outputs || 0) + " OUT");
+    else if (midi?.permission === "granted") parts.push("MIDI autorisé");
+    if (serial?.connected) parts.push("USB/Serial connecté");
+    else if (serial?.authorized) parts.push(String(serial.authorized) + " USB/Serial autorisé" + (serial.authorized > 1 ? "s" : ""));
+    summary.textContent = parts.length ? parts.join(" · ") : "Détection passive · aucune permission demandée automatiquement.";
+  }
   const linked = Number(!!midi?.connected) + Number(!!serial?.connected);
   if (linked >= 2) {
     btn.textContent = "P&P · 2 LIÉS";
@@ -212,6 +224,7 @@ async function runPlugAndPlayProbe({ silent=false } = {}) {
     renderPnpStatus();
     if (!silent) {
       const bits = [];
+      if (result.media?.cameras) bits.push(String(result.media.cameras) + " caméra" + (result.media.cameras > 1 ? "s" : "") + " disponible" + (result.media.cameras > 1 ? "s" : ""));
       if (result.serial?.connected) bits.push("USB/Serial connecté");
       else if (result.serial?.authorized) bits.push(`${result.serial.authorized} USB/Serial autorisé(s)`);
       if (result.midi?.connected) bits.push(`MIDI ${result.midi.inputs || 0} IN / ${result.midi.outputs || 0} OUT`);
@@ -592,6 +605,56 @@ window.addEventListener("pointermove", moveWire);
 window.addEventListener("pointerup", finishWire);
 window.addEventListener("resize", () => requestAnimationFrame(renderWires));
 
+let shaderDialogNodeId = null;
+function openShaderLab(node) {
+  if (!node || node.type !== "shader") return;
+  shaderDialogNodeId = node.id;
+  $("#shaderSource").value = node.params?.glsl || DEFAULT_FRAGMENT;
+  $("#shaderStatus").textContent = node.params?.glsl ? "Shader personnalisé" : "Shader par défaut";
+  const dialog = $("#shaderDialog");
+  if (dialog?.showModal) dialog.showModal();
+}
+function applyShaderLab() {
+  const node = nodeById(shaderDialogNodeId);
+  if (!node) return;
+  const source = $("#shaderSource").value.trim() || DEFAULT_FRAGMENT;
+  try {
+    runtime.shaderSurface.compile(source);
+    node.params ||= {};
+    node.params.glsl = source === DEFAULT_FRAGMENT ? "" : source;
+    $("#shaderStatus").textContent = "GLSL valide · appliqué";
+    autosave();
+    commitHistory();
+    runtime.render();
+    log("Shader Lab · " + node.title + " · GLSL appliqué");
+  } catch (error) {
+    $("#shaderStatus").textContent = "Erreur · " + (error?.message || error);
+    log("Shader Lab · GLSL invalide · " + (error?.message || error));
+  }
+}
+$("#shaderApply")?.addEventListener("click", applyShaderLab);
+$("#shaderReset")?.addEventListener("click", () => { $("#shaderSource").value = DEFAULT_FRAGMENT; $("#shaderStatus").textContent = "Shader par défaut prêt"; });
+$("#shaderClose")?.addEventListener("click", () => $("#shaderDialog")?.close());
+$("#shaderSource")?.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); applyShaderLab(); }
+});
+
+function openCompanionEditor(clientId = "") {
+  const dialog = $("#companionEditorDialog");
+  const frame = $("#companionEditorFrame");
+  if (!dialog?.showModal || !frame) {
+    window.open("../studio/?surface=regie", "_blank", "noopener");
+    return;
+  }
+  const query = new URLSearchParams({ surface:"regie", embedded:"1" });
+  if (clientId) query.set("client", clientId);
+  frame.src = "../studio/?" + query.toString();
+  $("#companionEditorStatus").textContent = clientId ? ("Companion " + clientId + " · édition live") : "Layout Local First · synchronisation live via l’hôte No-de";
+  dialog.showModal();
+}
+$("#companionEditorClose")?.addEventListener("click", () => $("#companionEditorDialog")?.close());
+$("#companionEditorDialog")?.addEventListener("close", () => { const frame=$("#companionEditorFrame"); if(frame) frame.removeAttribute("src"); });
+
 function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq / 4) * 110) {
   const g = activeGraph();
   const seq = (g.nodes.reduce((m, n) => Math.max(m, parseInt(String(n.id).replace(/\D/g, "")) || 0), 0) + 1);
@@ -635,7 +698,10 @@ function drawNode(n) {
   }).join("")}</div>`;
   $("#patchWorld").appendChild(el);
   el.onmousedown = (e) => selectNode(n.id, { additive: e.shiftKey });
-  el.ondblclick = () => { if (n.type === "subpatch") enterSubpatch(n); };
+  el.ondblclick = () => {
+    if (n.type === "subpatch") enterSubpatch(n);
+    else if (n.type === "shader") openShaderLab(n);
+  };
   attachPortInteractions(el);
   makeDraggable(el, n);
   requestAnimationFrame(renderWires);
@@ -2558,8 +2624,8 @@ $("#companionDetect")?.querySelectorAll("[data-detect]").forEach((btn) => {
     rememberDetectPref(action);
     const clientId = $("#companionDetect")?.dataset.clientId || "";
     if (action === DETECT_ACTIONS.OPEN_STUDIO) {
-      window.open("http://127.0.0.1:4177/studio/", "_blank", "noopener");
-      log("Companion · Open Studio");
+      openCompanionEditor(clientId);
+      log("Companion · Éditeur ouvert");
     } else if (action === DETECT_ACTIONS.SYNC) {
       if (sendCompanionLayout(clientId)) log("Companion · Sync layout envoyé");
       else log("Companion · Sync · layout ou lien manquant");

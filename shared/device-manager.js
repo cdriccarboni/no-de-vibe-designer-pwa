@@ -14,7 +14,8 @@ export class DeviceManager{
   async probe({autoReconnectSerial=true,autoConnectGrantedMidi=true}={}){
     const result={
       midi:{supported:this.midi.supported(),permission:"unknown",connected:!!this.midi.access,inputs:this.midi.inputs.length,outputs:this.midi.outputs.length},
-      serial:{supported:this.serial.supported(),authorized:0,connected:!!this.serial.port?.readable,reconnected:false}
+      serial:{supported:this.serial.supported(),authorized:0,connected:!!this.serial.port?.readable,reconnected:false},
+      media:{supported:!!(typeof navigator!=="undefined" && navigator.mediaDevices?.enumerateDevices),cameras:0,microphones:0}
     };
 
     if(result.midi.supported && typeof navigator!=="undefined" && navigator.permissions?.query){
@@ -28,6 +29,14 @@ export class DeviceManager{
           result.midi.outputs=this.midi.outputs.length;
         }
       }catch{/* permissions.query("midi") not supported everywhere */}
+    }
+
+    if(result.media.supported){
+      try{
+        const mediaDevices=await navigator.mediaDevices.enumerateDevices();
+        result.media.cameras=mediaDevices.filter(d=>d.kind==="videoinput").length;
+        result.media.microphones=mediaDevices.filter(d=>d.kind==="audioinput").length;
+      }catch(error){ result.media.error=String(error?.message||error); }
     }
 
     if(result.serial.supported){

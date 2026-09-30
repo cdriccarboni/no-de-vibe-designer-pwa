@@ -156,3 +156,18 @@ html.electron-macos .topbar{padding-left:84px}
 .library-mode{display:flex;align-items:center;gap:7px;padding:6px 10px;color:var(--muted,#8b949e);font-size:11px;border-bottom:1px solid rgba(255,255,255,.06)}
 .library-mode input{accent-color:var(--accent,#d7b86a)}
 .lib-item.unavailable{opacity:.58}
+
+/* 1.4 · Companion Device Editor + Shader Lab, modales contextuelles uniquement */
+.companion-editor-dialog,.shader-dialog{width:min(1180px,calc(100vw - 28px));height:min(86vh,860px);padding:0;border:1px solid var(--line,#30363d);border-radius:16px;background:#0c0f12;color:var(--text,#eef1f2);box-shadow:0 28px 100px #000b}
+.companion-editor-dialog::backdrop,.shader-dialog::backdrop{background:#000b;backdrop-filter:blur(4px)}
+.companion-editor-shell,.shader-shell{height:100%;display:grid;grid-template-rows:auto 1fr;min-height:0}
+.companion-editor-shell>header,.shader-shell>header{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line,#30363d);background:#12171b}
+.companion-editor-shell>header>div,.shader-shell>header>div{display:grid;gap:2px;flex:1}
+.companion-editor-shell header span,.shader-shell header span{font-size:11px;color:var(--muted,#8f989f)}
+#companionEditorFrame{width:100%;height:100%;border:0;background:#0b0d10}
+.shader-dialog{width:min(980px,calc(100vw - 28px));height:min(78vh,760px)}
+.shader-shell{grid-template-rows:auto 1fr auto}
+.shader-shell textarea{margin:12px;resize:none;border:1px solid var(--line,#30363d);border-radius:12px;background:#07090b;color:#d9efe6;padding:12px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;outline:none}
+.shader-shell textarea:focus{border-color:var(--accent,#d7b86a)}
+.shader-actions{display:flex;align-items:center;gap:8px;padding:0 12px 12px}
+.shader-actions #shaderStatus{margin-left:auto;font-size:11px;color:var(--muted,#8f989f)}

@@ -1,6 +1,6 @@
 # No-de Vibe Designer
 
-**Source canonique : `main` · No-de Vibe Designer 1.3.1.**  
+**Source canonique : `main` · No-de Vibe Designer 1.4.0.**  
 Production readiness : `docs/PRODUCTION_READINESS.md`.  
 La Library est à **105/105 nodes exécutables** ; les limites matérielles ou logicielles externes restent explicitement signalées.
 
@@ -12,7 +12,7 @@ Même moteur et même format de projet (`.cvd.json`, schéma `cvd.graph`) pour :
 3. Android via Capacitor
 4. Companion Studio tablette (`studio/`)
 
-## Nouveautés 1.3.1
+## Nouveautés 1.4.0
 
 - **PWA multi-surface** : Designer complet, Mobile, Régie, Plateau et Remote Camera dans une seule PWA.
 - **Bascule universelle** : tout appareil peut changer de rôle à tout moment ; Auto n’est qu’un défaut de démarrage.
@@ -55,8 +55,8 @@ npm run android:apk
 npm run android:aab
 ```
 
-APK 1.3.1 vérifié et téléchargeable :
-https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/No-de-Vibe-Designer-1.3.1-debug.apk
+APK de test courant :
+https://cdriccarboni.github.io/no-de-vibe-designer-pwa/downloads/
 
 Rapport package/version/signature :
 https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/android-verification.txt

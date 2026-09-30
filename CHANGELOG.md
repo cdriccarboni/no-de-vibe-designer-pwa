@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.4.0 — 2026-09-30
+
+### Companion / Plug & Play
+- La détection Companion ouvre maintenant **Éditer ce Companion** dans une modale intégrée au Designer, sans nouveau panneau permanent.
+- Le Plug & Play détecte passivement les caméras et affiche un résumé compact des périphériques déjà disponibles ou autorisés, sans demander de permission automatiquement.
+
+### Shader Lab
+- Double-clic sur un node Shader Lab ouvre un véritable éditeur GLSL.
+- Compilation/validation avant application, raccourci Ctrl/Cmd+Entrée, reset vers le shader par défaut et cache des programmes WebGL par source.
+
+### Distribution
+- Version source, Desktop et Android alignée en 1.4.0 ; préparation de la publication publique PWA/Android/macOS consolidée.
+
+
 ## 1.3.6 — 2026-09-30
 
 ### Finition discrète / états
