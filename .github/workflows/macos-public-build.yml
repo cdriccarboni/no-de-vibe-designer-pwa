@@ -221,6 +221,27 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_DIR/Contents/Info.plist" | grep -qx "fr.acousmatic.nodevibedesigner"
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_DIR/Contents/Info.plist" | grep -qx "$APP_VERSION"
 
+      - name: Smoke-test signed app startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_DIR="dist/mac-arm64/No-de Vibe Designer.app"
+          LOG="$RUNNER_TEMP/no-de-startup.log"
+
+          ELECTRON_ENABLE_LOGGING=1 "$APP_DIR/Contents/MacOS/No-de Vibe Designer" >"$LOG" 2>&1 &
+          PID=$!
+
+          sleep 8
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "Application exited during startup."
+            cat "$LOG" || true
+            exit 1
+          fi
+
+          kill "$PID" || true
+          wait "$PID" || true
+          tail -200 "$LOG" || true
+
       - name: Package signed ZIP and DMG
         shell: bash
         run: |
