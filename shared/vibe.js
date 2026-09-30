@@ -1,6 +1,7 @@
 import { APP_NAME, APP_VERSION } from "./version.js";
 import { isExecutable } from "./ports.js";
 import { validateEdge } from "./graph-engine.js";
+import { buildLocalAiPrompt, directOllamaChat, directOllamaProbe, normalizeLocalAiConfig, sanitizeLocalAiResponse, selectLocalModel } from "./local-ai-core.js";
 
 /**
  * Vibe coding — génération structurée de patch.
@@ -10,11 +11,23 @@ import { validateEdge } from "./graph-engine.js";
  */
 
 export function readAiConfig() {
+  let raw = {};
   try {
-    return JSON.parse(localStorage.getItem("nvd.ai") || localStorage.getItem("cvd.ai") || "null") || {};
+    raw = JSON.parse(localStorage.getItem("nvd.ai") || localStorage.getItem("cvd.ai") || "null") || {};
   } catch {
-    return {};
+    raw = {};
   }
+  const local = normalizeLocalAiConfig(raw);
+  return {
+    ...raw,
+    localEnabled: local.enabled,
+    localBaseUrl: local.baseUrl,
+    localModel: local.model,
+    localTemperature: local.temperature,
+    localMaxOps: local.maxOps,
+    // Cloud is opt-in. Legacy configs remain readable but are not contacted unless enabled === true.
+    enabled: raw.enabled === true
+  };
 }
 
 export function saveAiConfig(cfg) {
@@ -237,35 +250,42 @@ function parseAiOps(content, label = "IA") {
 }
 
 async function callLocalAi(text, project, cfg) {
-  const client = globalThis?.nvdDesktop?.localAiChat;
-  if (typeof client !== "function") {
-    return { ok:false, unavailable:true, error:"IA locale générative disponible uniquement dans l’hôte Desktop Electron pour le moment." };
-  }
-  const model = String(cfg.localModel || "qwen2.5-coder:7b").trim();
-  const baseUrl = String(cfg.localBaseUrl || "http://127.0.0.1:11434").trim();
+  const local = normalizeLocalAiConfig(cfg);
+  if (!local.enabled) return { ok:false, unavailable:true, error:"Local AI Core désactivé" };
+
+  const probe = await probeLocalAi(cfg);
+  if (!probe.ok) return { ok:false, unavailable:true, error:probe.error || "Ollama local indisponible" };
+
+  const model = probe.model || local.model;
+  const prompt = buildLocalAiPrompt(text, project);
   try {
-    const result = await client({
-      baseUrl,
-      model,
-      temperature: 0.15,
-      timeoutMs: 60000,
-      messages: [
-        { role:"system", content:"Tu génères des opérations JSON sûres et minimales pour un patch de spectacle vivant No-de Vibe Designer. Réponds uniquement en JSON." },
-        { role:"user", content:buildVibePrompt(text, project) }
-      ]
-    });
-    const parsed = parseAiOps(result?.content, "IA locale");
-    if (!parsed.ok) return parsed;
+    const raw = typeof globalThis?.nvdDesktop?.localAiChat === "function"
+      ? await globalThis.nvdDesktop.localAiChat({
+          baseUrl:local.baseUrl,
+          model,
+          temperature:local.temperature,
+          system:prompt.system,
+          user:prompt.user
+        })
+      : await directOllamaChat({
+          baseUrl:local.baseUrl,
+          model,
+          temperature:local.temperature,
+          system:prompt.system,
+          user:prompt.user
+        });
+    const parsed = sanitizeLocalAiResponse(raw, { maxOps:local.maxOps });
+    if (!parsed.ok) return { ok:false, unavailable:true, error:parsed.error || "Réponse locale inexploitable" };
     return {
       ok:true,
       engine:"local-ai",
       ops:parsed.ops,
       summary:parsed.summary,
-      note:`IA locale · ${result?.model || model}`,
-      localModel:result?.model || model
+      note:"Local AI Core · " + model + " · OFFLINE",
+      localModel:model
     };
   } catch (e) {
-    return { ok:false, unavailable:true, error:`IA locale injoignable : ${e?.message || e}` };
+    return { ok:false, unavailable:true, error:"Local AI Core injoignable : " + (e?.message || e) };
   }
 }
 
@@ -310,57 +330,68 @@ async function callRemoteAi(text, project, cfg) {
   return { ok:true, engine:"ai", ops:parsed.ops, summary:parsed.summary, note:`IA distante · ${model}` };
 }
 
-export async function probeLocalAi(cfg = readAiConfig()) {
-  const probe = globalThis?.nvdDesktop?.probeLocalAi;
-  if (typeof probe !== "function") return { ok:false, available:false, error:"Hôte Desktop Electron requis" };
+export async function probeLocalAi(cfg = readAiConfig(), { fresh = false } = {}) {
+  const local = normalizeLocalAiConfig(cfg);
+  if (!local.enabled) return { ok:false, available:false, disabled:true, error:"Local AI Core désactivé", models:[] };
   try {
-    const result = await probe({
-      baseUrl:cfg.localBaseUrl || "http://127.0.0.1:11434",
-      model:cfg.localModel || "qwen2.5-coder:7b"
-    });
-    return { ...result, available:true };
+    const result = typeof globalThis?.nvdDesktop?.localAiProbe === "function"
+      ? await globalThis.nvdDesktop.localAiProbe({ baseUrl:local.baseUrl })
+      : await directOllamaProbe(local.baseUrl);
+    const models = Array.isArray(result?.models) ? result.models : [];
+    const model = selectLocalModel(models, local.model);
+    return { ok:true, available:true, baseUrl:local.baseUrl, models, model, fresh };
   } catch (e) {
-    return { ok:false, available:false, error:e?.message || String(e) };
+    return { ok:false, available:false, baseUrl:local.baseUrl, models:[], error:e?.message || String(e) };
   }
 }
 
 export async function runVibe(text, project, { forceLocal = false } = {}) {
   const cfg = readAiConfig();
-  const localGenerativeEnabled = cfg.localEnabled !== false;
+  let localAiError = "";
 
-  if (!forceLocal && localGenerativeEnabled) {
+  if (!forceLocal && cfg.localEnabled !== false) {
     const localAi = await callLocalAi(text, project, cfg);
     if (localAi.ok) return localAi;
+    localAiError = localAi.error || "Local AI Core indisponible";
+  }
 
-    if (cfg.enabled !== false && cfg.endpoint) {
-      const remote = await callRemoteAi(text, project, cfg);
-      if (remote.ok) return { ...remote, localAiError:localAi.error };
-    }
-
-    const rules = localVibeParse(text, project);
+  // Zero-latency offline fallback: useful even if Ollama is stopped.
+  const rules = localVibeParse(text, project);
+  if (rules.ops.length > 0) {
     return {
-      ok:rules.ops.length > 0,
-      engine:"local-rules-fallback",
+      ok:true,
+      engine:"local-rules",
       ops:rules.ops,
       summary:rules.note,
-      aiError:localAi.error,
-      note:`IA locale indisponible — ${localAi.error} · repli moteur de règles`,
+      aiError:localAiError || undefined,
+      note:localAiError
+        ? "Local AI indisponible · repli règles offline"
+        : "Moteur de règles offline"
+    };
+  }
+
+  // Cloud is never automatic: it requires enabled === true AND an explicit endpoint.
+  if (!forceLocal && cfg.enabled === true && cfg.endpoint) {
+    const remote = await callRemoteAi(text, project, cfg);
+    if (remote.ok) return { ...remote, engine:"cloud-ai", localAiError:localAiError || undefined };
+    return {
+      ok:false,
+      engine:"none",
+      ops:[],
+      aiError:[localAiError, remote.error].filter(Boolean).join(" · "),
+      note:"Local AI, règles et fallback cloud n'ont rien produit",
       aiUnavailable:true
     };
   }
 
-  if (!forceLocal && cfg.enabled !== false && cfg.endpoint) {
-    const remote = await callRemoteAi(text, project, cfg);
-    if (remote.ok) return remote;
-  }
-
-  const local = localVibeParse(text, project);
   return {
-    ok:local.ops.length > 0,
-    engine:"local-rules",
-    ops:local.ops,
-    summary:local.note,
-    note:"Moteur local déterministe (règles).",
+    ok:false,
+    engine:"none",
+    ops:[],
+    aiError:localAiError || undefined,
+    note:localAiError
+      ? "Local AI indisponible et aucune règle locale correspondante"
+      : "Aucune opération locale trouvée",
     aiUnavailable:true
   };
 }
