@@ -1,0 +1,78 @@
+name: Platform builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:production
+      - run: npm test
+      - run: npm run check
+      - name: Build Linux x64
+        run: npm run pack:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: No-de-Vibe-Designer-linux-x64
+          path: dist/electron/*.zip
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    env:
+      NVD_UPLOAD_STORE_PASSWORD: ${{ secrets.NVD_UPLOAD_STORE_PASSWORD }}
+      NVD_UPLOAD_KEY_ALIAS: ${{ secrets.NVD_UPLOAD_KEY_ALIAS }}
+      NVD_UPLOAD_KEY_PASSWORD: ${{ secrets.NVD_UPLOAD_KEY_PASSWORD }}
+      NVD_UPLOAD_STORE_B64: ${{ secrets.NVD_UPLOAD_STORE_B64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm run audit:production
+      - run: npm test
+      - run: npm run android:sync
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: No-de-Vibe-Designer-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Prepare Play upload keystore
+        if: ${{ env.NVD_UPLOAD_STORE_B64 != '' && env.NVD_UPLOAD_STORE_PASSWORD != '' && env.NVD_UPLOAD_KEY_ALIAS != '' && env.NVD_UPLOAD_KEY_PASSWORD != '' }}
+        shell: bash
+        run: |
+          printf '%s' "$NVD_UPLOAD_STORE_B64" | base64 --decode > "$RUNNER_TEMP/nvd-upload.jks"
+          echo "NVD_UPLOAD_STORE_FILE=$RUNNER_TEMP/nvd-upload.jks" >> "$GITHUB_ENV"
+      - name: Build signed AAB
+        if: ${{ env.NVD_UPLOAD_STORE_B64 != '' && env.NVD_UPLOAD_STORE_PASSWORD != '' && env.NVD_UPLOAD_KEY_ALIAS != '' && env.NVD_UPLOAD_KEY_PASSWORD != '' }}
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        if: ${{ env.NVD_UPLOAD_STORE_B64 != '' && env.NVD_UPLOAD_STORE_PASSWORD != '' && env.NVD_UPLOAD_KEY_ALIAS != '' && env.NVD_UPLOAD_KEY_PASSWORD != '' }}
+        with:
+          name: No-de-Vibe-Designer-android-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
