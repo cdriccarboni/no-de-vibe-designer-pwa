@@ -41,7 +41,7 @@
 <div id="app">
   <header class="topbar">
     <div class="brand"><div class="brandmark" title="No-de Vibe Designer">◒</div><div><b>No-de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v3.0.3</span>
+    <span class="badge">v3.1.0</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
     <div class="themes workspace-modes"><button id="modeBureau" class="active">Bureau</button><button id="modePlateau">Plateau</button></div>
@@ -203,15 +203,27 @@
         <p class="hint"><b>IA locale prioritaire</b> : No-de utilise d’abord Ollama sur cette machine pour générer des opérations de patch JSON. Si elle est indisponible, repli automatique sur le moteur local déterministe.</p>
         <label>Activer l’IA générative locale <input id="aiLocalEnabled" type="checkbox" checked></label>
         <label class="stack">Serveur local / LAN<input id="aiLocalBase" type="url" value="http://127.0.0.1:11434" placeholder="http://192.168.1.20:11434"></label>
-        <label class="stack">Modèle principal<input id="aiLocalModel" type="text" value="qwen2.5-coder:7b"></label>
-        <label class="stack">Modèle léger<input id="aiLocalSecondaryModel" type="text" value="gemma3:1b"></label>
-        <label>Duo local parallèle <input id="aiLocalParallel" type="checkbox" checked></label>
-        <div class="preferences-actions">
-          <button id="aiInstallQwen" class="smallbtn" type="button">Installer Qwen</button>
-          <button id="aiInstallGemma" class="smallbtn" type="button">Installer Gemma</button>
-          <button id="aiLocalProbe" class="smallbtn" type="button">Tester l’IA locale</button>
-          <span id="aiLocalStatus" class="hint">Non testée</span>
+        <div class="local-agents">
+          <div class="local-agents-head">
+            <div><b>Agents locaux</b><span id="aiAgentsSummary" class="hint">Non détectés</span></div>
+            <button id="aiAgentsScan" class="smallbtn" type="button">↻ Détecter / actualiser</button>
+          </div>
+          <div id="aiAgentsList" class="local-agents-list">
+            <p class="hint">Détecte automatiquement les modèles Ollama disponibles, comme CX hub, puis choisis leur rôle.</p>
+          </div>
         </div>
+        <details class="ai-legacy">
+          <summary>Réglage manuel / compatibilité</summary>
+          <label class="stack">Modèle principal<input id="aiLocalModel" type="text" value="qwen2.5-coder:7b"></label>
+          <label class="stack">Modèle léger<input id="aiLocalSecondaryModel" type="text" value="gemma3:1b"></label>
+          <label>Duo local parallèle <input id="aiLocalParallel" type="checkbox" checked></label>
+          <div class="preferences-actions">
+            <button id="aiInstallQwen" class="smallbtn" type="button">Installer Qwen</button>
+            <button id="aiInstallGemma" class="smallbtn" type="button">Installer Gemma</button>
+            <button id="aiLocalProbe" class="smallbtn" type="button">Tester l’IA locale</button>
+            <span id="aiLocalStatus" class="hint">Non testée</span>
+          </div>
+        </details>
         <hr>
         <p class="hint">Cloud optionnel : utilisé seulement si l’IA locale échoue et qu’un endpoint distant est activé.</p>
         <p class="hint bad">Grok / xAI est exclu et sera refusé.</p>
