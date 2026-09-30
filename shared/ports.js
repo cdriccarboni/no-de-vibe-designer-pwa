@@ -32,6 +32,21 @@ export function typesCompatible(fromType, toType) {
 
 /** Ports explicites pour nodes exécutables. index = position dans la liste affichée. */
 export const EXECUTABLE_PORTS = {
+  presence: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "x", dir: "out", data: "number" },
+    { name: "y", dir: "out", data: "number" },
+    { name: "activity", dir: "out", data: "number" },
+    { name: "out", dir: "out", data: "video" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  livingshadow: [
+    { name: "video", dir: "in", data: "video" },
+    { name: "décrocher", dir: "in", data: "trigger" },
+    { name: "autonomie", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" },
+    { name: "state", dir: "out", data: "text" }
+  ],
   camera: [
     { name: "video", dir: "out", data: "video" },
     { name: "tracking", dir: "out", data: "number" },
@@ -279,6 +294,11 @@ export const EXECUTABLE_PORTS = {
   mapping: [
     { name: "video", dir: "in", data: "video" },
     { name: "scale", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  "stage-output": [
+    { name: "video", dir: "in", data: "video" },
+    { name: "status", dir: "out", data: "text" },
     { name: "out", dir: "out", data: "video" }
   ],
   anaglyph: [
