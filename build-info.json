@@ -1,7 +1,7 @@
 {
   "name": "No-de Vibe Designer",
   "version": "1.4.0",
-  "builtAt": "2026-09-30T20:25:00.000Z",
+  "builtAt": "2026-09-30T22:55:00.000Z",
   "files": 107,
   "surfaces": [
     "designer",
@@ -10,5 +10,6 @@
     "plateau",
     "camera"
   ],
-  "sourceCommit": "0492d6f29a320f041ec3a31a3294fde7a6d464cb"
+  "sourceCommit": "2eadc451c8b46d620b53fd851d03bc8781a5459a",
+  "cacheRevision": "2eadc451"
 }
