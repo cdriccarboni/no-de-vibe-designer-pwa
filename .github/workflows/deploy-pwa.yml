@@ -6,17 +6,6 @@ name: Deploy No-de PWA (public HTTPS)
 #   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - "cursor/**"
-    paths:
-      - "mobile/**"
-      - "shared/**"
-      - "scripts/build-pwa.mjs"
-      - "scripts/deploy-pwa.mjs"
-      - "package.json"
-      - ".github/workflows/deploy-pwa.yml"
 
 concurrency:
   group: nvd-pwa-deploy

@@ -1,4 +1,4 @@
-# No-de Vibe Designer — Production Readiness 1.3.0
+# No-de Vibe Designer — Production Readiness 1.4.0
 
 Date : 2026-09-30  
 Source canonique : `main`
@@ -196,3 +196,17 @@ Le desktop Electron Mac/Linux reste séparé du dépôt public afin de ne pas ex
 
 APK :
 https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/No-de-Vibe-Designer-1.3.1-debug.apk
+
+## Validation 1.4.0 — 2026-09-30
+
+- Source canonique privé : `main` 1.4.0.
+- Runtime QA public : **SUCCESS** (syntaxe, invariants PWA, 105/105 moteurs, Companion, Shader Lab, Plug & Play).
+- PWA publique : dépôt `no-de-vibe-designer-pwa`, cache `nvd-1.4.0-multi`.
+- Companion Device Editor : modale contextuelle intégrée au Designer ; moteur Companion Local First conservé.
+- Shader Lab : double-clic, édition GLSL, compilation avant Apply, cache de programmes.
+- Plug & Play : détection caméra passive sans permission automatique.
+- Distribution binaire : release publique GitHub produit APK Android + macOS ARM64 ; Google Play reste conditionné aux secrets d'upload et au compte de service.
+
+### CI canonique
+
+Les workflows automatiques du dépôt privé sont désormais manuels car GitHub n'y attribue actuellement aucun runner (jobs à 0 étape). La validation automatisée réelle et la distribution sont exécutées sur le dépôt public, sans exposer le source privé.

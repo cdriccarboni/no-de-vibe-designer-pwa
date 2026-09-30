@@ -1,4 +1,4 @@
-# Companion Studio — No-de Vibe Designer 1.3.0
+# Companion Studio — No-de Vibe Designer 1.4.0
 
 Date : 2026-09-30 · Source canonique : `main`
 
@@ -105,3 +105,7 @@ Studio local : `http://<IP-DU-MAC>:4177/studio/`.
 - profils consoles réellement utilisés ;
 - Art-Net / sACN avec le réseau lumière ;
 - Remote Camera / monitor avec les téléphones du spectacle.
+
+## Édition depuis le Designer — 1.4
+
+Lorsqu'un Companion est détecté, **Éditer ce Companion** ouvre Companion Studio dans une modale contextuelle du Designer. Aucun panneau permanent n'est ajouté. Le layout reste Local First, peut être synchronisé en live avec l'hôte, et reste conservé après déconnexion.
