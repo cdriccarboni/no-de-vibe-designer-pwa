@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.1 — 2026-09-30
+
+### PWA / UX
+- Corrige la PWA qui ouvrait seulement l’interface mobile/Companion.
+- Embarque Designer complet, Mobile, Régie, Plateau et Remote Camera dans la même PWA.
+- Ajoute une bascule universelle persistante sur chaque surface.
+- Permet d’utiliser un second ordinateur comme Régie/Plateau.
+- Ajoute le routeur Auto : ordinateur → Designer, mobile/tablette → Mobile, sans verrouiller le choix.
+- Service worker multi-surface `nvd-1.3.1-multi`.
+- Android passe à `versionCode 131` / `versionName 1.3.1`.
+
+
 ## 1.3.0 — 2026-09-30
 
 ### Moteur
