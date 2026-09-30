@@ -1,10 +1,8 @@
 # No-de Vibe Designer
 
-**Source canonique : `main` · package 1.1.0 tant que la DoD 2.2 n’est pas validée.**  
-La consolidation 2.2 provient de `cursor/no-de-2.2-reprise-20260929` (PR #6).  
-Docs : `docs/V2.2_STATUS.md`, `docs/V2.2_TODO.md`, `docs/V2.2_TEST_MATRIX.md`, `docs/FANTASY.md`.  
-Recovery only : `cursor/no-de-ultimate-20260928` / checkpoints — never overwrite main.  
-Checkpoint 0.10.1 intact : `cursor/mobile-pwa-reprise-a257`.
+**Source canonique : `main` · No-de Vibe Designer **1.2.0**.**  
+Production readiness : `docs/PRODUCTION_READINESS.md`.  
+La Library est à **81/81 nodes exécutables** ; les limites matérielles ou logicielles externes restent explicitement signalées.  
 
 Même moteur et même format de projet (`.cvd.json`, schéma `cvd.graph`) pour trois interfaces :
 
@@ -47,12 +45,11 @@ HTTP LAN téléphone = souvent PLATFORM-LIMITED pour getUserMedia (HTTPS requis)
 npm run remote:bridge
 ```
 
-## Tests
+## Validation production
 
 ```bash
-npm test
-npm run check
+npm run release:check
 npm run test:pwa
 ```
 
-Matrices : `docs/V2.2_TEST_MATRIX.md` (préférer aux docs 0.10.1 / 1.0.0).
+`release:check` lance l’audit 81/81, les tests, les checks syntaxiques et le build PWA. Voir `docs/PRODUCTION_READINESS.md`.
