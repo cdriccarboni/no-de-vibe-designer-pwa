@@ -44,6 +44,13 @@
 - PeerJS/WebRTC direct, reconnexion, RTT et FIRST_FRAME→LIVE.
 - NDI conservé comme relais natif honnête : pas de faux NDI navigateur.
 
+### Validation
+- Runtime QA public : success.
+- GitHub Pages : success.
+- APK Android 1.3.0 / code 130 vérifié par aapt + apksigner.
+- Signature APK v2 valide.
+- AAB non signé généré.
+
 ### Distribution
 - Version desktop/PWA/Android alignée 1.3.0.
 - Android versionCode 130.
