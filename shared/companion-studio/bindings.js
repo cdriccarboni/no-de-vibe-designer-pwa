@@ -27,6 +27,11 @@ export function applyCompanionBinding({
   runtime = null,
   applyCue = null,
   listCues = null,
+  sendOsc = null,
+  sendMidi = null,
+  sendSerial = null,
+  cameraControl = null,
+  videoControl = null,
   onLog = () => {}
 } = {}) {
   if (!widget?.id) throw new Error("Widget absent");
@@ -57,9 +62,18 @@ export function applyCompanionBinding({
             ? cues[(cues.findIndex((c) => c.id === cur) + 1) % Math.max(cues.length, 1)]
             : cues[0];
           if (!next) throw new Error("Aucun cue Stage");
-          applyCue(project, next);
+          const applied = applyCue(project, next);
+          if (applied?.project) {
+            for (const key of Object.keys(project)) delete project[key];
+            Object.assign(project, applied.project);
+          }
           project.meta ||= {};
           project.meta.activeCueId = next.id;
+          if (runtime && typeof next.time === "number") {
+            runtime.time = Number(next.time) || 0;
+            runtime.setProject?.(project);
+            runtime.play?.();
+          }
           onLog(`Companion · Stage ${action} · ${next.label || next.id}`);
           return makeStudioFeedback({
             widgetId: widget.id,
@@ -72,8 +86,18 @@ export function applyCompanionBinding({
         if (action === "prev" && cues.length) {
           const cur = project.meta?.activeCueId || cues[0].id;
           const idx = Math.max(0, cues.findIndex((c) => c.id === cur) - 1);
-          applyCue(project, cues[idx]);
+          const applied = applyCue(project, cues[idx]);
+          if (applied?.project) {
+            for (const key of Object.keys(project)) delete project[key];
+            Object.assign(project, applied.project);
+          }
+          project.meta ||= {};
           project.meta.activeCueId = cues[idx].id;
+          if (runtime && typeof cues[idx].time === "number") {
+            runtime.time = Number(cues[idx].time) || 0;
+            runtime.setProject?.(project);
+            runtime.play?.();
+          }
           return makeStudioFeedback({
             widgetId: widget.id,
             value: cues[idx].id,
@@ -112,15 +136,47 @@ export function applyCompanionBinding({
       });
     }
 
-    // Honest stubs — not fake success
-    if (["osc", "midi", "serial", "video", "camera"].includes(kind)) {
-      return makeStudioFeedback({
-        widgetId: widget.id,
-        value: null,
-        ok: false,
-        detail: `Binding ${kind} · pas encore câblé (PLATFORM-LIMITED / TODO)`,
-        rttMs: Date.now() - t0
-      });
+    if (kind === "osc") {
+      if (typeof sendOsc !== "function") throw new Error("Transport OSC hôte indisponible");
+      const address = binding.oscAddress || "/nvd/companion";
+      const host = binding.oscHost || "127.0.0.1";
+      const port = Number(binding.oscPort) || 9000;
+      sendOsc({ host, port, address, args: [value] });
+      onLog(`Companion · OSC ${address} → ${host}:${port}`);
+      return makeStudioFeedback({ widgetId: widget.id, value, ok: true, detail: `OSC ${address}`, rttMs: Date.now() - t0 });
+    }
+
+    if (kind === "serial") {
+      if (typeof sendSerial !== "function") throw new Error("Transport Serial hôte indisponible");
+      const template = binding.serialText || "COMPANION {value}";
+      const text = String(template).replaceAll("{value}", String(value));
+      sendSerial(text);
+      onLog(`Companion · Serial ${text}`);
+      return makeStudioFeedback({ widgetId: widget.id, value, ok: true, detail: "SERIAL", rttMs: Date.now() - t0 });
+    }
+
+    if (kind === "midi") {
+      if (typeof sendMidi !== "function") throw new Error("Sortie MIDI hôte indisponible");
+      const data = Array.isArray(binding.midiData) && binding.midiData.length
+        ? binding.midiData.map((n, i) => i === 2 && n === -1 ? Math.max(0, Math.min(127, Math.round(Number(value) * 127))) : Number(n))
+        : [0xB0, 0, Math.max(0, Math.min(127, Math.round(Number(value) * 127)))];
+      sendMidi(binding.midiOutputId || null, data);
+      onLog(`Companion · MIDI ${data.join(" ")}`);
+      return makeStudioFeedback({ widgetId: widget.id, value, ok: true, detail: "MIDI", rttMs: Date.now() - t0 });
+    }
+
+    if (kind === "camera") {
+      if (typeof cameraControl !== "function") throw new Error("Contrôle caméra hôte indisponible");
+      const action = binding.cameraAction || binding.action || (value ? "on" : "off");
+      cameraControl(action);
+      return makeStudioFeedback({ widgetId: widget.id, value: action, ok: true, detail: `CAMERA ${action}`, rttMs: Date.now() - t0 });
+    }
+
+    if (kind === "video") {
+      if (typeof videoControl !== "function") throw new Error("Contrôle vidéo hôte indisponible");
+      const action = binding.videoAction || binding.action || "toggle";
+      videoControl(action);
+      return makeStudioFeedback({ widgetId: widget.id, value: action, ok: true, detail: `VIDEO ${action}`, rttMs: Date.now() - t0 });
     }
 
     throw new Error(`Binding inconnu : ${kind}`);
