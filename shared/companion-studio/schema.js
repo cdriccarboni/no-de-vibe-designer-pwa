@@ -106,6 +106,8 @@ export function normalizeWidget(w = {}) {
       serialText: w.binding?.serialText || null,
       cameraAction: w.binding?.cameraAction || null,
       videoAction: w.binding?.videoAction || null,
+      playerSlot: Math.max(1, Math.min(12, Number(w.binding?.playerSlot) || 1)),
+      playerAction: w.binding?.playerAction || null,
       valueOn: w.binding?.valueOn ?? true,
       valueOff: w.binding?.valueOff ?? false,
       momentary: !!w.binding?.momentary
