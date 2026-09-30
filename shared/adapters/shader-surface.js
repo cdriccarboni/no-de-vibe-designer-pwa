@@ -7,12 +7,22 @@ export class ShaderSurface {
     this.gl = this.canvas.getContext("webgl", { alpha: true, preserveDrawingBuffer: true });
     this.program = null;
     this.buffer = null;
+    this.programs = new Map();
+    this.currentFragment = "";
     if (this.gl) this.compile(DEFAULT_FRAGMENT);
   }
 
   compile(fragment, vertex = VERTEX) {
     const gl = this.gl;
     if (!gl) throw new Error("WebGL indisponible");
+    const source = String(fragment || DEFAULT_FRAGMENT);
+    const key = vertex + "\u0000" + source;
+    const cached = this.programs.get(key);
+    if (cached) {
+      this.program = cached;
+      this.currentFragment = source;
+      return cached;
+    }
     const make = (type, src) => {
       const s = gl.createShader(type);
       gl.shaderSource(s, src);
@@ -23,7 +33,7 @@ export class ShaderSurface {
       return s;
     };
     const vs = make(gl.VERTEX_SHADER, vertex);
-    const fs = make(gl.FRAGMENT_SHADER, fragment);
+    const fs = make(gl.FRAGMENT_SHADER, source);
     const p = gl.createProgram();
     gl.attachShader(p, vs);
     gl.attachShader(p, fs);
@@ -32,13 +42,20 @@ export class ShaderSurface {
       throw new Error(gl.getProgramInfoLog(p) || "Link GLSL impossible");
     }
     this.program = p;
-    this.buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    this.currentFragment = source;
+    this.programs.set(key, p);
+    if (!this.buffer) {
+      this.buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    }
+    return p;
   }
 
-  render(width, height, timeSeconds, { intensity = 1 } = {}) {
+  render(width, height, timeSeconds, { intensity = 1, fragment = "" } = {}) {
     const gl = this.gl;
+    const wanted = String(fragment || DEFAULT_FRAGMENT);
+    if (wanted !== this.currentFragment) this.compile(wanted);
     if (!gl || !this.program) return this.canvas;
     const d = Math.min(devicePixelRatio || 1, 2);
     this.canvas.width = Math.max(1, Math.round(width * d));

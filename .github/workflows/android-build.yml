@@ -17,19 +17,6 @@ on:
           - internal
           - alpha
           - beta
-  push:
-    branches: [main]
-    paths:
-      - "index.html"
-      - "desktop/**"
-      - "mobile/**"
-      - "studio/**"
-      - "companion/**"
-      - "privacy/**"
-      - "manifest.webmanifest"
-      - "shared/**"
-      - "icons/**"
-      - ".github/workflows/android-build.yml"
 
 permissions:
   contents: write
@@ -284,31 +271,6 @@ jobs:
             android/app/build/outputs/bundle/release/No-de-Vibe-Designer-${{ env.APP_VERSION }}-play.aab
             play-signature-verification.txt
           if-no-files-found: error
-
-      - name: Publish downloadable test APK
-        if: ${{ success() || steps.signing.outputs.ready == 'false' }}
-        shell: bash
-        run: |
-          mkdir -p downloads
-          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/No-de-Vibe-Designer-${APP_VERSION}-debug.apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/No-de-Vibe-Designer-latest-debug.apk
-          cp android/app/build/outputs/bundle/release/app-release.aab downloads/No-de-Vibe-Designer-${APP_VERSION}-unsigned.aab
-          cp android-verification.txt downloads/android-verification.txt
-          printf '%s\n' '# Android downloads' '' \
-            "- APK test: No-de-Vibe-Designer-${APP_VERSION}-debug.apk" \
-            "- AAB de contrôle: No-de-Vibe-Designer-${APP_VERSION}-unsigned.aab (non publiable tel quel)" \
-            "- AAB Play signé: produit uniquement par la CI avec la clé d'upload sécurisée; il n'est pas commité dans le dépôt." \
-            > downloads/README.md
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add downloads
-          if ! git diff --cached --quiet; then
-            git commit -m "build(android): publish No-de ${APP_VERSION} test binaries"
-            git fetch origin main
-            git rebase origin/main
-            git push origin HEAD:main
-          fi
 
       - name: Build summary
         if: always()

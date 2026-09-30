@@ -1,5 +1,10 @@
-# Android downloads
+# Téléchargements No-de Vibe Designer
 
-- APK test: No-de-Vibe-Designer-1.3.6-debug.apk
-- AAB de contrôle: No-de-Vibe-Designer-1.3.6-unsigned.aab (non publiable tel quel)
-- AAB Play signé: produit uniquement par la CI avec la clé d'upload sécurisée; il n'est pas commité dans le dépôt.
+Les binaires ne sont plus commités dans `main`.
+
+- Page stable : https://cdriccarboni.github.io/no-de-vibe-designer-pwa/downloads/
+- Release : https://github.com/cdriccarboni/no-de-vibe-designer-pwa/releases/latest
+- APK stable : `releases/latest/download/No-de-Vibe-Designer-Android-debug.apk`
+- macOS ARM64 stable : `releases/latest/download/No-de-Vibe-Designer-macOS-arm64.zip`
+
+Les AAB Google Play signés ne sont produits que lorsque les secrets Play sont configurés.

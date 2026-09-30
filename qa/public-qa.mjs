@@ -9,6 +9,7 @@ import { encodeSacnChannel, sacnMulticastAddress } from "../shared/protocols/sac
 import { createRegiePreset, REGIE_PRESETS } from "../shared/companion-studio/regie-presets.js";
 import { APP_VERSION } from "../shared/version.js";
 import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl, navigateSurface } from "../shared/surface-switcher.js";
+import fs from "node:fs";
 
 function assert(condition, message) {
   if (!condition) throw new Error(`QA FAIL · ${message}`);
@@ -17,7 +18,7 @@ function assert(condition, message) {
 
 console.log(`No-de Vibe Designer public QA ${APP_VERSION}`);
 
-assert(/^1\.3\.\d+$/.test(APP_VERSION), `runtime version is current 1.3.x (${APP_VERSION})`);
+assert(/^1\.4\.\d+$/.test(APP_VERSION), `runtime version is current 1.4.x (${APP_VERSION})`);
 assert(SURFACES.length === 5, "five switchable No-de surfaces are available");
 const surfaceMem = new Map();
 const surfaceStorage = {
@@ -104,6 +105,13 @@ const light = createRegiePreset("lumiere");
 const lightPage = light.pages.find(p => p.role === "lighting");
 assert(lightPage?.widgets.filter(w => w.type === "fader").length >= 4, "Lumière preset has compact faders");
 assert(lightPage?.widgets.some(w => w.binding?.kind === "sacn" && w.binding?.universe === 1), "Lumière preset has real sACN binding");
+
+const desktopHtml = fs.readFileSync(new URL("../desktop/index.html", import.meta.url), "utf8");
+const desktopJs = fs.readFileSync(new URL("../desktop/app.js", import.meta.url), "utf8");
+const deviceManagerJs = fs.readFileSync(new URL("../shared/device-manager.js", import.meta.url), "utf8");
+assert(desktopHtml.includes("Éditer ce Companion") && desktopHtml.includes("companionEditorDialog"), "Companion Device Editor is integrated as a contextual modal");
+assert(desktopJs.includes("openShaderLab") && desktopJs.includes("runtime.shaderSurface.compile"), "Shader Lab double-click editor compiles GLSL before apply");
+assert(deviceManagerJs.includes("enumerateDevices") && deviceManagerJs.includes("cameras"), "Plug & Play passively detects available cameras");
 
 console.log("PUBLIC QA OK");
 
