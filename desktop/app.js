@@ -106,7 +106,7 @@ if (typeof window.nvdDesktop?.sendArtNetUdp === "function") {
 ensureRouting(project);
 
 /** Catalogue UI — mêmes groupes ; marque visuelle des nodes exécutables. */
-const LIB = NODE_GROUPS.filter(([title]) => title !== "Mobile / device").map(([title, items]) => [title, items]);
+const LIB = NODE_GROUPS.map(([title, items]) => [title, items]);
 
 function spec(t) {
   return sharedSpec(t);
