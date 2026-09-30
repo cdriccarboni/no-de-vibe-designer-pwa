@@ -47,6 +47,19 @@ Le node importe réellement :
 
 L’import est déclenché explicitement depuis l’inspecteur et peut ajouter ou remplacer les cues existants. Aucun ordre OSC/DMX n’est exécuté au moment de l’import.
 
+## IA locale générative
+
+No-de Desktop utilise une architecture **local-first** pour Vibe :
+
+1. Ollama local via le bridge Electron ;
+2. modèle par défaut : `qwen2.5-coder:7b` ;
+3. réponse attendue : opérations de patch JSON structurées ;
+4. aperçu avant application + Undo ;
+5. si Ollama ou le modèle est indisponible : repli automatique sur le moteur local déterministe ;
+6. cloud distant uniquement en secours explicite.
+
+Le process Electron n’autorise le bridge IA local que vers `localhost` / `127.0.0.1`. L’IA ne peut pas armer automatiquement les sorties Serial/Servo/OSC/DMX externes : `auto=true` est bloqué dans les opérations générées.
+
 ## Diagnostic spectacle
 
 Préférences → Moteurs / I/O → **Diagnostic spectacle**.
