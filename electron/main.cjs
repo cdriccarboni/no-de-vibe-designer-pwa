@@ -197,6 +197,67 @@ ipcMain.handle("nvd:host-card", async () => {
   return hostCard;
 });
 
+function localAiBase(raw = "http://127.0.0.1:11434") {
+  const url = new URL(String(raw || "http://127.0.0.1:11434"));
+  if (url.protocol !== "http:") throw new Error("Local AI Core : HTTP loopback requis");
+  if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(url.hostname)) {
+    throw new Error("Local AI Core : seules les adresses loopback sont autorisées");
+  }
+  return url.origin;
+}
+
+async function localAiFetch(url, options = {}, timeoutMs = 60000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+ipcMain.handle("nvd:local-ai-probe", async (_event, config = {}) => {
+  const base = localAiBase(config.baseUrl);
+  const res = await localAiFetch(base + "/api/tags", { method: "GET" }, 3500);
+  if (!res.ok) throw new Error("Ollama probe HTTP " + res.status);
+  const data = await res.json();
+  return {
+    ok: true,
+    baseUrl: base,
+    models: Array.isArray(data?.models)
+      ? data.models.map(m => String(m?.name || m?.model || "")).filter(Boolean)
+      : []
+  };
+});
+
+ipcMain.handle("nvd:local-ai-chat", async (_event, request = {}) => {
+  const base = localAiBase(request.baseUrl);
+  const model = String(request.model || "").trim();
+  if (!model) throw new Error("Local AI Core : modèle requis");
+  const res = await localAiFetch(base + "/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      format: "json",
+      options: {
+        temperature: Math.max(0, Math.min(1, Number(request.temperature ?? 0.15))),
+        num_predict: Math.max(256, Math.min(4096, Number(request.numPredict ?? 1800)))
+      },
+      messages: [
+        { role: "system", content: String(request.system || "") },
+        { role: "user", content: String(request.user || "") }
+      ]
+    })
+  }, 90000);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error("Ollama chat HTTP " + res.status + " · " + body.slice(0, 180));
+  }
+  return res.json();
+});
+
 
 ipcMain.handle("nvd:local-ai-probe", async (_event, options = {}) => {
   const data = await localAiRequest("/api/tags", { baseUrl: options.baseUrl, timeoutMs: 3500 });
