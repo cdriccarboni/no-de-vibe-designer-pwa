@@ -6,6 +6,7 @@ import { findWidget } from "/shared/companion-studio/bindings.js";
 import { loadRememberedHost } from "/shared/discovery/host-card.js";
 import { CONSOLE_PROFILES, PROTOCOL_FAMILIES } from "/shared/companion-studio/console-profiles.js";
 import { mergeRegieProfiles } from "/shared/companion-studio/layout-generator.js";
+import { REGIE_PRESETS, createRegiePreset } from "/shared/companion-studio/regie-presets.js";
 
 const $ = (id) => document.getElementById(id);
 const logEl = $("log");
@@ -296,6 +297,33 @@ function profileCategoryLabel(cat) {
   return ({lighting:"Lumière",sound:"Son",video:"Vidéo",utility:"Outils"})[cat] || cat;
 }
 
+function renderRegiePresets() {
+  const box = $("regiePresets");
+  if (!box) return;
+  box.innerHTML = REGIE_PRESETS.map(p => `
+    <button type="button" class="preset-card" data-preset="${p.id}">
+      <span><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.badge || "")}</small></span>
+      <em>${escapeHtml(p.description || "")}</em>
+    </button>`
+  ).join("");
+  box.querySelectorAll("[data-preset]").forEach(btn => {
+    btn.onclick = () => installRegiePreset(btn.dataset.preset);
+  });
+}
+
+function installRegiePreset(id) {
+  doc = createRegiePreset(id);
+  pageIndex = 0;
+  selectedId = currentPage()?.widgets?.[0]?.id || null;
+  saveCompanionLayout(doc);
+  syncLayoutToHost();
+  renderPageNav();
+  renderGrid();
+  const preset = REGIE_PRESETS.find(p => p.id === id);
+  log(`Preset installé · ${preset?.name || id}`);
+  $("regieDialog")?.close();
+}
+
 function renderRegieProfiles() {
   const selected = new Set(doc.meta?.profileIds || []);
   const groups = ["lighting","sound","video","utility"];
@@ -313,6 +341,7 @@ function renderRegieProfiles() {
 }
 
 function openRegieDialog() {
+  renderRegiePresets();
   renderRegieProfiles();
   $("regieDialog").showModal();
 }
