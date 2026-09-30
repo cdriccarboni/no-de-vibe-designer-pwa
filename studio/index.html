@@ -39,6 +39,20 @@
     <img id="monitorFrame" alt="Retour vidéo No-de" />
   </section>
 
+  <section id="cuePanel" class="cue-panel" aria-label="Conduite spectacle">
+    <div class="cue-summary">
+      <div class="cue-last"><span>JOUÉ</span><b id="cueLast">—</b></div>
+      <button type="button" id="cueGoRemote" class="cue-go">GO</button>
+      <div class="cue-standby"><span>EN ATTENTE</span><b id="cueStandby">Aucune cue</b></div>
+    </div>
+    <div class="cue-actions">
+      <button type="button" id="cuePrevRemote" class="ghost">‹ Préc.</button>
+      <button type="button" id="cueNextRemote" class="ghost">Suiv. ›</button>
+      <span id="cueProjectName" class="hint">Conduite non connectée</span>
+    </div>
+    <div id="cueListRemote" class="cue-list" role="listbox" aria-label="Liste des cues"></div>
+  </section>
+
   <nav class="page-nav" aria-label="Pages de régie">
     <button type="button" id="pagePrev" class="ghost" aria-label="Page précédente">‹</button>
     <div id="pageTabs" class="page-tabs"></div>
