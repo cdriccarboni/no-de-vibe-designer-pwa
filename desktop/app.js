@@ -110,6 +110,8 @@ ensureRouting(project);
 
 /** Catalogue UI — mêmes groupes ; marque visuelle des nodes exécutables. */
 const LIB = NODE_GROUPS.map(([title, items]) => [title, items]);
+const OSC_BRIDGE_TYPES = new Set(["twozero","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
+const SERIAL_NODE_TYPES = new Set(["arduino","esp","servo","rfid"]);
 let showExperimental = localStorage.getItem("nvd.showExperimental") === "1";
 
 function spec(t) {
@@ -509,10 +511,52 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="field"><label>Vitesse</label><input id="nSpeed" type="range" min="0" max="3" step=".01" value="${n.params.speed ?? .6}"></div>`;
     extra += `<div class="field"><label>Afficher les points</label><select id="nShowPoints"><option value="false">Non</option><option value="true">Oui</option></select></div>`;
   }
-  if (n.type === "osc") {
-    extra += `<div class="field"><label>Host / cible</label><input id="nHost" value="${n.params.host || "bridge"}"></div>`;
+  if (n.type === "osc" || OSC_BRIDGE_TYPES.has(n.type)) {
+    extra += `<div class="field"><label>Host / cible</label><input id="nHost" value="${n.params.host || (n.type === "osc" ? "bridge" : "127.0.0.1")}"></div>`;
     extra += `<div class="field"><label>Adresse OSC</label><input id="nAddr" value="${n.params.address || "/nvd/value"}"></div>`;
+    extra += `<div class="field"><label>Port UDP</label><input id="nPort" type="number" min="1" max="65535" value="${n.params.port || (n.type === "millumin" ? 5000 : n.type === "supercollider" ? 57120 : 9000)}"></div>`;
+    if (OSC_BRIDGE_TYPES.has(n.type)) extra += `<div class="field"><label>Envoi auto</label><select id="nAutoExternal"><option value="false">Non · Trigger conseillé</option><option value="true">Oui · à chaque changement</option></select></div>`;
   }
+  if (n.type === "arduino" || n.type === "esp") {
+    extra += `<div class="field"><label>Commande Serial</label><input id="nCommand" value="${n.params.command || "PING"}"></div>`;
+    extra += `<div class="field"><label>Envoi auto</label><select id="nAutoExternal"><option value="false">Non · Trigger conseillé</option><option value="true">Oui · au changement</option></select></div>`;
+    extra += `<div class="camera-actions"><button id="serialConnectBtn" type="button">Connecter Serial</button><button id="serialReconnectBtn" type="button">Reconnecter</button></div>`;
+    extra += `<p class="hint">Aucun ordre n'est envoyé à l'ajout du node. Le firmware reste à ta charge ; No-de transporte réellement les lignes Serial.</p>`;
+  }
+  if (n.type === "servo") {
+    extra += `<div class="field"><label>Canal</label><input id="nChannel" type="number" min="0" value="${n.params.channel ?? 0}"></div>`;
+    extra += `<div class="field"><label>Angle</label><input id="nAngle" type="number" min="0" max="180" value="${n.params.angle ?? 90}"></div>`;
+    extra += `<div class="field"><label>Vitesse</label><input id="nServoSpeed" type="number" min="0" step=".1" value="${n.params.speed ?? 1}"></div>`;
+    extra += `<div class="field"><label>Envoi auto</label><select id="nAutoExternal"><option value="false">Non · Trigger conseillé</option><option value="true">Oui · au changement</option></select></div>`;
+    extra += `<div class="camera-actions"><button id="serialConnectBtn" type="button">Connecter Serial</button><button id="serialReconnectBtn" type="button">Reconnecter</button></div>`;
+    extra += `<p class="hint">Commande par défaut : <code>SERVO canal angle vitesse</code>. Aucun mouvement n'est envoyé sans Trigger ou Envoi auto.</p>`;
+  }
+  if (n.type === "rfid") {
+    extra += `<div class="field"><label>Préfixe attendu</label><input id="nRfidPrefix" value="${n.params.prefix ?? "RFID:"}"></div>`;
+    extra += `<div class="camera-actions"><button id="serialConnectBtn" type="button">Connecter lecteur Serial</button><button id="serialReconnectBtn" type="button">Reconnecter</button></div>`;
+  }
+  if (n.type === "sensors") {
+    const sensor = n.params.sensor || "gyro";
+    extra += `<div class="field"><label>Capteur</label><select id="nSensor"><option value="gyro">Gyroscope</option><option value="accelerometer">Accéléromètre</option><option value="orientation">Orientation</option><option value="gps">GPS</option><option value="wifi">Wi-Fi</option><option value="touch">Touch</option></select></div>`;
+    n.params.sensor = sensor;
+  }
+  if (n.type === "inputmapper") {
+    extra += `<div class="field"><label>Entrée min</label><input id="nMapInMin" type="number" step=".01" value="${n.params.inMin ?? 0}"></div>`;
+    extra += `<div class="field"><label>Entrée max</label><input id="nMapInMax" type="number" step=".01" value="${n.params.inMax ?? 1}"></div>`;
+    extra += `<div class="field"><label>Sortie min</label><input id="nMapOutMin" type="number" step=".01" value="${n.params.outMin ?? 0}"></div>`;
+    extra += `<div class="field"><label>Sortie max</label><input id="nMapOutMax" type="number" step=".01" value="${n.params.outMax ?? 1}"></div>`;
+  }
+  if (n.type === "automation") {
+    extra += `<div class="field"><label>Vitesse</label><input id="nAutoSpeed" type="number" step=".01" value="${n.params.speed ?? .25}"></div>`;
+    extra += `<div class="field"><label>Phase</label><input id="nAutoPhase" type="number" step=".01" value="${n.params.phase ?? 0}"></div>`;
+    extra += `<div class="field"><label>Forme</label><select id="nAutoShape"><option value="sine">Sinus</option><option value="triangle">Triangle</option><option value="saw">Dent de scie</option><option value="square">Carré</option></select></div>`;
+  }
+  if (n.type === "datalab") {
+    extra += `<div class="field"><label>Échelle</label><input id="nDataScale" type="number" step=".01" value="${n.params.scale ?? 1}"></div>`;
+    extra += `<div class="field"><label>Offset</label><input id="nDataBias" type="number" step=".01" value="${n.params.bias ?? 0}"></div>`;
+  }
+  if (n.type === "surface") extra += `<p class="hint">Passage de valeur vers le Control Surface. Expose ensuite les paramètres utiles depuis l'inspecteur des nodes concernés.</p>`;
+  if (n.type === "connectors") extra += `<p class="hint">Lien local typé pour organiser le patch sans conversion de valeur.</p>`;
   if (n.type === "midi") {
     extra += `<div class="field"><label>Fallback CC (0–1)</label><input id="nFb" type="range" min="0" max="1" step=".01" value="${n.params.fallback ?? 0}"></div>`;
     extra += `<p class="hint">Matériel MIDI : à vérifier sur périphérique réel. Test logiciel = bus interne.</p>`;
@@ -616,6 +660,35 @@ function selectNode(id, { additive = false } = {}) {
   if ($("#nInt")) $("#nInt").oninput = e => { n.params.intensity = +e.target.value; runtime.render(); autosave(); };
   if ($("#nHost")) $("#nHost").onchange = e => { n.params.host = e.target.value; autosave(); commitHistory(); };
   if ($("#nAddr")) $("#nAddr").onchange = e => { n.params.address = e.target.value; autosave(); commitHistory(); };
+  if ($("#nPort")) $("#nPort").onchange = e => { n.params.port = Math.max(1, Math.min(65535, +e.target.value || 9000)); autosave(); commitHistory(); };
+  if ($("#nAutoExternal")) {
+    $("#nAutoExternal").value = String(n.params.auto === true);
+    $("#nAutoExternal").onchange = e => { n.params.auto = e.target.value === "true"; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#nCommand")) $("#nCommand").onchange = e => { n.params.command = e.target.value; autosave(); commitHistory(); };
+  if ($("#nChannel")) $("#nChannel").onchange = e => { n.params.channel = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nAngle")) $("#nAngle").onchange = e => { n.params.angle = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nServoSpeed")) $("#nServoSpeed").onchange = e => { n.params.speed = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nRfidPrefix")) $("#nRfidPrefix").onchange = e => { n.params.prefix = e.target.value; autosave(); commitHistory(); };
+  if ($("#nSensor")) {
+    $("#nSensor").value = n.params.sensor || "gyro";
+    $("#nSensor").onchange = e => { n.params.sensor = e.target.value; runtime.render(); autosave(); commitHistory(); };
+  }
+  for (const [id,key] of [["nMapInMin","inMin"],["nMapInMax","inMax"],["nMapOutMin","outMin"],["nMapOutMax","outMax"],["nAutoSpeed","speed"],["nAutoPhase","phase"],["nDataScale","scale"],["nDataBias","bias"]]) {
+    if ($("#"+id)) $("#"+id).onchange = e => { n.params[key] = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#nAutoShape")) {
+    $("#nAutoShape").value = n.params.shape || "sine";
+    $("#nAutoShape").onchange = e => { n.params.shape = e.target.value; runtime.render(); autosave(); commitHistory(); };
+  }
+  if ($("#serialConnectBtn")) $("#serialConnectBtn").onclick = async () => {
+    try { await devices.serial.connect(); log("SERIAL · connecté"); runtime.render(); }
+    catch (e) { log("SERIAL · " + (e?.message || e)); }
+  };
+  if ($("#serialReconnectBtn")) $("#serialReconnectBtn").onclick = async () => {
+    try { const port = await devices.serial.reconnect(); log(port ? "SERIAL · reconnecté" : "SERIAL · aucun port autorisé"); runtime.render(); }
+    catch (e) { log("SERIAL · " + (e?.message || e)); }
+  };
   if ($("#nFb")) $("#nFb").oninput = e => { n.params.fallback = +e.target.value; runtime.render(); autosave(); };
   if ($("#nFreq")) $("#nFreq").onchange = e => { n.params.freq = +e.target.value; runtime.render(); autosave(); commitHistory(); };
   if ($("#nGain")) $("#nGain").oninput = e => { n.params.gain = +e.target.value; runtime.render(); autosave(); };
