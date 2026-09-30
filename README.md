@@ -1,15 +1,37 @@
 # No-de Vibe Designer — public PWA
 
-Built artifacts only. Source: private `no-de-vibe-designer`.
+No-de Vibe Designer est une PWA multi-interface pour la régie et la création visuelle : Designer, Mobile, Régie, Plateau et Remote Camera.
 
-- Public URL: https://cdriccarboni.github.io/no-de-vibe-designer-pwa/
-- Version: 1.3.0
-- Release branch: release/1.3.0
-- Source commit: 912b731ab851ee1df293e5449c95e904acf5268f
-
+- PWA publique : https://cdriccarboni.github.io/no-de-vibe-designer-pwa/
+- Version : 1.3.1
+- Package Android : `fr.acousmatic.nodevibedesigner`
+- versionCode Android : `131`
+- Target Android : API 36
+- Source de build : `build-info.json`
 
 ## Android
 
-- APK direct : [No-de Vibe Designer 1.3.0](./downloads/No-de-Vibe-Designer-1.3.0-debug.apk)
-- Vérification : [package / version / signature](./downloads/android-verification.txt)
-- AAB : disponible pour préparation Play, mais la copie publique actuelle est non signée.
+### Test direct
+
+- Page de téléchargement : https://cdriccarboni.github.io/no-de-vibe-designer-pwa/downloads/
+- APK de test : `downloads/No-de-Vibe-Designer-1.3.1-debug.apk`
+- Vérification APK : `downloads/android-verification.txt`
+
+L'APK public sert uniquement aux tests directs. La distribution Google Play utilise un **AAB release signé avec la clé d'upload Play**, généré par GitHub Actions sans publier la clé dans le dépôt.
+
+### Google Play
+
+Le workflow `.github/workflows/android-build.yml` produit :
+
+1. un APK debug pour les tests directs ;
+2. un AAB de contrôle non signé ;
+3. un AAB Play signé si les secrets de signature sont configurés ;
+4. une publication optionnelle vers les canaux `internal`, `alpha` ou `beta`.
+
+Les instructions de finalisation sont dans `play/README.md`.
+
+## Confidentialité
+
+La politique de confidentialité publique est disponible ici :
+
+https://cdriccarboni.github.io/no-de-vibe-designer-pwa/privacy/
