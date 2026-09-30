@@ -15,7 +15,8 @@ export const BINDING_KINDS = Object.freeze({
   midi: "midi",
   serial: "serial",
   video: "video",
-  camera: "camera"
+  camera: "camera",
+  audioplayer: "audioplayer"
 });
 
 /**
@@ -36,6 +37,7 @@ export function applyCompanionBinding({
   sendSerial = null,
   cameraControl = null,
   videoControl = null,
+  audioPlayerControl = null,
   onLog = () => {}
 } = {}) {
   if (!widget?.id) throw new Error("Widget absent");
@@ -221,6 +223,21 @@ export function applyCompanionBinding({
       const action = binding.videoAction || binding.action || "toggle";
       videoControl(action);
       return makeStudioFeedback({ widgetId: widget.id, value: action, ok: true, detail: `VIDEO ${action}`, rttMs: Date.now() - t0 });
+    }
+
+    if (kind === "audioplayer") {
+      if (typeof audioPlayerControl !== "function") throw new Error("Rack audio hôte indisponible");
+      const slot = Math.max(1, Math.min(12, Number(binding.playerSlot) || 1));
+      const action = binding.playerAction || binding.action || "play";
+      const state = audioPlayerControl(slot, action, value);
+      onLog(`Companion · Audio P${slot} · ${action}`);
+      return makeStudioFeedback({
+        widgetId: widget.id,
+        value: state?.playing ?? value ?? true,
+        ok: true,
+        detail: `P${slot} · ${action}`,
+        rttMs: Date.now() - t0
+      });
     }
 
     throw new Error(`Binding inconnu : ${kind}`);
