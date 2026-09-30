@@ -122,6 +122,7 @@ const runtime = new Runtime($("#previewCanvas"), {
 });
 runtime.setDeviceBus(deviceBus);
 
+let pnpState = null;
 const devices = new DeviceManager(e => {
   if (e.type === "midi-in") {
     deviceBus.lastMidi = e.message;
@@ -131,11 +132,136 @@ const devices = new DeviceManager(e => {
     log(`SERIAL < ${e.line}`);
   } else if (e.type === "serial-state") {
     deviceBus.serialState = e.state || "offline";
+    if (pnpState?.serial) pnpState.serial.connected = e.state === "online";
+    renderPnpStatus();
     log(`SERIAL · ${e.state}`);
   } else if (e.type === "bridge-message") {
     log(`BRIDGE < ${typeof e.data === "string" ? e.data : JSON.stringify(e.data).slice(0, 160)}`);
   } else if (e.type === "bridge-state") log(`BRIDGE · ${e.state}`);
-  else if (e.type === "midi-state") log(`MIDI · ${e.inputs.length} IN / ${e.outputs.length} OUT`);
+  else if (e.type === "midi-state") {
+    pnpState ||= { midi:{}, serial:{} };
+    pnpState.midi = { ...(pnpState.midi || {}), connected: e.inputs.length + e.outputs.length > 0 || !!devices.midi.access, inputs:e.inputs.length, outputs:e.outputs.length };
+    renderPnpStatus();
+    log(`MIDI · ${e.inputs.length} IN / ${e.outputs.length} OUT`);
+  } else if (e.type === "pnp-probe") {
+    pnpState = e.result;
+    renderPnpStatus();
+  }
+});
+
+function readGeneralPrefsNow() {
+  try {
+    return { restoreAutosave:true, loadDemo:true, plugAndPlay:true, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") };
+  } catch {
+    return { restoreAutosave:true, loadDemo:true, plugAndPlay:true };
+  }
+}
+
+function writeGeneralPrefsFromUi() {
+  const previous = readGeneralPrefsNow();
+  const next = {
+    ...previous,
+    restoreAutosave: $("#prefRestoreAutosave")?.checked !== false,
+    loadDemo: $("#prefLoadDemo")?.checked !== false,
+    plugAndPlay: $("#prefPlugAndPlay")?.checked !== false
+  };
+  localStorage.setItem("nvd.general", JSON.stringify(next));
+  return next;
+}
+
+function renderPnpStatus() {
+  const btn = $("#pnpBtn");
+  if (!btn) return;
+  const prefs = readGeneralPrefsNow();
+  btn.classList.remove("live", "attention");
+  if (prefs.plugAndPlay === false) {
+    btn.textContent = "P&P · OFF";
+    btn.title = "Plug & Play désactivé";
+    return;
+  }
+  const midi = pnpState?.midi;
+  const serial = pnpState?.serial;
+  const linked = Number(!!midi?.connected) + Number(!!serial?.connected);
+  if (linked >= 2) {
+    btn.textContent = "P&P · 2 LIÉS";
+    btn.classList.add("live");
+  } else if (serial?.connected) {
+    btn.textContent = "P&P · USB ✓";
+    btn.classList.add("live");
+  } else if (midi?.connected) {
+    btn.textContent = "P&P · MIDI ✓";
+    btn.classList.add("live");
+  } else if ((serial?.authorized || 0) > 0 || midi?.permission === "granted") {
+    btn.textContent = "P&P · PRÊT";
+    btn.classList.add("attention");
+  } else {
+    btn.textContent = "P&P · AUTO";
+  }
+  btn.title = "Plug & Play · détecter / connecter les périphériques";
+}
+
+async function runPlugAndPlayProbe({ silent=false } = {}) {
+  const prefs = readGeneralPrefsNow();
+  if (prefs.plugAndPlay === false) {
+    renderPnpStatus();
+    return null;
+  }
+  try {
+    const result = await devices.probe({ autoReconnectSerial:true, autoConnectGrantedMidi:true });
+    pnpState = result;
+    renderPnpStatus();
+    if (!silent) {
+      const bits = [];
+      if (result.serial?.connected) bits.push("USB/Serial connecté");
+      else if (result.serial?.authorized) bits.push(`${result.serial.authorized} USB/Serial autorisé(s)`);
+      if (result.midi?.connected) bits.push(`MIDI ${result.midi.inputs || 0} IN / ${result.midi.outputs || 0} OUT`);
+      log(`Plug & Play · ${bits.length ? bits.join(" · ") : "prêt · rien à autoriser pour l’instant"}`);
+    }
+    return result;
+  } catch (error) {
+    log(`Plug & Play · ${error?.message || error}`);
+    return null;
+  }
+}
+
+async function connectPnpMidi() {
+  try {
+    await devices.connectMidi();
+    await runPlugAndPlayProbe({ silent:true });
+    log("Plug & Play · MIDI connecté");
+  } catch (error) {
+    log(`MIDI · ${error?.message || error}`);
+  }
+}
+
+async function connectPnpSerial() {
+  try {
+    await devices.connectSerial();
+    await runPlugAndPlayProbe({ silent:true });
+    log("Plug & Play · USB / Arduino / ESP connecté");
+  } catch (error) {
+    log(`SERIAL · ${error?.message || error}`);
+  }
+}
+
+$("#pnpBtn")?.addEventListener("click", event => {
+  event.stopPropagation();
+  $("#pnpMenu")?.classList.toggle("hidden");
+});
+$("#pnpRefresh")?.addEventListener("click", async () => {
+  $("#pnpMenu")?.classList.add("hidden");
+  await runPlugAndPlayProbe();
+});
+$("#pnpMidi")?.addEventListener("click", async () => {
+  $("#pnpMenu")?.classList.add("hidden");
+  await connectPnpMidi();
+});
+$("#pnpSerial")?.addEventListener("click", async () => {
+  $("#pnpMenu")?.classList.add("hidden");
+  await connectPnpSerial();
+});
+document.addEventListener("click", event => {
+  if (!event.target?.closest?.(".pnp-wrap")) $("#pnpMenu")?.classList.add("hidden");
 });
 
 runtime.setBridgeSend(packet => {
@@ -1733,6 +1859,7 @@ function openPreferences(tab = "general") {
   try {
     const g = JSON.parse(localStorage.getItem("nvd.general") || "{}");
     if ($("#prefRestoreAutosave")) $("#prefRestoreAutosave").checked = g.restoreAutosave !== false;
+    if ($("#prefPlugAndPlay")) $("#prefPlugAndPlay").checked = g.plugAndPlay !== false;
     if ($("#prefLoadDemo")) $("#prefLoadDemo").checked = g.loadDemo !== false;
   } catch { /* */ }
   if ($("#prefDefaultZoom")) $("#prefDefaultZoom").value = String(Math.round(view.scale * 100));
@@ -1809,13 +1936,13 @@ $("#clearAutosave")?.addEventListener("click", () => {
   localStorage.removeItem("cvd.autosave");
   log("Autosave effacée");
 });
-$("#prefRestoreAutosave")?.addEventListener("change", () => {
-  const g = { restoreAutosave: $("#prefRestoreAutosave").checked, loadDemo: $("#prefLoadDemo")?.checked !== false };
-  localStorage.setItem("nvd.general", JSON.stringify(g));
-});
-$("#prefLoadDemo")?.addEventListener("change", () => {
-  const g = { restoreAutosave: $("#prefRestoreAutosave")?.checked !== false, loadDemo: $("#prefLoadDemo").checked };
-  localStorage.setItem("nvd.general", JSON.stringify(g));
+$("#prefRestoreAutosave")?.addEventListener("change", () => { writeGeneralPrefsFromUi(); });
+$("#prefLoadDemo")?.addEventListener("change", () => { writeGeneralPrefsFromUi(); });
+$("#prefPlugAndPlay")?.addEventListener("change", async () => {
+  const next = writeGeneralPrefsFromUi();
+  renderPnpStatus();
+  if (next.plugAndPlay !== false) await runPlugAndPlayProbe();
+  else log("Plug & Play · désactivé");
 });
 $("#prefDefaultZoom")?.addEventListener("input", e => {
   view.scale = Math.max(0.4, Math.min(2.2, (+e.target.value || 100) / 100));
@@ -2038,7 +2165,7 @@ ensureEdges();
 updateRouteButtons();
 buildLibrary();
 
-let generalPrefs = { restoreAutosave: true, loadDemo: true };
+let generalPrefs = { restoreAutosave: true, loadDemo: true, plugAndPlay: true };
 try { generalPrefs = { ...generalPrefs, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") }; } catch { /* */ }
 
 let recoveredFromCrash = false;
@@ -2076,6 +2203,10 @@ if (project.nodes.length === 0 && generalPrefs.loadDemo !== false && localStorag
   setDemoBanner(false);
 }
 $("#demoExitBtn")?.addEventListener("click", exitShowcaseDemo);
+renderPnpStatus();
+if (generalPrefs.plugAndPlay !== false) {
+  queueMicrotask(() => runPlugAndPlayProbe({ silent:true }));
+}
 redraw();
 history.clear();
 commitHistory();
