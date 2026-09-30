@@ -452,6 +452,25 @@ assert(bh.get(2)?.pixels?.length === 8 * 8 * 4, "blackhole processor");
 const xf = logicFns.get("transform")({ id: "xf", params: { scale: 1, rotation: 0, opacity: 1 } }, new Map([[0, { value: bh.get(2) }]]), {});
 assert(xf.get(3)?.pixels?.length >= 16 * 16 * 4 && xf.get(3)?.source === "transform", "transform processor");
 
+console.log("stage-video-1.2");
+const stageFrame = {
+  kind: "video", width: 16, height: 16,
+  pixels: new Uint8ClampedArray(16 * 16 * 4).map((_, i) => (i % 4 === 3 ? 255 : (i * 17) % 255))
+};
+const stageInput = new Map([[0, { value: stageFrame }]]);
+for (const type of ["videoreturn", "mapping", "anaglyph", "creativefx", "storm", "bending", "transmute"]) {
+  assert(isExecutable(type), `${type} is executable`);
+}
+const returnOut = logicFns.get("videoreturn")({ id: "vr", params: {} }, stageInput, {});
+assert(returnOut.get(2) === stageFrame && returnOut.get(1)?.value === "LIVE", "video return pass-through");
+const stageCtx = { width: 16, height: 16, time: 1.2, frameScratch: new Map(), warnings: [], errors: [] };
+const mapOut = logicFns.get("mapping")({ id: "map", params: { scale: 1 } }, stageInput, stageCtx);
+assert(mapOut.get(2)?.pixels?.length >= 16 * 16 * 4, "mapping processor");
+for (const type of ["anaglyph", "creativefx", "storm", "bending", "transmute"]) {
+  const out = logicFns.get(type)({ id: type, params: { amount: 0.5, depth: 0.05 } }, stageInput, stageCtx);
+  assert(out.get(2)?.pixels?.length === 16 * 16 * 4, `${type} raster processor`);
+}
+
 console.log("wrap-box-ports");
 const wrapGraph = {
   nodes: [
