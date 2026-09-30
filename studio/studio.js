@@ -1,7 +1,7 @@
-import { STUDIO_MODES, normalizeWidget } from "/shared/companion-studio/schema.js";
+import { STUDIO_MODES, normalizeWidget, validateCompanionDocument } from "/shared/companion-studio/schema.js";
 import { ensureCompanionLayout, saveCompanionLayout } from "/shared/companion-studio/store.js";
 import { createWsCompanionTransport } from "/shared/companion-studio/transport-ws.js";
-import { STUDIO_MSG, makeStudioAction } from "/shared/companion-studio/protocol.js";
+import { STUDIO_MSG, makeStudioAction, makeStudioLayout } from "/shared/companion-studio/protocol.js";
 import { findWidget } from "/shared/companion-studio/bindings.js";
 import { loadRememberedHost } from "/shared/discovery/host-card.js";
 
@@ -14,6 +14,8 @@ let mode = STUDIO_MODES.EDITION;
 let doc = ensureCompanionLayout();
 let selectedId = doc.pages[0]?.widgets?.[0]?.id || null;
 let transport = null;
+let layoutRevision = 0;
+let monitorLastAt = 0;
 const clientId = `studio-${Math.random().toString(36).slice(2, 7)}`;
 
 function log(msg) {
@@ -53,14 +55,29 @@ function escapeHtml(s) {
   return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function targetForWidget(w) {
+  const b = w?.binding || {};
+  if (b.kind === "osc") return `${b.oscAddress || "/nvd/companion"}@${b.oscHost || "127.0.0.1"}:${b.oscPort || 9000}`;
+  if (b.kind === "serial") return b.serialText || "COMPANION {value}";
+  if (b.kind === "midi") return (b.midiData || [176,0,-1]).join(",");
+  if (b.kind === "camera") return b.cameraAction || b.action || "toggle";
+  if (b.kind === "video") return b.videoAction || b.action || "toggle";
+  return "";
+}
+
 function syncEditor() {
   const w = findWidget(doc, selectedId);
   if (!w) return;
   $("edLabel").value = w.presentation?.label || "";
   $("edSecondary").value = w.presentation?.secondary || "";
   $("edColor").value = w.presentation?.color || "#d7b86a";
+  $("edW").value = Math.max(1, Math.min(4, Number(w.presentation?.w) || 1));
+  $("edH").value = Math.max(1, Math.min(6, Number(w.presentation?.h) || 1));
   const bind = `${w.binding?.kind || "action"}:${w.binding?.action || "ping"}`;
   $("edBinding").value = [...$("edBinding").options].some((o) => o.value === bind) ? bind : "action:ping";
+  $("edTarget").value = targetForWidget(w);
+  const needsTarget = ["osc","serial","midi","camera","video"].includes(w.binding?.kind);
+  $("edTargetWrap").style.display = needsTarget ? "grid" : "none";
 }
 
 function onWidgetClick(id) {
@@ -105,6 +122,49 @@ function flash(id, ok) {
   setTimeout(() => el.classList.remove("flash", "err"), 280);
 }
 
+function syncLayoutToHost() {
+  if (!transport || transport.state !== "CONNECTED") return false;
+  layoutRevision += 1;
+  try {
+    transport.send({ ...makeStudioLayout(doc, { revision: layoutRevision }), clientId });
+    return true;
+  } catch (e) {
+    log(`Sync layout · ${e.message || e}`);
+    return false;
+  }
+}
+
+function hideMonitor() {
+  $("monitorPanel").hidden = true;
+  $("monitorFrame").removeAttribute("src");
+  $("monitorInfo").textContent = "—";
+  monitorLastAt = 0;
+}
+
+function parseBindingTarget(w, kind, action, raw) {
+  const value = String(raw || "").trim();
+  w.binding.kind = kind;
+  w.binding.action = action;
+  if (kind === "osc") {
+    const at = value.lastIndexOf("@");
+    const address = at >= 0 ? value.slice(0, at) : value;
+    const hostPort = at >= 0 ? value.slice(at + 1) : "127.0.0.1:9000";
+    const colon = hostPort.lastIndexOf(":");
+    w.binding.oscAddress = address.startsWith("/") ? address : "/nvd/companion";
+    w.binding.oscHost = colon >= 0 ? hostPort.slice(0, colon) || "127.0.0.1" : hostPort || "127.0.0.1";
+    w.binding.oscPort = colon >= 0 ? Math.max(1, Math.min(65535, Number(hostPort.slice(colon + 1)) || 9000)) : 9000;
+  } else if (kind === "serial") {
+    w.binding.serialText = value || "COMPANION {value}";
+  } else if (kind === "midi") {
+    const data = value.split(",").map(v => Number(v.trim())).filter(Number.isFinite).slice(0, 3);
+    w.binding.midiData = data.length ? data : [176, 0, -1];
+  } else if (kind === "camera") {
+    w.binding.cameraAction = value || action || "toggle";
+  } else if (kind === "video") {
+    w.binding.videoAction = value || action || "toggle";
+  }
+}
+
 function setMode(next) {
   mode = next;
   document.body.className = `mode-${mode}`;
@@ -123,12 +183,14 @@ $("edApply").onclick = () => {
   w.presentation.label = $("edLabel").value.trim() || w.presentation.label;
   w.presentation.secondary = $("edSecondary").value.trim();
   w.presentation.color = $("edColor").value;
+  w.presentation.w = Math.max(1, Math.min(4, Number($("edW").value) || 1));
+  w.presentation.h = Math.max(1, Math.min(6, Number($("edH").value) || 1));
   const [kind, action] = String($("edBinding").value || "action:ping").split(":");
-  w.binding.kind = kind;
-  w.binding.action = action;
+  parseBindingTarget(w, kind, action, $("edTarget").value);
   saveCompanionLayout(doc);
+  syncLayoutToHost();
   renderGrid();
-  log("Widget mis à jour · layout local sauvé");
+  log("Widget mis à jour · layout sauvé + synchronisé");
 };
 
 $("edAdd").onclick = () => {
@@ -142,12 +204,30 @@ $("edAdd").onclick = () => {
   page.widgets.push(w);
   selectedId = w.id;
   saveCompanionLayout(doc);
+  syncLayoutToHost();
   renderGrid();
+};
+
+$("edDelete").onclick = () => {
+  if (mode === STUDIO_MODES.PLATEAU) return;
+  const page = currentPage();
+  page.widgets = (page.widgets || []).filter(w => w.id !== selectedId);
+  selectedId = page.widgets[0]?.id || null;
+  saveCompanionLayout(doc);
+  syncLayoutToHost();
+  renderGrid();
+  log("Widget supprimé");
+};
+
+$("edBinding").onchange = () => {
+  const kind = String($("edBinding").value || "action:ping").split(":")[0];
+  $("edTargetWrap").style.display = ["osc","serial","midi","camera","video"].includes(kind) ? "grid" : "none";
 };
 
 $("btnSave").onclick = () => {
   saveCompanionLayout(doc);
-  log(`Layout sauvé · ${doc.name}`);
+  syncLayoutToHost();
+  log(`Layout sauvé + synchronisé · ${doc.name}`);
 };
 
 $("btnConnect").onclick = async () => {
@@ -160,6 +240,49 @@ $("btnConnect").onclick = async () => {
       clientId,
       pairCode: ($("pairCode").value || "").trim(),
       onMessage: (msg) => {
+        if (msg.type === STUDIO_MSG.LAYOUT && msg.layout) {
+          try {
+            doc = validateCompanionDocument(msg.layout);
+            saveCompanionLayout(doc);
+            selectedId = doc.pages[0]?.widgets?.[0]?.id || null;
+            layoutRevision = Math.max(layoutRevision, Number(msg.revision) || 0);
+            renderGrid();
+            transport?.send({
+              type: STUDIO_MSG.LAYOUT_ACK,
+              clientId,
+              revision: msg.revision || layoutRevision,
+              ok: true,
+              t: Date.now()
+            });
+            log(`Layout ← hôte · ${doc.name}`);
+          } catch (e) {
+            log(`Layout invalide ← hôte · ${e.message || e}`);
+          }
+          return;
+        }
+        if (msg.type === STUDIO_MSG.LAYOUT_ACK) {
+          log(msg.ok === false ? `Layout refusé · ${msg.error || "?"}` : `Layout ACK · rev ${msg.revision || "?"}`);
+          return;
+        }
+        if (msg.type === STUDIO_MSG.MONITOR_START) {
+          $("monitorPanel").hidden = false;
+          $("monitorInfo").textContent = `${msg.width || 480}px · ${msg.fps || 8} fps cible`;
+          log("Monitor ← hôte · démarré");
+          return;
+        }
+        if (msg.type === STUDIO_MSG.MONITOR_FRAME && typeof msg.frame === "string") {
+          $("monitorPanel").hidden = false;
+          $("monitorFrame").src = msg.frame;
+          monitorLastAt = Date.now();
+          const age = typeof msg.sentAt === "number" ? Math.max(0, Date.now() - msg.sentAt) : null;
+          $("monitorInfo").textContent = age == null ? "LIVE" : `frame ${age} ms`;
+          return;
+        }
+        if (msg.type === STUDIO_MSG.MONITOR_STOP) {
+          hideMonitor();
+          log("Monitor ← hôte · coupé");
+          return;
+        }
         if (msg.type === STUDIO_MSG.FEEDBACK) {
           const w = findWidget(doc, msg.widgetId);
           if (w) {
@@ -194,9 +317,23 @@ $("btnConnect").onclick = async () => {
   }
 };
 
+$("btnRequestMonitor").onclick = () => {
+  if (!transport || transport.state !== "CONNECTED") return log("Monitor · connecte d'abord le Studio");
+  transport.send({ type: STUDIO_MSG.MONITOR_START, clientId, t: Date.now() });
+  log("Monitor · demande envoyée");
+};
+
+$("btnStopMonitor").onclick = () => {
+  try { transport?.send({ type: STUDIO_MSG.MONITOR_STOP, clientId, t: Date.now() }); } catch { /* */ }
+  hideMonitor();
+  log("Monitor · stop demandé");
+};
+
 $("btnDisconnect").onclick = () => {
+  try { transport?.send({ type: STUDIO_MSG.MONITOR_STOP, clientId, t: Date.now() }); } catch { /* */ }
   transport?.disconnect();
   transport = null;
+  hideMonitor();
   netStatus.textContent = "DISCONNECTED";
   log("Déconnecté");
 };
