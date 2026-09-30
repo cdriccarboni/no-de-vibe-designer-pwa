@@ -1,77 +1,122 @@
-# No-de Vibe Designer — Production Readiness 1.2.0
+# No-de Vibe Designer — Production Readiness 1.3.0
 
 Date : 2026-09-30  
 Source canonique : `main`
 
 ## Couverture moteur
 
-- **81/81 types de nodes de la Library ont des ports exécutables et un processeur réel.**
+- **105/105 types de nodes de la Library ont des ports exécutables et un processeur réel.**
 - Les nodes internes `box-in` / `box-out` complètent les sous-patchs.
-- La Library démarre en mode Production ; le filtre Expérimental se masque automatiquement lorsqu’aucun type incomplet n’existe.
-- `npm run audit:production` échoue si un node Library perd son processeur, si un nouveau type incomplet apparaît sans revue, ou si la couverture descend sous 81/81.
+- `npm run audit:production` échoue si un node Library perd son processeur, si un type incomplet apparaît ou si la couverture descend sous 105/105.
+- La Library ne doit plus afficher de faux `＋` sans moteur.
 
-## Moteurs principaux
+## Moteurs théâtre / interaction
 
-- Vidéo : caméra locale, Remote Camera, vidéo fichier, retour vidéo, mapping 2D, Shader Lab, Anaglyphe, Creative FX, Storm, Bending, Transmute, Ghost, Threshold, Mirror, Shadow, Body Clone, Composite, Transform.
-- Génératif offline : Processing Garden / p5 subset, Sketch Lab, Dream Engine, Baleine, Blob, Trou noir.
-- Audio : Audio Lab, filtre, delay, FFT, Organic Audio, niveau micro / mémo.
-- Contrôle : MIDI, OSC, Art-Net/DMX, Control Surface, Input Mapper, Stage I/O.
-- Serial : Arduino, ESP/Wemos, Servo, RFID/QR Serial, capteurs génériques.
-- Passerelles OSC : TWOZERO, TD Tool, Isadora Tool, Chataigne, Millumin, TouchDesigner, Isadora, Max/MSP, Pure Data, SuperCollider.
-- Projet : sous-patch, Show Importer, Automation, Data Lab, Universal Wire, Connectors.
-- Mobile : caméras, micro, tactile, multitouch, gyroscope, accéléromètre, orientation, GPS, haptique, Wi‑Fi, Bluetooth.
+- **Présence / Interprète** : identité nommable, source vidéo, activité et position scénique.
+- **Ombre Vivante** : silhouette, jardin/cour, miroir, décrochage mémorisé, rattachement et autonomie organique.
+- Sorties scéniques nommables : rideau de fils, cyclo, écran, tulle, sol, etc.
+- Langage naturel : le Planner peut transformer une description de scène en patch lisible et nommé.
+
+## Moteurs visuels
+
+Vidéo / FX :
+- caméra locale, Remote Camera, fichier vidéo, retour vidéo, mapping, Stage Output ;
+- Threshold, Depth/Silhouette Mask, Optical Flow, Ghost, Feedback, Mirror, Shadow, Body Clone ;
+- Fluid Warp, Refraction/Glass, Point Cloud Depth, Composite, Transform ;
+- Shader Lab, Anaglyphe, Creative FX, Storm, Bending, Transmute.
+
+Interactif / génératif offline :
+- Thread Curtain ;
+- Flow Field / particules ;
+- Reaction Diffusion ;
+- Ribbon Trails ;
+- Metaballs / SDF ;
+- Interactive Sand ;
+- Swarm / Boids ;
+- Ripple Field ;
+- Baleine, Blob, Trou noir ;
+- Processing Garden / p5 subset, Sketch Lab, Dream Engine.
+
+## Audio / contrôle / devices
+
+- Audio Lab, filtre, delay, FFT, Organic Audio, mémo sonore.
+- MIDI, OSC, Control Surface, Input Mapper, Stage I/O.
+- Art-Net / DMX.
+- **sACN / E1.31** natif via bridge Electron/Node.
+- Arduino, ESP/Wemos, Servo, RFID/QR Serial, capteurs.
+- Mobile : caméras, micro, tactile, multitouch, gyro, accéléromètre, orientation, GPS, haptique, Wi-Fi, Bluetooth.
+
+## Companion Régie
+
+Companion Studio fournit une régie tablette sobre et personnalisable :
+
+- pages **Conduite / Son / Lumière / Vidéo / Plateau** ;
+- swipe horizontal ;
+- button / momentary / toggle / fader ;
+- sauvegarde Local First et synchronisation live ;
+- feedback réseau ;
+- profils consoles/logicielles ;
+- presets fonctionnels compacts ;
+- OSC / MIDI / Serial / Art-Net / sACN ;
+- transport vidéo/monitor séparé des commandes.
+
+Les profils consoles sont des recettes au-dessus des protocoles réels : No-de ne simule pas une compatibilité non vérifiée.
+
+## IA locale / Vibe
+
+Architecture local-first :
+
+1. Ollama local via Electron ;
+2. modèle par défaut `qwen2.5-coder:7b` ;
+3. sortie structurée en opérations JSON ;
+4. **Planner déterministe** capable de construire des patches sans modèle ;
+5. **Safety Engine** indépendant avant preview puis avant Apply ;
+6. Undo disponible ;
+7. cloud distant uniquement en secours explicite.
+
+Sécurité :
+- l’IA ne peut pas armer automatiquement les sorties Serial / Servo / OSC / DMX ;
+- aucune permission caméra/micro n’est accordée automatiquement ;
+- nombre d’opérations et nouveaux nodes bornés ;
+- connexions incompatibles filtrées.
+
+## ART → No-de
+
+Briques reprises/adaptées depuis notre code ART :
+
+- cycle Remote Camera / retour vidéo PeerJS-WebRTC ;
+- reconnexion ;
+- RTT par data channel ;
+- état LIVE uniquement après première frame réelle ;
+- séparation contrôle / média ;
+- approche NDI honnête : navigateur = pas d’émission NDI native.
+
+### NDI
+
+Le node NDI est **PLATFORM-LIMITED** tant que le relais natif n’est pas présent.  
+No-de ne revendique jamais un faux flux NDI. La cible produit est : vidéo No-de → relais natif local → NDI réseau.
 
 ## Sécurité de scène
 
-Les nodes qui peuvent agir sur du matériel ou un logiciel externe sont **désarmés par défaut**.
+Les actions externes sont désarmées par défaut :
 
-- Arduino / ESP / Servo : aucun envoi à l’ajout du node.
-- Bridges OSC : aucun envoi à l’ajout du node.
-- Envoi uniquement par **Trigger** ou après activation explicite de **Envoi auto**.
-- Le bouton PANIC coupe le moteur et les traitements audio prévus par le projet.
-- Les erreurs du graphe restent visibles sans faux état « OK ».
-
-## Processing / Sketch
-
-Le moteur génératif est embarqué et offline. Pour rester déterministe et sûr en spectacle, il n’exécute pas de JavaScript arbitraire.
-
-Sous-ensemble : `background()`, `fill()`, `circle()`, `rect()`, `line()`, `wave()`.
-
-Variables : `width`, `height`, `time`, `frameCount`, `mouseX`, `mouseY`.
-
-## Show Importer
-
-Le node importe réellement :
-- un projet `.cvd.json` en tant que source de cues ;
-- ou un manifeste `{"name":"Spectacle","cues":[...]}`.
-
-L’import est déclenché explicitement depuis l’inspecteur et peut ajouter ou remplacer les cues existants. Aucun ordre OSC/DMX n’est exécuté au moment de l’import.
-
-## IA locale générative
-
-No-de Desktop utilise une architecture **local-first** pour Vibe :
-
-1. Ollama local via le bridge Electron ;
-2. modèle par défaut : `qwen2.5-coder:7b` ;
-3. réponse attendue : opérations de patch JSON structurées ;
-4. aperçu avant application + Undo ;
-5. si Ollama ou le modèle est indisponible : repli automatique sur le moteur local déterministe ;
-6. cloud distant uniquement en secours explicite.
-
-Le process Electron n’autorise le bridge IA local que vers `localhost` / `127.0.0.1`. L’IA ne peut pas armer automatiquement les sorties Serial/Servo/OSC/DMX externes : `auto=true` est bloqué dans les opérations générées.
+- Arduino / ESP / Servo : aucun ordre à l’ajout.
+- Bridges OSC : aucun envoi à l’ajout.
+- Companion : les actions partent uniquement lors d’une interaction explicite.
+- PANIC / STOP restent accessibles.
+- erreurs et transports absents remontent comme erreurs réelles.
 
 ## Diagnostic spectacle
 
 Préférences → Moteurs / I/O → **Diagnostic spectacle**.
 
-Le diagnostic expose sans secrets :
+Il expose sans secrets :
 - version / plateforme ;
-- erreurs récentes du graphe ;
-- Remote Camera / WS ;
+- erreurs du graphe ;
+- Remote Camera / Companion ;
 - MIDI / Serial ;
-- disponibilité OSC UDP / Art-Net ;
-- nodes non exécutables présents dans un ancien projet ;
-- sorties externes armées en automatique.
+- OSC / Art-Net / sACN disponibles ;
+- sorties externes éventuellement armées.
 
 ## Gates de livraison
 
@@ -80,29 +125,32 @@ npm run audit:production
 npm test
 npm run check
 npm run build:pwa
-```
-
-Commande complète :
-
-```bash
 npm run release:check
 ```
 
-## Matériel réel à recetter avant une représentation critique
+## Cibles de distribution
 
-Le code peut être prêt sans prétendre qu’un périphérique non branché a été validé. Recette terrain requise pour :
-- Remote Camera téléphone ↔ Mac et mesure de latence ;
-- périphérique MIDI du spectacle ;
-- Arduino / ESP / Servo / RFID et firmware utilisés ;
-- OSC vers chaque logiciel tiers avec ses ports/adresses ;
-- Art-Net vers l’interface ou node DMX réel ;
+- macOS Apple Silicon / Electron ;
+- Linux x64 / Electron ;
+- PWA HTTPS téléphone/tablette ;
+- Android APK ;
+- Android AAB Play lorsque la vraie clé d’upload est fournie.
+
+## Recette terrain requise
+
+Un build logiciel ne remplace pas une recette matérielle. À valider physiquement avant une représentation critique :
+
+- téléphone ↔ Mac Remote Camera et latence réelle ;
+- réseau Companion long terme / perte puis reprise Wi-Fi ;
+- périphériques MIDI ;
+- Arduino / ESP / Servo / RFID + firmware ;
+- OSC vers chaque logiciel tiers ;
+- Art-Net / sACN vers le réseau lumière réel ;
+- relais NDI natif ;
 - installation/offline PWA ;
-- AAB Play signé ;
-- signature/notarisation macOS si distribution hors machine de régie.
+- AAB signé ;
+- signature/notarisation macOS pour distribution large.
 
-## PLATFORM-LIMITED
+## Infrastructure CI
 
-- NDI Out : relais natif requis.
-- Syphon / Spout : non annoncés comme moteurs actifs.
-- Les logiciels tiers (TouchDesigner, Isadora, Millumin, Max, Pure Data, SuperCollider, Chataigne) ne sont pas embarqués : No-de fournit les moteurs de contrôle/export/OSC.
-- GitHub Actions du dépôt échoue actuellement avant le premier step ; tant que l’infrastructure CI n’est pas rétablie, `release:check` exécuté localement reste le gate de référence.
+Les workflows sont configurés pour PWA, macOS et builds multiplateformes. Si GitHub ne fournit aucun runner (`runner_id: 0`), le blocage est infrastructurel et non un résultat de test. La publication PWA peut être réalisée directement vers le dépôt public en attendant.
