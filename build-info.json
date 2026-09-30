@@ -1,7 +1,7 @@
 {
   "name": "No-de Vibe Designer",
-  "version": "1.4.1",
-  "builtAt": "2026-09-30T21:31:56.000Z",
+  "version": "2.2.0",
+  "builtAt": "2026-09-30T22:08:00.000Z",
   "files": 107,
   "surfaces": [
     "designer",
@@ -11,11 +11,18 @@
     "camera"
   ],
   "sourceCommit": "",
-  "cacheRevision": "1.4.1-macfix",
+  "cacheRevision": "2.2.0-multi-v1",
   "rolesFlexible": true,
   "defaultRouting": {
     "desktop": "designer",
     "mobile": "mobile",
     "manualOverride": true
+  },
+  "features": {
+    "cueEngine": "2.2",
+    "companionCueList": true,
+    "audioPlayers": 12,
+    "threadCurtainPinch": true,
+    "luminousWaves": true
   }
 }
