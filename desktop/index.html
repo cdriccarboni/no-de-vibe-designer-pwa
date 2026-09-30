@@ -186,12 +186,15 @@
           <li><b>Audio</b> — moteur local actif (Audio Lab, filtre, delay, FFT, Organic Audio). <b>NDI Out</b> utilise un relais natif et reste PLATFORM-LIMITED sans hôte compatible. Syphon/Spout ne sont pas encore exposés comme moteurs actifs.</li>
         </ul>
         <div class="preferences-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+          <button type="button" id="runDiagnosticBtn" class="smallbtn">Diagnostic spectacle</button>
+          <button type="button" id="copyDiagnosticBtn" class="smallbtn">Copier diagnostic</button>
           <button type="button" id="showHostCard" class="smallbtn">Carte hôte / QR</button>
           <button type="button" id="exportMaxBtn" class="smallbtn">Export Max</button>
           <button type="button" id="exportTdBtn" class="smallbtn">Export TD</button>
           <button type="button" id="exportPdBtn" class="smallbtn">Export Pure Data</button>
           <button type="button" id="exportMilluminBtn" class="smallbtn">Carte Millumin OSC</button>
         </div>
+        <pre id="diagnosticOut" class="term-log" style="max-height:260px;margin-top:10px;display:none"></pre>
         <pre id="hostCardOut" class="term-log" style="max-height:160px;margin-top:10px;display:none"></pre>
       </div>
       <div data-pref-panel="backup" class="hidden">
