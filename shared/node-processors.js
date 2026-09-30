@@ -19,6 +19,7 @@ import {
   sdfField, noiseValue, curlVector
 } from "./graphics/interactive-effects.js";
 import { showManifestSummary } from "./show-importer.js";
+import { analyzePresence, renderLivingShadow } from "./graphics/living-shadow.js";
 
 function videoVal(el, opacity = 1) {
   return { kind: "video", el, opacity };
@@ -563,6 +564,90 @@ export function createNodeProcessors() {
     });
   }
 
+
+  fns.set("presence", (node, inputs, ctx) => {
+    const raw = inputs.get(0)?.value;
+    const out = new Map();
+    if (!raw) {
+      out.set(1, numOut(.5));
+      out.set(2, numOut(.5));
+      out.set(3, numOut(0));
+      out.set(5, textOut(`${node.params?.person || node.title || "Présence"} · NO SIGNAL`));
+      return out;
+    }
+    const source = fxRaster(raw, node, ctx, "presence");
+    const analysis = analyzePresence(source, {
+      threshold: Number(node.params?.threshold ?? .45),
+      invert: !!node.params?.invert
+    });
+    out.set(1, numOut(analysis.x));
+    out.set(2, numOut(analysis.y));
+    out.set(3, numOut(analysis.activity));
+    out.set(4, source);
+    out.set(5, textOut(`${node.params?.person || node.title || "Présence"} · ${analysis.visible ? "LIVE" : "NO SILHOUETTE"}`));
+    return out;
+  });
+
+  fns.set("livingshadow", (node, inputs, ctx) => {
+    const raw = inputs.get(0)?.value;
+    const out = new Map();
+    if (!raw) {
+      out.set(4, textOut(`${node.params?.person || "Ombre"} · NO SIGNAL`));
+      return out;
+    }
+    const source = fxRaster(raw, node, ctx, "living-shadow");
+    const memory = nodeMemory(ctx);
+    const key = `living-shadow:${node.id}`;
+    const state = memory.get(key) || { detached:false, detachedFrame:null, trigger:false };
+
+    const trigger = truthyTrigger(inputs.get(1));
+    const rising = trigger && !state.trigger;
+    const autonomy = inputs.has(2) ? readNum(inputs.get(2)) : Number(node.params?.autonomy ?? .58);
+    const baseMode = node.params?.mode || "mirror";
+
+    // Capture the current silhouette exactly at the detach cue.
+    if (rising && !state.detached) {
+      const capturePass = renderLivingShadow({
+        frame: source,
+        time: Number(ctx.time) || 0,
+        mode: "mirror",
+        sourceZone: node.params?.sourceZone || "jardin",
+        shadowZone: node.params?.shadowZone || "cour",
+        threshold: Number(node.params?.threshold ?? .45),
+        invert: !!node.params?.invert,
+        autonomy
+      });
+      if (capturePass.capture) {
+        state.detachedFrame = capturePass.capture;
+        state.detached = true;
+      }
+    } else if (rising && state.detached) {
+      state.detached = false;
+      state.detachedFrame = null;
+    }
+
+    const runtimeMode = state.detached ? "autonomous" : baseMode;
+    const result = renderLivingShadow({
+      frame: source,
+      time: Number(ctx.time) || 0,
+      mode: runtimeMode,
+      sourceZone: node.params?.sourceZone || "jardin",
+      shadowZone: node.params?.shadowZone || "cour",
+      threshold: Number(node.params?.threshold ?? .45),
+      invert: !!node.params?.invert,
+      autonomy,
+      detachedFrame: state.detachedFrame
+    });
+
+    state.trigger = trigger;
+    state.lastState = result.state;
+    memory.set(key, state);
+
+    out.set(3, result.frame);
+    out.set(4, textOut(`${node.params?.person || "Ombre"} · ${result.state}`));
+    return out;
+  });
+
   fns.set("transform", (node, inputs, ctx) => {
     const visual = inputs.get(0)?.value;
     const scale = inputs.get(1) ? readNum(inputs.get(1)) : Number(node.params?.scale ?? 1);
@@ -689,6 +774,20 @@ export function createNodeProcessors() {
       return out;
     }
     out.set(1, { kind: "text", value: "LIVE" });
+    out.set(2, source);
+    return out;
+  });
+
+  fns.set("stage-output", (node, inputs, ctx) => {
+    const source = inputs.get(0)?.value;
+    const out = new Map();
+    const surface = node.params?.surfaceName || node.params?.surface || node.title || "Sortie Scène";
+    if (!source) {
+      out.set(1, textOut(`${surface} · NO SIGNAL`));
+      return out;
+    }
+    ctx.stageOutput = { surface, nodeId: node.id, live: true };
+    out.set(1, textOut(`${surface} · READY`));
     out.set(2, source);
     return out;
   });
