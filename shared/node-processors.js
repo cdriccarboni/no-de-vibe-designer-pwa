@@ -116,7 +116,8 @@ function genericOscBridge(node, inputs, ctx, defaults = {}) {
   const key = `osc-bridge:${node.id}`;
   const prev = memory.get(key) || {};
   const signature = `${host}|${port}|${address}|${value}`;
-  const shouldSend = triggerConnected ? (triggerNow && !prev.trigger) : prev.signature !== signature;
+  const autoSend = node.params?.auto === true;
+  const shouldSend = triggerConnected ? (triggerNow && !prev.trigger) : (autoSend && prev.signature !== signature);
   let status = host === "bridge" ? "BRIDGE" : `UDP ${host}:${port}`;
 
   if (shouldSend) {
@@ -148,7 +149,8 @@ function serialCommandNode(node, inputs, ctx, fallbackCommand) {
   const memory = nodeMemory(ctx);
   const key = `serial-node:${node.id}`;
   const prev = memory.get(key) || {};
-  const shouldSend = triggerConnected ? (triggerNow && !prev.trigger) : command && prev.command !== command;
+  const autoSend = node.params?.auto === true;
+  const shouldSend = triggerConnected ? (triggerNow && !prev.trigger) : (autoSend && command && prev.command !== command);
   const state = ctx.deviceBus?.serialState || "offline";
 
   if (shouldSend && state === "online" && typeof ctx.serialSend === "function") {
@@ -722,16 +724,21 @@ export function createNodeProcessors() {
     const channel = Math.max(0, Math.round(inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.channel ?? 0)));
     const angle = Math.max(0, Math.min(180, inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.angle ?? 90)));
     const speed = Math.max(0, inputs.has(2) ? readNum(inputs.get(2)) : Number(node.params?.speed ?? 1));
+    const triggerConnected = inputs.has(3);
+    const triggerNow = truthyTrigger(inputs.get(3));
     const command = node.params?.format
       ? String(node.params.format).replace("{channel}", channel).replace("{angle}", angle).replace("{speed}", speed)
       : `SERVO ${channel} ${angle} ${speed}`;
-    const memory = nodeMemory(ctx), key = `servo:${node.id}`, prev = memory.get(key);
+    const memory = nodeMemory(ctx), key = `servo:${node.id}`, prev = memory.get(key) || {};
     const state = ctx.deviceBus?.serialState || "offline";
-    if (command !== prev && state === "online" && typeof ctx.serialSend === "function") {
+    const shouldSend = triggerConnected
+      ? (triggerNow && !prev.trigger)
+      : (node.params?.auto === true && command !== prev.command);
+    if (shouldSend && state === "online" && typeof ctx.serialSend === "function") {
       asyncWarn(ctx.serialSend(command), ctx, "Servo Serial");
-      memory.set(key, command);
     }
-    return new Map([[3, textOut(state === "online" ? "SERIAL ONLINE" : "SERIAL OFFLINE")]]);
+    memory.set(key, { command, trigger: triggerNow });
+    return new Map([[4, textOut(state === "online" ? "SERIAL ONLINE" : "SERIAL OFFLINE")]]);
   });
 
   fns.set("rfid", (node, _inputs, ctx) => {
