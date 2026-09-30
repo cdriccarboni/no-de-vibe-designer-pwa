@@ -1,9 +1,13 @@
+import { detectCameraAvailability, watchCameraAvailability } from "./capability.js";
+
 /**
  * Local camera helpers — adapted from ART `patcher-regie-video-return.tsx`.
  * Explicit permission only; STOP always ends tracks. Direct MediaStream, no reencode.
  */
 
 export async function listVideoInputs() {
+  const availability = await detectCameraAvailability();
+  if (availability === false) throw new Error("Aucune caméra détectée");
   if (!navigator.mediaDevices?.enumerateDevices) {
     throw new Error("enumerateDevices indisponible");
   }
@@ -38,3 +42,5 @@ export function stopStream(stream) {
     try { t.stop(); } catch { /* ignore */ }
   });
 }
+
+export { detectCameraAvailability, watchCameraAvailability };

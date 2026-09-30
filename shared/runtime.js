@@ -30,6 +30,7 @@ export class Runtime {
     this.previousOutputs = new Map();
     this.deviceBus = { lastMidi: null, lastSerial: null };
     this.bridgeSend = null;
+    this.serialSend = null;
     this.lastGraph = { errors: [], warnings: [] };
     this.cameraWanted = false;
     this.audioEngine = sharedAudio;
@@ -43,6 +44,7 @@ export class Runtime {
 
   setDeviceBus(bus) { this.deviceBus = bus || this.deviceBus; }
   setBridgeSend(fn) { this.bridgeSend = fn; }
+  setSerialSend(fn) { this.serialSend = fn || null; }
   setSensorBus(bus) { this.sensorBus = bus || null; }
   setOscUdpSend(fn) { this.oscUdpSend = fn || null; }
   setArtNetUdpSend(fn) { this.artnetUdpSend = fn || null; }
@@ -248,6 +250,7 @@ export class Runtime {
       resultCanvas: this.resultCanvas,
       deviceBus: this.deviceBus,
       bridgeSend: this.bridgeSend,
+      serialSend: this.serialSend,
       oscUdpSend: this.oscUdpSend,
       artnetUdpSend: this.artnetUdpSend,
       controls: this.project.controls || [],
