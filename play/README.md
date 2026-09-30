@@ -3,7 +3,8 @@
 ## Identité Android
 
 - Package : `fr.acousmatic.nodevibedesigner`
-- Version : lue automatiquement depuis `shared/version.js`\n- versionCode : calculé automatiquement (`major × 10000 + minor × 100 + patch`)
+- Version : lue automatiquement depuis `shared/version.js`
+- versionCode : calculé automatiquement (`major × 10000 + minor × 100 + patch`)
 - Target SDK : `36` (Android 16)
 - Format Play : Android App Bundle (`.aab`)
 
