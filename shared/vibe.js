@@ -272,7 +272,12 @@ export function applyVibeOps(project, ops, helpers) {
           applied.push({ op: "addNode", skipped: true, type: op.type, reason: "déjà présent" });
         } else {
           const n = addNode(op.type, op.x ?? 60, op.y ?? 60);
-          applied.push({ op: "addNode", id: n.id, type: op.type });
+          if (op.title) n.title = op.title;
+          if (op.params && typeof op.params === "object") {
+            n.params = { ...n.params, ...op.params };
+            if (AI_PROTECTED_EXTERNAL_TYPES.has(n.type) && n.params.auto === true) n.params.auto = false;
+          }
+          applied.push({ op: "addNode", id: n.id, type: op.type, title: n.title });
         }
       } else if (op.op === "connect") {
         ensureEdges();
