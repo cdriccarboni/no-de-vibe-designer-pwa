@@ -154,3 +154,30 @@ Un build logiciel ne remplace pas une recette matérielle. À valider physiqueme
 ## Infrastructure CI
 
 Les workflows sont configurés pour PWA, macOS et builds multiplateformes. Si GitHub ne fournit aucun runner (`runner_id: 0`), le blocage est infrastructurel et non un résultat de test. La publication PWA peut être réalisée directement vers le dépôt public en attendant.
+
+
+## Validation publique 1.3.0
+
+État vérifié le 2026-09-30 :
+
+- PWA GitHub Pages : **success**
+- Runtime QA public : **success**
+- syntaxe `mobile.js` + tous les `shared/*.js` : **success**
+- Library : **105/105**
+- phrase de scène Maxime → Ombre Vivante → Rideau de fils : **success**
+- Ombre Vivante miroir + autonome : **success**
+- Thread Curtain : **success**
+- sACN/E1.31 : **success**
+- Safety Engine : **success**
+- 5 presets Companion : **success**
+- APK Android 1.3.0 (130) : **build success**
+- signature APK v2 : **verified**
+- AAB non signé : **build success**
+
+APK public :
+https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/No-de-Vibe-Designer-1.3.0-debug.apk
+
+Rapport Android :
+https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/android-verification.txt
+
+Le desktop Electron Mac/Linux reste séparé du dépôt public afin de ne pas exposer le source privé.
