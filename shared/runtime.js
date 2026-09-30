@@ -28,6 +28,9 @@ export class Runtime {
     this.resultCanvas = document.createElement("canvas");
     this.nodeFns = createNodeProcessors();
     this.previousOutputs = new Map();
+    this.nodeState = new Map();
+    this.aiRequest = null;
+    this.aiAssetRequest = null;
     this.deviceBus = { lastMidi: null, lastSerial: null };
     this.bridgeSend = null;
     this.serialSend = null;
@@ -39,12 +42,14 @@ export class Runtime {
     this.mediaElements = new Map();
     this._pixelScratch = null;
     this.frameScratch = new Map();
-    this.pointer = { x: 0.5, y: 0.52, speed: 0, spread: 0, active: false, t: 0 };
+    this.pointer = { x: 0.5, y: 0.52, speed: 0, active: false, t: 0 };
   }
 
   setDeviceBus(bus) { this.deviceBus = bus || this.deviceBus; }
   setBridgeSend(fn) { this.bridgeSend = fn; }
   setSerialSend(fn) { this.serialSend = fn || null; }
+  setAiRequest(fn) { this.aiRequest = fn || null; }
+  setAiAssetRequest(fn) { this.aiAssetRequest = fn || null; }
   setSensorBus(bus) { this.sensorBus = bus || null; }
   setOscUdpSend(fn) { this.oscUdpSend = fn || null; }
   setArtNetUdpSend(fn) { this.artnetUdpSend = fn || null; }
@@ -56,29 +61,7 @@ export class Runtime {
     const dx = nx - (this.pointer?.x ?? nx);
     const dy = ny - (this.pointer?.y ?? ny);
     const speed = Math.min(2, Math.hypot(dx, dy) / (dt / 1000));
-    this.pointer = {
-      x: nx,
-      y: ny,
-      speed,
-      spread: Math.max(0, Math.min(1, Number(this.pointer?.spread) || 0)),
-      active: true,
-      t: now
-    };
-  }
-
-  setGestureSpread(value) {
-    const spread = Math.max(0, Math.min(1, Number(value) || 0));
-    this.pointer = {
-      ...(this.pointer || { x:.5, y:.52, speed:0, active:true }),
-      spread,
-      active: true,
-      t: typeof performance !== "undefined" ? performance.now() : Date.now()
-    };
-    return spread;
-  }
-
-  adjustGestureSpread(delta) {
-    return this.setGestureSpread((Number(this.pointer?.spread) || 0) + (Number(delta) || 0));
+    this.pointer = { x: nx, y: ny, speed, active: true, t: now };
   }
 
   setMediaElement(nodeId, el) {
@@ -273,6 +256,9 @@ export class Runtime {
       deviceBus: this.deviceBus,
       bridgeSend: this.bridgeSend,
       serialSend: this.serialSend,
+      aiRequest: this.aiRequest,
+      aiAssetRequest: this.aiAssetRequest,
+      nodeState: this.nodeState,
       oscUdpSend: this.oscUdpSend,
       artnetUdpSend: this.artnetUdpSend,
       controls: this.project.controls || [],
