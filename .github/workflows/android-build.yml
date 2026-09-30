@@ -301,7 +301,11 @@ jobs:
           cp "$APK_SRC" "$APK_STABLE"
           cp "$AAB_SRC" "$AAB"
           sha256sum "$APK" "$APK_STABLE" "$AAB" > SHA256SUMS-Android.txt
-          gh release upload "v${APP_VERSION}" "$APK" "$APK_STABLE" "$AAB" SHA256SUMS-Android.txt --clobber
+          TAG="v${APP_VERSION}"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "No-de Vibe Designer ${APP_VERSION}" --notes "Build de distribution No-de Vibe Designer ${APP_VERSION}." || gh release view "$TAG" >/dev/null
+          fi
+          gh release upload "$TAG" "$APK" "$APK_STABLE" "$AAB" SHA256SUMS-Android.txt --clobber
 
       - name: Build summary
         if: always()
