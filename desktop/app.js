@@ -37,7 +37,8 @@ import { mediaStatusForNode, MEDIA_STATUS } from "../shared/media-status.js";
 import { createRemoteGhostDemo, createVideoMagicFxDemo, createStageOscDemo } from "../shared/demos.js";
 import { STUDIO_MSG } from "../shared/companion-studio/protocol.js";
 import { applyCompanionBinding, findWidget } from "../shared/companion-studio/bindings.js";
-import { loadCompanionLayout, ensureCompanionLayout } from "../shared/companion-studio/store.js";
+import { loadCompanionLayout, ensureCompanionLayout, saveCompanionLayout } from "../shared/companion-studio/store.js";
+import { validateCompanionDocument } from "../shared/companion-studio/schema.js";
 import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref } from "../shared/companion-studio/detect.js";
 import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT } from "../shared/graphics/sketch-engine.js";
 import { applyShowManifest, showManifestSummary } from "../shared/show-importer.js";
@@ -1920,6 +1921,9 @@ let remoteSession = null;
 let applyingRemote = false;
 let companionLayout = null;
 try { companionLayout = loadCompanionLayout() || ensureCompanionLayout(); } catch { companionLayout = null; }
+let companionMonitorTimer = null;
+let companionMonitorClientId = "";
+const companionMonitorCanvas = document.createElement("canvas");
 
 function publishHostState() {
   if (!remoteSession?.online || applyingRemote) return;
@@ -1929,6 +1933,71 @@ function publishHostState() {
 
 function hideCompanionDetect() {
   $("#companionDetect")?.classList.add("hidden");
+}
+
+function sendCompanionLayout(clientId = "") {
+  if (!remoteSession?.online || !companionLayout) return false;
+  remoteSession.send({
+    type: STUDIO_MSG.LAYOUT,
+    layout: companionLayout,
+    clientId: clientId || undefined,
+    revision: Date.now(),
+    t: Date.now()
+  });
+  return true;
+}
+
+function stopCompanionMonitor({ notify = true } = {}) {
+  if (companionMonitorTimer) clearInterval(companionMonitorTimer);
+  companionMonitorTimer = null;
+  const target = companionMonitorClientId;
+  companionMonitorClientId = "";
+  if (notify && target && remoteSession?.online) {
+    remoteSession.send({ type: STUDIO_MSG.MONITOR_STOP, clientId: target, t: Date.now() });
+  }
+  if (target) log(`Companion Monitor · STOP · ${target}`);
+}
+
+function startCompanionMonitor(clientId = "") {
+  if (!clientId) return log("Companion Monitor · client inconnu");
+  stopCompanionMonitor({ notify: false });
+  companionMonitorClientId = clientId;
+  const source = $("#previewCanvas");
+  if (!source) return log("Companion Monitor · preview absente");
+  remoteSession?.send?.({
+    type: STUDIO_MSG.MONITOR_START,
+    clientId,
+    width: 480,
+    fps: 8,
+    codec: "jpeg-dataurl",
+    t: Date.now()
+  });
+  const push = () => {
+    if (!remoteSession?.online || !companionMonitorClientId || document.hidden) return;
+    try {
+      const width = 480;
+      const aspect = (source.height || 720) / Math.max(1, source.width || 1280);
+      const height = Math.max(180, Math.round(width * aspect));
+      if (companionMonitorCanvas.width !== width) companionMonitorCanvas.width = width;
+      if (companionMonitorCanvas.height !== height) companionMonitorCanvas.height = height;
+      const ctx = companionMonitorCanvas.getContext("2d", { alpha: false });
+      ctx.drawImage(source, 0, 0, width, height);
+      const frame = companionMonitorCanvas.toDataURL("image/jpeg", 0.52);
+      remoteSession.send({
+        type: STUDIO_MSG.MONITOR_FRAME,
+        clientId: companionMonitorClientId,
+        frame,
+        width,
+        height,
+        sentAt: Date.now()
+      });
+    } catch (e) {
+      log(`Companion Monitor · ${e?.message || e}`);
+    }
+  };
+  push();
+  companionMonitorTimer = setInterval(push, 125);
+  log(`Companion Monitor · LIVE LAN · ${clientId} · 480p/8fps cible`);
 }
 
 function showCompanionDetect(payload = {}) {
@@ -1956,10 +2025,45 @@ function handleCompanionStudioMessage(msg) {
   if (msg.type === STUDIO_MSG.DETECT) {
     showCompanionDetect(msg);
     log(`Companion Studio · détecté · ${msg.clientId || "?"}`);
+    if (companionLayout) sendCompanionLayout(msg.clientId || "");
+    return;
+  }
+  if (msg.type === STUDIO_MSG.LAYOUT) {
+    try {
+      companionLayout = validateCompanionDocument(msg.layout);
+      saveCompanionLayout(companionLayout);
+      remoteSession?.send?.({
+        type: STUDIO_MSG.LAYOUT_ACK,
+        clientId: msg.clientId,
+        revision: msg.revision || Date.now(),
+        ok: true,
+        t: Date.now()
+      });
+      log(`Companion · layout synchronisé · ${companionLayout.name}`);
+    } catch (e) {
+      remoteSession?.send?.({
+        type: STUDIO_MSG.LAYOUT_ACK,
+        clientId: msg.clientId,
+        revision: msg.revision || Date.now(),
+        ok: false,
+        error: e?.message || String(e),
+        t: Date.now()
+      });
+      log(`Companion · layout refusé · ${e?.message || e}`);
+    }
+    return;
+  }
+  if (msg.type === STUDIO_MSG.MONITOR_START) {
+    startCompanionMonitor(msg.clientId || "");
+    return;
+  }
+  if (msg.type === STUDIO_MSG.MONITOR_STOP) {
+    if (!msg.clientId || msg.clientId === companionMonitorClientId) stopCompanionMonitor({ notify: false });
     return;
   }
   if (msg.type === STUDIO_MSG.DISCONNECT) {
     log(`Companion · déconnecté · ${msg.clientId || "?"}`);
+    if (msg.clientId && msg.clientId === companionMonitorClientId) stopCompanionMonitor({ notify: false });
     hideCompanionDetect();
     return;
   }
@@ -1977,6 +2081,25 @@ function handleCompanionStudioMessage(msg) {
       runtime,
       applyCue,
       listCues,
+      sendOsc: ({ host, port, address, args }) => {
+        if (host !== "bridge" && typeof window.nvdDesktop?.sendOscUdp === "function") {
+          return window.nvdDesktop.sendOscUdp({ host, port, address, args });
+        }
+        return devices.bridge.send({ type: "osc", target: host || "bridge", address, args });
+      },
+      sendMidi: (outputId, data) => devices.midi.send(outputId, data),
+      sendSerial: (text) => devices.serial.send(text),
+      cameraControl: (action) => {
+        if (action === "off" || action === "stop") runtime.stopCamera();
+        else runtime.syncCameraFromProject({ request: true }).catch(e => log(`Caméra Companion · ${e?.message || e}`));
+      },
+      videoControl: (action) => {
+        if (action === "play") runtime.play();
+        else if (action === "pause") runtime.pause();
+        else if (action === "stop") runtime.stop();
+        else runtime.toggle();
+        syncPlayButton();
+      },
       onLog: (m) => log(m)
     });
     remoteSession?.send?.({ ...feedback, clientId: msg.clientId });
@@ -2035,19 +2158,13 @@ $("#companionDetect")?.querySelectorAll("[data-detect]").forEach((btn) => {
       window.open("http://127.0.0.1:4177/studio/", "_blank", "noopener");
       log("Companion · Open Studio");
     } else if (action === DETECT_ACTIONS.SYNC) {
-      if (companionLayout && remoteSession?.online) {
-        remoteSession.send({
-          type: STUDIO_MSG.LAYOUT,
-          layout: companionLayout,
-          clientId: clientId || undefined,
-          t: Date.now()
-        });
-        log("Companion · Sync layout envoyé");
-      } else log("Companion · Sync · layout ou lien manquant");
+      if (sendCompanionLayout(clientId)) log("Companion · Sync layout envoyé");
+      else log("Companion · Sync · layout ou lien manquant");
     } else if (action === DETECT_ACTIONS.MONITOR) {
-      log("Companion · Use as Monitor · P2 (pas encore câblé)");
+      startCompanionMonitor(clientId);
     } else if (action === DETECT_ACTIONS.CONTROLLER) {
-      log("Companion · Use as Controller · layout actif");
+      sendCompanionLayout(clientId);
+      log("Companion · Controller · layout actif");
     } else {
       log("Companion · Ignore");
     }
