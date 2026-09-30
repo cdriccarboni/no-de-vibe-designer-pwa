@@ -1,6 +1,6 @@
-No-de Vibe Designer 1.3.2
+No-de Vibe Designer 1.3.3
 
-package: name='fr.acousmatic.nodevibedesigner' versionCode='10302' versionName='1.3.2' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+package: name='fr.acousmatic.nodevibedesigner' versionCode='10303' versionName='1.3.3' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
 sdkVersion:'24'
 targetSdkVersion:'36'
 application-label:'No-de Vibe Designer'
@@ -15,11 +15,11 @@ Verified using v4 scheme (APK Signature Scheme v4): false
 Verified for SourceStamp: false
 Number of signers: 1
 V2 Signer: certificate DN: C=US, O=Android, CN=Android Debug
-V2 Signer: certificate SHA-256 digest: ece84190de9b1183bdf56a809466a30b94ec80555b9da6de757dccd61e358165
-V2 Signer: certificate SHA-1 digest: 374fc312688742cc7e2204d27f3d11ec95072084
-V2 Signer: certificate MD5 digest: 7aa5cf94eff76248699636d4a2588d8e
+V2 Signer: certificate SHA-256 digest: 11f452b56d826f1464d64c7be3ee500b7f652d5be586b5967c8867a034bfa35c
+V2 Signer: certificate SHA-1 digest: fec5fdfe09d5954dcbb4d28336e475b4b029663e
+V2 Signer: certificate MD5 digest: d1dba1ffa2889dbe8f7d1f6d354b6b70
 V2 Signer: key algorithm: RSA
 V2 Signer: key size (bits): 2048
-V2 Signer: public key SHA-256 digest: fdf8f06927e3ee647884f82307fb259287893af8f831ccc68fe74492e32df195
-V2 Signer: public key SHA-1 digest: 8ede2840b68356172692fad57d6ddb47373ff249
-V2 Signer: public key MD5 digest: 0417e683b0962c7b633f5f905f235036
+V2 Signer: public key SHA-256 digest: 8e5b39485f754fb28e5c9125a396039528bba64776d538b99055b85b6bbafbdd
+V2 Signer: public key SHA-1 digest: 1d0c2105ee61e066dd680e122d227283db9ef5a4
+V2 Signer: public key MD5 digest: 3be0cd4cd20dbe17f96c8bfaf853a2ac
