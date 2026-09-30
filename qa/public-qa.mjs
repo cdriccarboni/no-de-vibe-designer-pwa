@@ -19,7 +19,8 @@ function assert(condition, message) {
 
 console.log(`No-de Vibe Designer public QA ${APP_VERSION}`);
 
-const publicBuildInfo = JSON.parse(fs.readFileSync(new URL("../build-info.json", import.meta.url), "utf8"));\nassert(publicBuildInfo.version === APP_VERSION, `runtime version matches build-info (${APP_VERSION})`);
+const publicBuildInfo = JSON.parse(fs.readFileSync(new URL("../build-info.json", import.meta.url), "utf8"));
+assert(publicBuildInfo.version === APP_VERSION, `runtime version matches build-info (${APP_VERSION})`);
 assert(SURFACES.length === 5, "five switchable No-de surfaces are available");
 const surfaceMem = new Map();
 const surfaceStorage = {
