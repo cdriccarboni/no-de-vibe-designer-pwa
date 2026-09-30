@@ -54,21 +54,67 @@ function pointerPx(pointer,w,h){
   return {x:clamp01(pointer?.x??0.5)*w,y:clamp01(pointer?.y??0.5)*h,speed:Math.max(0,Number(pointer?.speed)||0)};
 }
 
-export function renderThreadCurtain({width=320,height=180,time=0,pointer=null,strands=96,force=.85,wave=.28}={}){
+export function renderThreadCurtain({
+  width=320,height=180,time=0,pointer=null,strands=96,force=.85,wave=.28,
+  spread=null,lightWaves=.9,glow=.78
+}={}){
   const f=frame(width,height,"thread-curtain"),p=pointerPx(pointer,f.width,f.height);
-  const count=Math.max(12,Math.min(220,Math.round(strands))),fx=clamp01(force),wv=clamp01(wave);
+  const count=Math.max(12,Math.min(220,Math.round(strands)));
+  const fx=clamp01(force),wv=clamp01(wave),lights=clamp01(lightWaves),gl=clamp01(glow);
+  const open=clamp01(spread ?? pointer?.spread ?? 0);
+  const aperture=Math.max(0,open*f.width*.34);
+  const centerX=p.x;
+
   for(let s=0;s<count;s++){
     const baseX=(s+0.5)/count*f.width;
     let px=baseX,py=0;
     for(let y=2;y<f.height;y+=3){
-      const d=Math.hypot(baseX-p.x,y-p.y),radius=Math.max(24,f.width*.22);
+      const dx=baseX-p.x,dy=y-p.y,d=Math.hypot(dx,dy),radius=Math.max(28,f.width*.24);
       const influence=Math.max(0,1-d/radius);
-      const side=Math.sign(baseX-p.x||1);
-      const push=side*influence*influence*fx*f.width*.09;
+      const side=Math.sign(dx||1);
+
+      // Main pointer force: the curtain physically yields around the cursor.
+      const push=side*influence*influence*fx*f.width*.115;
+
+      // Trackpad pinch spread: create a real opening centered on the pointer.
+      const horizontalDistance=Math.abs(baseX-centerX);
+      const insideAperture=aperture>0 ? Math.max(0,1-horizontalDistance/Math.max(1,aperture)) : 0;
+      const verticalEnvelope=.4+.6*Math.max(0,1-Math.abs(y-p.y)/(f.height*.72));
+      const pinchPush=side*insideAperture*insideAperture*aperture*.9*verticalEnvelope;
+
       const sway=Math.sin(y*.035+s*.23+time*1.7)*wv*6;
-      const x=baseX+push+sway;
-      line(f,px,py,x,y,[160+60*influence,190+40*influence,220+30*influence,190],true);
+
+      // Luminous waves travel through the strands from the pointer.
+      const ring=Math.sin(d*.105-time*5.8);
+      const ringMask=Math.pow(Math.max(0,ring),5)*lights*Math.max(.18,1-d/(Math.max(f.width,f.height)*.9));
+      const pulse=Math.pow(Math.max(0,Math.sin(d*.055-time*3.15)),8)*lights*.7;
+      const lum=clamp01(influence*.55+ringMask+pulse);
+
+      const x=baseX+push+pinchPush+sway;
+      const r=145+90*lum,g=175+80*lum,b=210+45*lum,a=155+90*gl+45*lum;
+      line(f,px,py,x,y,[r,g,b,a],true);
+
+      if(lum>.22){
+        addPixel(f,x-1,y,70*lum,120*lum,185*lum,170*lum);
+        addPixel(f,x+1,y,70*lum,120*lum,185*lum,170*lum);
+      }
       px=x;py=y;
+    }
+  }
+
+  // Soft luminous rings reinforce the wave front without hiding the strands.
+  if(lights>0){
+    for(let r=0;r<5;r++){
+      const radius=((time*(26+lights*22)+r*34)%(Math.min(f.width,f.height)*.72));
+      const alpha=(1-radius/(Math.min(f.width,f.height)*.72))*lights;
+      if(alpha<=0)continue;
+      let prev=null;
+      for(let a=0;a<=Math.PI*2+.11;a+=.11){
+        const x=p.x+Math.cos(a)*radius;
+        const y=p.y+Math.sin(a)*radius*.58;
+        if(prev)line(f,prev.x,prev.y,x,y,[55+80*alpha,110+95*alpha,205+45*alpha,70*alpha],true);
+        prev={x,y};
+      }
     }
   }
   return f;
