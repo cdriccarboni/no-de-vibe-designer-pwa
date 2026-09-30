@@ -286,6 +286,7 @@ export const EXECUTABLE_PORTS = {
     { name: "channel", dir: "in", data: "number" },
     { name: "angle", dir: "in", data: "number" },
     { name: "speed", dir: "in", data: "number" },
+    { name: "trigger", dir: "in", data: "trigger" },
     { name: "status", dir: "out", data: "text" }
   ],
   rfid: [
