@@ -52,7 +52,7 @@ const qall = s => [...document.querySelectorAll(s)];
 
 if ("serviceWorker" in navigator && window.nvdDesktop?.runtime !== "electron") {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(err => console.warn("PWA_SW", err?.message || err));
+    navigator.serviceWorker.register("../sw.js", { scope: "../" }).catch(err => console.warn("PWA_SW", err?.message || err));
   });
 }
 
