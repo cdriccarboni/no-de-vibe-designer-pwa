@@ -52,7 +52,7 @@ if ("serviceWorker" in navigator && window.nvdDesktop?.runtime !== "electron") {
 let project = newProject();
 let nodeSeq = 0, clipSeq = 0, pointSeq = 0, selectedNode = null;
 const selection = new Set();
-const deviceBus = { lastMidi: null, lastSerial: null };
+const deviceBus = { lastMidi: null, lastSerial: null, serialState: "offline" };
 let graphLogThrottle = 0;
 const history = createHistory(40);
 let historySuspended = false;
@@ -85,10 +85,12 @@ const devices = new DeviceManager(e => {
   } else if (e.type === "serial-line") {
     deviceBus.lastSerial = e.line;
     log(`SERIAL < ${e.line}`);
+  } else if (e.type === "serial-state") {
+    deviceBus.serialState = e.state || "offline";
+    log(`SERIAL · ${e.state}`);
   } else if (e.type === "bridge-message") {
     log(`BRIDGE < ${typeof e.data === "string" ? e.data : JSON.stringify(e.data).slice(0, 160)}`);
   } else if (e.type === "bridge-state") log(`BRIDGE · ${e.state}`);
-  else if (e.type === "serial-state") log(`SERIAL · ${e.state}`);
   else if (e.type === "midi-state") log(`MIDI · ${e.inputs.length} IN / ${e.outputs.length} OUT`);
 });
 
@@ -96,6 +98,7 @@ runtime.setBridgeSend(packet => {
   try { devices.bridge.send(packet); }
   catch (err) { throw err; }
 });
+runtime.setSerialSend(text => devices.serial.send(text));
 if (typeof window.nvdDesktop?.sendOscUdp === "function") {
   runtime.setOscUdpSend(msg => window.nvdDesktop.sendOscUdp(msg));
 }
