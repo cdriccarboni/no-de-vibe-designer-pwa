@@ -4,7 +4,7 @@ import { DESTINATIONS, ROUTE_MODES, ensureRouting, effectiveRoute } from "../sha
 import { DeviceManager } from "../shared/device-manager.js";
 import { portDirection, portLabels, portDataType, isExecutable } from "../shared/ports.js";
 import { validateEdge } from "../shared/graph-engine.js";
-import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed } from "../shared/vibe.js";
+import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed, probeLocalAi } from "../shared/vibe.js";
 import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
 import { NODE_GROUPS, spec as sharedSpec } from "../shared/node-specs.js";
 import { createHistory } from "../shared/history.js";
@@ -1588,7 +1588,10 @@ function openPreferences(tab = "general") {
   qall("[data-pref-tab]").forEach(b => b.classList.toggle("active", b.dataset.prefTab === tab));
   qall("[data-pref-panel]").forEach(p => p.classList.toggle("hidden", p.dataset.prefPanel !== tab));
   const ai = readAiConfig();
-  if ($("#aiEnabled")) $("#aiEnabled").checked = ai.enabled !== false;
+  if ($("#aiLocalEnabled")) $("#aiLocalEnabled").checked = ai.localEnabled !== false;
+  if ($("#aiLocalBase")) $("#aiLocalBase").value = ai.localBaseUrl || "http://127.0.0.1:11434";
+  if ($("#aiLocalModel")) $("#aiLocalModel").value = ai.localModel || "qwen2.5-coder:7b";
+  if ($("#aiEnabled")) $("#aiEnabled").checked = ai.enabled === true;
   if ($("#aiEndpoint")) $("#aiEndpoint").value = ai.endpoint || "";
   if ($("#aiKey")) $("#aiKey").value = ai.apiKey || "";
   if ($("#aiModel")) $("#aiModel").value = ai.model || "gpt-4o-mini";
@@ -1621,13 +1624,20 @@ $("#appearanceReset").onclick = () => {
   applyAppearance({ accent: "#d7b86a", secondary: "#8fa79d", gradient: "subtle", intensity: 35 });
 };
 
-$("#aiSave")?.addEventListener("click", () => {
-  const cfg = {
-    enabled: $("#aiEnabled").checked,
-    endpoint: $("#aiEndpoint").value.trim(),
-    apiKey: $("#aiKey").value.trim(),
-    model: $("#aiModel").value.trim() || "gpt-4o-mini"
+function collectAiConfig() {
+  return {
+    localEnabled: $("#aiLocalEnabled")?.checked !== false,
+    localBaseUrl: $("#aiLocalBase")?.value?.trim() || "http://127.0.0.1:11434",
+    localModel: $("#aiLocalModel")?.value?.trim() || "qwen2.5-coder:7b",
+    enabled: $("#aiEnabled")?.checked === true,
+    endpoint: $("#aiEndpoint")?.value?.trim() || "",
+    apiKey: $("#aiKey")?.value?.trim() || "",
+    model: $("#aiModel")?.value?.trim() || "gpt-4o-mini"
   };
+}
+
+$("#aiSave")?.addEventListener("click", () => {
+  const cfg = collectAiConfig();
   const check = assertAiProviderAllowed(cfg);
   if (!check.ok) {
     log(`ERREUR · ${check.error}`);
@@ -1635,7 +1645,24 @@ $("#aiSave")?.addEventListener("click", () => {
     return;
   }
   saveAiConfig(cfg);
-  log("Préférences IA enregistrées");
+  log(`Préférences IA enregistrées · local ${cfg.localEnabled ? cfg.localModel : "désactivé"}`);
+});
+
+$("#aiLocalProbe")?.addEventListener("click", async () => {
+  const status = $("#aiLocalStatus");
+  if (status) status.textContent = "Test…";
+  const cfg = collectAiConfig();
+  saveAiConfig(cfg);
+  const result = await probeLocalAi(cfg);
+  if (result.ok && result.available) {
+    const names = Array.isArray(result.models) ? result.models : [];
+    const installed = result.installed ? "modèle prêt" : "serveur OK · modèle absent";
+    if (status) status.textContent = `${installed} · ${names.length} modèle(s)`;
+    log(`IA locale · Ollama OK · ${installed}`);
+  } else {
+    if (status) status.textContent = `Indisponible · ${result.error || "Ollama non joignable"}`;
+    log(`IA locale · indisponible · ${result.error || "Ollama non joignable"}`);
+  }
 });
 
 $("#clearAutosave")?.addEventListener("click", () => {
