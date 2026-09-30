@@ -23,7 +23,8 @@ export function normalizeLocalAiConfig(raw = {}) {
     parallel: cfg.localParallel !== false,
     temperature: Math.max(0, Math.min(1, Number(cfg.localTemperature ?? LOCAL_AI_DEFAULTS.temperature))),
     maxOps: Math.max(1, Math.min(128, Number(cfg.localMaxOps ?? LOCAL_AI_DEFAULTS.maxOps) || LOCAL_AI_DEFAULTS.maxOps)),
-    remoteFallback: cfg.remoteFallback === true
+    remoteFallback: cfg.remoteFallback === true,
+    agents: Array.isArray(cfg.localAgents) ? cfg.localAgents : []
   };
 }
 
