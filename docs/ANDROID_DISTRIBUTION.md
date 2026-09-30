@@ -1,23 +1,23 @@
-# Android — No-de Vibe Designer 1.3.0
+# Android — No-de Vibe Designer 1.3.1
 
 Date : 2026-09-30
 
 ## Artefacts publics
 
-Runtime Android construit depuis la PWA publique 1.3.0 via Capacitor 8.5.2.
+Runtime Android construit depuis la PWA publique 1.3.1 via Capacitor 8.5.2.
 
 - APK debug installable :
-  https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/No-de-Vibe-Designer-1.3.0-debug.apk
+  https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/No-de-Vibe-Designer-1.3.1-debug.apk
 - AAB non signé :
-  https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/No-de-Vibe-Designer-1.3.0-unsigned.aab
+  https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/No-de-Vibe-Designer-1.3.1-unsigned.aab
 - Rapport de vérification :
   https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/android-verification.txt
 
 ## Vérification réelle
 
 - package : `fr.acousmatic.nodevibedesigner`
-- versionCode : `130`
-- versionName : `1.3.0`
+- versionCode : `131`
+- versionName : `1.3.1`
 - compile SDK : `36`
 - min SDK : `24`
 - target SDK : `36`
@@ -42,7 +42,7 @@ Le script `scripts/prepare-upload-keystore.sh` refuse tout écrasement automatiq
 
 Le dépôt `no-de-vibe-designer-pwa` contient un workflow Android indépendant qui :
 1. transforme les artefacts PWA en projet Capacitor ;
-2. force la version 1.3.0 / code 130 ;
+2. force la version 1.3.1 / code 131 ;
 3. construit l'APK debug ;
 4. vérifie le package/version/signature avec `aapt` et `apksigner` ;
 5. construit l'AAB non signé ;
