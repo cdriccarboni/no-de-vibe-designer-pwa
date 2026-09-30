@@ -55,7 +55,19 @@ export function secureVibePlan(project, rawOps, { source = "unknown", maxOps = 6
       if (count >= 3) { dropped.push(`Trop de nodes ${op.type} dans une seule génération`); continue; }
       op.x = Math.max(-4000,Math.min(4000,Number(op.x) || 60));
       op.y = Math.max(-4000,Math.min(4000,Number(op.y) || 60));
+      op.title = op.title ? String(op.title).slice(0,120) : undefined;
+      op.params = op.params && typeof op.params === "object" && !Array.isArray(op.params) ? { ...op.params } : {};
       delete op.auto;
+      if (EXTERNAL_TYPES.has(op.type) && op.params.auto === true) {
+        op.params.auto = false;
+        rewrites.push(`Sécurité scène : ${op.type}.auto forcé à false`);
+      }
+      for (const key of ["permission","playing","recording"]) {
+        if (op.params[key] === true && ["camera","remote-camera","phone-camera-front","phone-camera-back","phone-mic"].includes(op.type)) {
+          delete op.params[key];
+          rewrites.push(`Permission média supprimée de ${op.type}.${key}`);
+        }
+      }
       virtualTypes.add(op.type);
       addedCounts.set(op.type,count+1);
       newNodes++;
