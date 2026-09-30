@@ -13,6 +13,7 @@ on:
       - "sw.js"
       - "build-info.json"
       - "shared/**"
+      - ".github/workflows/android-build.yml"
   workflow_dispatch:
     inputs:
       publish_to_play:
@@ -283,6 +284,21 @@ jobs:
             android/app/build/outputs/bundle/release/No-de-Vibe-Designer-${{ env.APP_VERSION }}-play.aab
             play-signature-verification.txt
           if-no-files-found: error
+
+      - name: Refresh v1.4.0 Android release assets
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          APK_SRC="android/app/build/outputs/apk/debug/app-debug.apk"
+          AAB_SRC="android/app/build/outputs/bundle/release/app-release.aab"
+          APK="No-de-Vibe-Designer-${APP_VERSION}-Android-debug.apk"
+          AAB="No-de-Vibe-Designer-${APP_VERSION}-unsigned.aab"
+          cp "$APK_SRC" "$APK"
+          cp "$AAB_SRC" "$AAB"
+          sha256sum "$APK" "$AAB" > SHA256SUMS-Android.txt
+          gh release upload "v${APP_VERSION}" "$APK" "$AAB" SHA256SUMS-Android.txt --clobber
 
       - name: Build summary
         if: always()
