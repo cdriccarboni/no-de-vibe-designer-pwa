@@ -52,7 +52,7 @@ jobs:
                 "category": "public.app-category.graphics-design",
                 "identity": null,
                 "target": [{"target":"zip","arch":["arm64"]}],
-                "artifactName": "No-de-Vibe-Designer-1.3.3-arm64-mac.\${ext}"
+                "artifactName": "No-de-Vibe-Designer-1.3.3-arm64-mac.zip"
               }
             }
           }
