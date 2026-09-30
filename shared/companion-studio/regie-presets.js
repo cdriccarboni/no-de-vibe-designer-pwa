@@ -23,8 +23,8 @@ function button(label, secondary, binding, {
 }
 
 function rehearsalExpress() {
-  const doc = createUniversalRegieLayout({ name:"Répète Express", profileIds:[], includeCore:true });
-  doc.meta.presetId = "rehearsal-express";
+  const doc = createUniversalRegieLayout({ name:"Répète", profileIds:[], includeCore:true });
+  doc.meta.presetId = "rehearsal";
   doc.meta.quickReady = true;
   const show = page(doc,"show","Conduite");
   show.widgets.unshift(
@@ -52,11 +52,11 @@ function soloRegie() {
 
 function videoRescue() {
   const doc = createUniversalRegieLayout({
-    name:"Vidéo Secours",
+    name:"Vidéo",
     profileIds:["qlab5","millumin5","generic-osc"],
     includeCore:true
   });
-  doc.meta.presetId = "video-rescue";
+  doc.meta.presetId = "video";
   doc.meta.quickReady = true;
   const video = page(doc,"video","Vidéo");
   video.widgets.unshift(
@@ -69,11 +69,11 @@ function videoRescue() {
 
 function lightingRescue() {
   const doc = createUniversalRegieLayout({
-    name:"Lumière Secours",
+    name:"Lumière",
     profileIds:["generic-dmx"],
     includeCore:true
   });
-  doc.meta.presetId = "lighting-rescue";
+  doc.meta.presetId = "lighting";
   doc.meta.quickReady = true;
   const lighting = page(doc,"lighting","Lumière");
   for (let ch=1; ch<=4; ch++) {
@@ -88,23 +88,23 @@ function lightingRescue() {
 
 function soundRescue() {
   const doc = createUniversalRegieLayout({
-    name:"Son Secours · XR/X32",
+    name:"Son · XR/X32",
     profileIds:["behringer-xair","behringer-x32"],
     includeCore:true
   });
-  doc.meta.presetId = "sound-rescue";
+  doc.meta.presetId = "sound-xr-x32";
   doc.meta.quickReady = true;
   return validateCompanionDocument(doc);
 }
 
 function stageSimple() {
-  const doc = createUniversalRegieLayout({ name:"Plateau Simple", profileIds:[], includeCore:true });
-  doc.meta.presetId = "stage-simple";
+  const doc = createUniversalRegieLayout({ name:"Plateau", profileIds:[], includeCore:true });
+  doc.meta.presetId = "stage";
   doc.meta.quickReady = true;
   doc.pages = doc.pages.filter(p => ["show","stage"].includes(p.role));
   const stage = page(doc,"stage","Plateau");
   stage.widgets.unshift(
-    button("GO", "Conduite", { kind:"stage", action:"go" }, { w:2, h:2, color:"#d7b86a" }),
+    button("GO", "Conduite", { kind:"stage", action:"go" }, { w:2, h:1, color:"#d7b86a" }),
     button("RETOUR VIDÉO", "Monitor via bouton en haut", { kind:"action", action:"ping" }, { w:2, h:1, color:"#8ca7c2" })
   );
   return validateCompanionDocument(doc);
@@ -112,89 +112,89 @@ function stageSimple() {
 
 function qlabExpress() {
   const doc = createUniversalRegieLayout({
-    name:"QLab Express",
+    name:"QLab",
     profileIds:["qlab5"],
     includeCore:true
   });
-  doc.meta.presetId = "qlab-express";
+  doc.meta.presetId = "qlab";
   doc.meta.quickReady = true;
   return validateCompanionDocument(doc);
 }
 
 function milluminExpress() {
   const doc = createUniversalRegieLayout({
-    name:"Millumin Express",
+    name:"Millumin",
     profileIds:["millumin5"],
     includeCore:true
   });
-  doc.meta.presetId = "millumin-express";
+  doc.meta.presetId = "millumin";
   doc.meta.quickReady = true;
   return validateCompanionDocument(doc);
 }
 
 export const REGIE_PRESETS = Object.freeze([
   {
-    id:"rehearsal-express",
-    name:"Répète Express",
-    badge:"2 min",
-    description:"GO, reprise, caméra, réseau et arrêt. Zéro console externe nécessaire.",
-    category:"urgence",
+    id:"rehearsal",
+    name:"Répète",
+    badge:"répète",
+    description:"Conduite, reprise, caméra, réseau et arrêt dans un layout compact.",
+    category:"pratique",
     factory:rehearsalExpress
   },
   {
     id:"solo-regie",
     name:"Régie Solo",
-    badge:"tout-en-un",
+    badge:"solo",
     description:"Conduite + Plateau + OSC + lumière réseau pour une seule personne.",
-    category:"urgence",
+    category:"pratique",
     factory:soloRegie
   },
   {
-    id:"stage-simple",
-    name:"Plateau Simple",
-    badge:"simple",
-    description:"Deux pages seulement : Conduite et Plateau. Gros boutons pour jouer vite.",
-    category:"urgence",
+    id:"stage",
+    name:"Plateau",
+    badge:"plateau",
+    description:"Deux pages seulement : Conduite et Plateau, sans surcharge.",
+    category:"pratique",
     factory:stageSimple
   },
   {
-    id:"video-rescue",
-    name:"Vidéo Secours",
+    id:"video",
+    name:"Vidéo",
     badge:"vidéo",
     description:"Transport No-de + QLab + Millumin + OSC générique.",
-    category:"metier",
+    category:"pratique",
     factory:videoRescue
   },
   {
-    id:"lighting-rescue",
-    name:"Lumière Secours",
+    id:"lighting",
+    name:"Lumière",
     badge:"lumière",
-    description:"4 faders sACN immédiats + Art-Net/sACN générique + conduite.",
-    category:"metier",
+    description:"4 faders sACN compacts + Art-Net/sACN générique + conduite.",
+    category:"pratique",
     factory:lightingRescue
   },
   {
-    id:"sound-rescue",
-    name:"Son Secours · XR/X32",
+    id:"sound-xr-x32",
+    name:"Son · XR/X32",
     badge:"son",
     description:"Pages Behringer X Air/XR18 et X32/M32 prêtes à personnaliser.",
-    category:"metier",
+    category:"pratique",
     factory:soundRescue
   },
   {
-    id:"qlab-express",
-    name:"QLab Express",
+    id:"qlab",
+    name:"QLab",
     badge:"QLab",
     description:"GO / start / stop QLab + conduite No-de.",
-    category:"logiciel",
+    category:"pratique",
     factory:qlabExpress
   },
   {
-    id:"millumin-express",
-    name:"Millumin Express",
+    id:"millumin",
+    name:"Millumin",
     badge:"Millumin",
     description:"Commandes Millumin + transport No-de + conduite.",
-    category:"logiciel",
+    category:"pratique",
     factory:milluminExpress
   }
 ]);
