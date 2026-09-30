@@ -2184,6 +2184,14 @@ function handleCompanionStudioMessage(msg) {
         }
         return devices.bridge.send({ type: "osc", target: host || "bridge", address, args });
       },
+      sendArtNet: (message) => {
+        if (typeof window.nvdDesktop?.sendArtNetUdp === "function") return window.nvdDesktop.sendArtNetUdp(message);
+        return devices.bridge.send({ type: "artnet", ...message });
+      },
+      sendSacn: (message) => {
+        if (typeof window.nvdDesktop?.sendSacnUdp === "function") return window.nvdDesktop.sendSacnUdp(message);
+        return devices.bridge.send({ type: "sacn", ...message });
+      },
       sendMidi: (outputId, data) => devices.midi.send(outputId, data),
       sendSerial: (text) => devices.serial.send(text),
       cameraControl: (action) => {
