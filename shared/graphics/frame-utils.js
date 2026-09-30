@@ -11,18 +11,37 @@ function makeCanvas(width, height) {
     canvas.height = height;
     return canvas;
   }
-  throw new Error("Canvas indisponible dans ce runtime");
+  return null;
 }
 
 function scratchCanvas(scratchMap, key, width, height) {
   let canvas = scratchMap?.get?.(key);
   if (!canvas) {
     canvas = makeCanvas(width, height);
+    if (!canvas) return null;
     scratchMap?.set?.(key, canvas);
   }
   if (canvas.width !== width) canvas.width = width;
   if (canvas.height !== height) canvas.height = height;
   return canvas;
+}
+
+/** Nearest-neighbour resize — works in Node without DOM canvas. */
+function resizePixels(src, srcW, srcH, dstW, dstH) {
+  const out = new Uint8ClampedArray(dstW * dstH * 4);
+  for (let y = 0; y < dstH; y++) {
+    const sy = Math.min(srcH - 1, Math.floor((y * srcH) / dstH));
+    for (let x = 0; x < dstW; x++) {
+      const sx = Math.min(srcW - 1, Math.floor((x * srcW) / dstW));
+      const si = (sy * srcW + sx) * 4;
+      const di = (y * dstW + x) * 4;
+      out[di] = src[si];
+      out[di + 1] = src[si + 1];
+      out[di + 2] = src[si + 2];
+      out[di + 3] = src[si + 3];
+    }
+  }
+  return out;
 }
 
 export function drawVideoLike(ctx, width, height, value) {
@@ -41,6 +60,10 @@ export function drawVideoLike(ctx, width, height, value) {
   }
   if (value.pixels && value.width && value.height) {
     const temp = makeCanvas(value.width, value.height);
+    if (!temp) {
+      // Node / headless: draw via ImageData requires canvas — callers should prefer pixel paths.
+      throw new Error("Canvas indisponible dans ce runtime");
+    }
     const tctx = temp.getContext("2d", { willReadFrequently: true });
     const img = tctx.createImageData(value.width, value.height);
     img.data.set(value.pixels);
@@ -60,16 +83,22 @@ export function rasterizeVideoValue(value, {
   if (!value) throw new Error("Image absente");
   const w = Math.max(16, Math.round(width));
   const h = Math.max(16, Math.round(height));
-  if (value.pixels && value.width === w && value.height === h) {
+  if (value.pixels && value.width && value.height) {
+    const pixels = (value.width === w && value.height === h)
+      ? new Uint8ClampedArray(value.pixels)
+      : resizePixels(value.pixels, value.width, value.height, w, h);
     return {
       width: w,
       height: h,
-      pixels: new Uint8ClampedArray(value.pixels),
+      pixels,
       kind: "video",
       source: value.source || "pixels"
     };
   }
   const canvas = scratchCanvas(scratchMap, key, w, h);
+  if (!canvas) {
+    throw new Error("Canvas indisponible dans ce runtime");
+  }
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.clearRect(0, 0, w, h);
   drawVideoLike(ctx, w, h, value);

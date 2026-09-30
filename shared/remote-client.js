@@ -13,7 +13,8 @@ export function connectRemote({
   setState,
   onStatus = () => {},
   onLog = () => {},
-  onConflict = null
+  onConflict = null,
+  onMessage = null
 } = {}) {
   let ws = null;
   let closedByUser = false;
@@ -119,7 +120,9 @@ export function connectRemote({
         applying = false;
         if (outcome?.holdStatus) status(outcome.state || "conflict", outcome.detail || "Conflit");
         else status("online", `révision ${msg.revision}`);
+        return;
       }
+      onMessage?.(msg);
     };
     socket.onerror = () => {
       stopOpenTimer();

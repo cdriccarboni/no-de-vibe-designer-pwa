@@ -1,4 +1,4 @@
-import { newProject, validateProject, exportProject, createDemoProject } from "../shared/ir.js";
+import { newProject, validateProject, exportProject, createDemoProject, openProject } from "../shared/ir.js";
 import { Runtime } from "../shared/runtime.js";
 import { DESTINATIONS, ROUTE_MODES, ensureRouting, effectiveRoute } from "../shared/routing.js";
 import { DeviceManager } from "../shared/device-manager.js";
@@ -18,6 +18,27 @@ import { applyCue, listCues, nextCue, previousCue } from "../shared/stage/cues.j
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
 import { createHostCard, hostCardToQrPayload } from "../shared/discovery/host-card.js";
 import { discoveryCapabilities } from "../shared/discovery/lan-beacon.js";
+import { createRemoteCameraSession, makeRoomCode } from "../shared/remote-camera/session.js";
+import { companionJoinUrl } from "../shared/remote-camera/url.js";
+import { rcStateLabel } from "../shared/remote-camera/states.js";
+import { ndiStatusMessage } from "../shared/remote-camera/ndi.js";
+import { markCrashRecovery, clearCrashRecovery, loadCrashRecovery, pushRecentProject } from "../shared/session-recovery.js";
+import {
+  loadSession,
+  saveSession,
+  rememberRemoteCameraRoom,
+  loadRemoteCameraRoom,
+  markProjectMeta,
+  COMPANION_BASE_KEY
+} from "../shared/session-store.js";
+import { LINK_STATES, linkFromRemoteCamera } from "../shared/connection-states.js";
+import { buildDiagnosticSnapshot, copyDiagnostic, formatDiagnosticText } from "../shared/diagnostic.js";
+import { mediaStatusForNode, MEDIA_STATUS } from "../shared/media-status.js";
+import { createRemoteGhostDemo, createVideoMagicFxDemo, createStageOscDemo } from "../shared/demos.js";
+import { STUDIO_MSG } from "../shared/companion-studio/protocol.js";
+import { applyCompanionBinding, findWidget } from "../shared/companion-studio/bindings.js";
+import { loadCompanionLayout, ensureCompanionLayout } from "../shared/companion-studio/store.js";
+import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref } from "../shared/companion-studio/detect.js";
 
 const $ = s => document.querySelector(s);
 const qall = s => [...document.querySelectorAll(s)];
@@ -40,6 +61,7 @@ let panDrag = null;
 /** Pile de navigation sous-patch : [{ id, title }] */
 let graphPath = [];
 let pendingVibe = null;
+let rcSession = null;
 
 const runtime = new Runtime($("#previewCanvas"), {
   onGraphEvent: ev => {
@@ -455,6 +477,17 @@ function selectNode(id, { additive = false } = {}) {
   if (["camera", "phone-camera-front", "phone-camera-back"].includes(n.type)) {
     extra += `<div class="camera-actions"><button id="cameraStart" type="button">Activer la caméra</button><button id="cameraStop" class="stop" type="button">Couper caméra</button></div><p class="hint">La caméra ne démarre jamais automatiquement. L'action ci-dessus demande explicitement l'accès.</p>`;
   }
+  if (n.type === "remote-camera") {
+    const st = runtime.remoteCamera?.state || n.params?.status || "WAITING";
+    const knownRoom = n.params?.room || loadRemoteCameraRoom() || "";
+    extra += `<div class="camera-actions"><button id="rcHost" type="button">${knownRoom ? "Reprendre salon / QR" : "QR · démarrer hôte"}</button><button id="rcStop" class="stop" type="button">Couper / déconnecter</button></div>`;
+    extra += `<p class="hint">Remote Camera · PeerJS (ART Intercom). LIVE seulement après FIRST_FRAME. État : <b id="rcState">${st}</b> · ${rcStateLabel(st)} · lien ${linkFromRemoteCamera(st)}</p>`;
+    extra += `<div id="rcQrBox" class="hint">Companion : <code>npm run serve:companion</code>${knownRoom ? ` · salon connu <code>${knownRoom}</code> (pas de nouveau QR obligatoire)` : " puis scanne le QR."}</div>`;
+    if (runtime.remoteCamera?.room) extra += `<p class="hint">Salon actif <code>${runtime.remoteCamera.room}</code></p>`;
+  }
+  if (n.type === "ndi-out") {
+    extra += `<p class="hint">${ndiStatusMessage()}</p>`;
+  }
   if (n.type === "whale") {
     extra += `<div class="field"><label>Échelle</label><input id="nScale" type="range" min=".35" max="2.2" step=".01" value="${n.params.scale ?? 1}"></div>`;
     extra += `<div class="field"><label>Traînée</label><input id="nTrailAmount" type="range" min="0" max=".7" step=".01" value="${n.params.trail ?? .18}"></div>`;
@@ -611,6 +644,65 @@ function selectNode(id, { additive = false } = {}) {
     log(ok ? "Caméra active · action utilisateur" : "Caméra non activée");
   };
   if ($("#cameraStop")) $("#cameraStop").onclick = () => runtime.stopCamera();
+  if ($("#rcHost")) $("#rcHost").onclick = async () => {
+    try {
+      if (!window.Peer) throw new Error("PeerJS non chargé — recharge la page");
+      rcSession?.stop();
+      const known = (n.params?.room || loadRemoteCameraRoom() || "").toUpperCase();
+      const room = known || makeRoomCode();
+      n.params.room = room;
+      n.params.status = "QR_OPEN";
+      rcSession = createRemoteCameraSession({
+        role: "host",
+        room,
+        videoEl: runtime.remoteVideo,
+        onState: ({ state, error, metrics, room: r }) => {
+          n.params.status = state;
+          runtime.setRemoteCamera({
+            state,
+            live: state === "LIVE",
+            videoEl: runtime.remoteVideo,
+            metrics,
+            room: r
+          });
+          const el = $("#rcState");
+          if (el) el.textContent = state;
+          if (state === "LIVE") log("Remote Camera · LIVE (FIRST_FRAME)");
+          if (error) log(`Remote Camera · ${error}`);
+        },
+        onStream: (stream) => {
+          runtime.setRemoteCamera({
+            state: runtime.remoteCamera?.state || "PEER_CONNECTED",
+            live: false,
+            stream,
+            videoEl: runtime.remoteVideo,
+            room
+          });
+        },
+        onLog: (msg) => log(msg)
+      });
+      await rcSession.startHost();
+      const base = localStorage.getItem(COMPANION_BASE_KEY) || localStorage.getItem("nvd.companionBase") || "http://127.0.0.1:4177/";
+      rememberRemoteCameraRoom(room, { companionBase: base, status: LINK_STATES.CONNECTING });
+      const join = companionJoinUrl({ companionBase: base, room });
+      const box = $("#rcQrBox");
+      if (box) {
+        box.innerHTML = `<p>Salon <code>${room}</code>${known ? " · reprise" : ""}</p><p><a href="${join}" target="_blank" rel="noopener">${join}</a></p><p class="hint">Ouvre ce lien sur le téléphone (HTTPS recommandé). HTTP LAN = PLATFORM-LIMITED pour getUserMedia.</p>`;
+      }
+      log(`Remote Camera · ${known ? "REPRISE" : "QR_OPEN"} · ${room}`);
+      autosave();
+    } catch (e) {
+      log(`Remote Camera · ${e.message || e}`);
+    }
+  };
+  if ($("#rcStop")) $("#rcStop").onclick = () => {
+    rcSession?.stop();
+    rcSession = null;
+    runtime.stopRemoteCameraTracks();
+    n.params.status = "DISCONNECTED";
+    log("Remote Camera · coupé · tracks arrêtées");
+    renderInspector(n.id);
+  };
   if ($("#exposeChannelBtn")) $("#exposeChannelBtn").onclick = () => {
     const key = $("#channelParam")?.value;
     const def = channelDefs.find(([k]) => k === key);
@@ -797,7 +889,16 @@ function redraw() {
 }
 
 function autosave() {
-  try { localStorage.setItem("cvd.autosave", exportProject(project)); } catch { /* */ }
+  try {
+    const data = exportProject(project);
+    localStorage.setItem("cvd.autosave", data);
+    markCrashRecovery(data);
+    markProjectMeta(project.name, {
+      workspace: localStorage.getItem("cvd.workspace") || "bureau"
+    });
+  } catch (e) {
+    console.error("AUTOSAVE_FAILED", e?.message || e);
+  }
   try { publishHostState(); } catch { /* hôte distant optionnel */ }
 }
 
@@ -1564,13 +1665,32 @@ buildLibrary();
 let generalPrefs = { restoreAutosave: true, loadDemo: true };
 try { generalPrefs = { ...generalPrefs, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") }; } catch { /* */ }
 
+let recoveredFromCrash = false;
+try {
+  const crash = loadCrashRecovery();
+  if (crash && generalPrefs.restoreAutosave !== false) {
+    project = validateProject(crash);
+    recoveredFromCrash = true;
+    clearCrashRecovery();
+    log("Recovery crash · projet restauré (cvd.crash-recovery)");
+  }
+} catch (e) {
+  log(`Recovery crash · ${e.message || e}`);
+}
+
 const autosaved = localStorage.getItem("cvd.autosave");
-if (generalPrefs.restoreAutosave !== false && autosaved) {
+if (!recoveredFromCrash && generalPrefs.restoreAutosave !== false && autosaved) {
   try {
-    project = validateProject(JSON.parse(autosaved));
-    log("Autosave restaurée");
+    const opened = openProject(JSON.parse(autosaved));
+    project = opened.project;
+    log(opened.changed ? `Autosave restaurée · migration ${opened.migratedFrom}→${opened.migratedTo}` : "Autosave restaurée");
   } catch { /* */ }
 }
+try {
+  const session = loadSession();
+  if (session.lastProjectName) log(`Session · dernier projet « ${session.lastProjectName} »`);
+  if (session.remoteCamera?.room) log(`Session · Remote Camera connu ${session.remoteCamera.room} · ${session.remoteCamera.lastStatus || LINK_STATES.KNOWN}`);
+} catch { /* */ }
 if (project.nodes.length === 0 && generalPrefs.loadDemo !== false) {
   project = createDemoProject();
   log("Démo Baleine interactive initialisée · aucune permission requise");
@@ -1585,6 +1705,8 @@ window.__nvdSelfTest = () => nestedBoxSelfTest();
 let remoteRevision = 0;
 let remoteSession = null;
 let applyingRemote = false;
+let companionLayout = null;
+try { companionLayout = loadCompanionLayout() || ensureCompanionLayout(); } catch { companionLayout = null; }
 
 function publishHostState() {
   if (!remoteSession?.online || applyingRemote) return;
@@ -1592,11 +1714,72 @@ function publishHostState() {
   remoteSession.pushState({ revision: remoteRevision, project });
 }
 
+function hideCompanionDetect() {
+  $("#companionDetect")?.classList.add("hidden");
+}
+
+function showCompanionDetect(payload = {}) {
+  const pref = loadDetectPref();
+  if (pref === DETECT_ACTIONS.IGNORE) {
+    log(`Companion · détecté (${payload.clientId || "?"}) · ignoré (préférence)`);
+    return;
+  }
+  const banner = $("#companionDetect");
+  const text = $("#companionDetectText");
+  if (!banner || !text) {
+    log(formatDetectBanner({ name: payload.clientId || "Companion" }));
+    return;
+  }
+  text.textContent = formatDetectBanner({
+    name: payload.clientId || "Companion Studio",
+    transport: "LAN"
+  });
+  banner.dataset.clientId = payload.clientId || "";
+  banner.classList.remove("hidden");
+}
+
+function handleCompanionStudioMessage(msg) {
+  if (!msg?.type) return;
+  if (msg.type === STUDIO_MSG.DETECT) {
+    showCompanionDetect(msg);
+    log(`Companion Studio · détecté · ${msg.clientId || "?"}`);
+    return;
+  }
+  if (msg.type === STUDIO_MSG.DISCONNECT) {
+    log(`Companion · déconnecté · ${msg.clientId || "?"}`);
+    hideCompanionDetect();
+    return;
+  }
+  if (msg.type === STUDIO_MSG.ACTION) {
+    const layout = companionLayout || loadCompanionLayout() || ensureCompanionLayout();
+    companionLayout = layout;
+    const widget = findWidget(layout, msg.widgetId) || {
+      id: msg.widgetId,
+      binding: { kind: "action", action: msg.action === "press" ? "ping" : msg.action }
+    };
+    const feedback = applyCompanionBinding({
+      widget,
+      value: msg.value,
+      project,
+      runtime,
+      applyCue,
+      listCues,
+      onLog: (m) => log(m)
+    });
+    remoteSession?.send?.({ ...feedback, clientId: msg.clientId });
+    if (feedback.ok) {
+      autosave();
+      redraw();
+    }
+  }
+}
+
 function startDesktopRemoteHost() {
   const params = new URLSearchParams(location.search);
   const query = params.get("remoteHost");
   const electron = window.nvdDesktop?.runtime === "electron";
-  if (!query && !electron) return;
+  // Always allow ?companionHost=1 or electron; also enable with remoteHost
+  if (!query && !electron && params.get("companionHost") !== "1") return;
   const url = query && query.startsWith("ws") ? query : `ws://127.0.0.1:${window.nvdDesktop?.remotePort || REMOTE_PORT}`;
   remoteSession = connectRemote({
     url,
@@ -1623,10 +1806,41 @@ function startDesktopRemoteHost() {
       }
     },
     onStatus: (s) => log(`Distant · ${s.state}${s.detail ? " · " + s.detail : ""}`),
-    onLog: (m) => log(`Distant · ${m}`)
+    onLog: (m) => log(`Distant · ${m}`),
+    onMessage: handleCompanionStudioMessage
   });
+  log(`Companion host · écoute ${url}`);
 }
 startDesktopRemoteHost();
+
+$("#companionDetect")?.querySelectorAll("[data-detect]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const action = btn.dataset.detect;
+    rememberDetectPref(action);
+    const clientId = $("#companionDetect")?.dataset.clientId || "";
+    if (action === DETECT_ACTIONS.OPEN_STUDIO) {
+      window.open("http://127.0.0.1:4177/studio/", "_blank", "noopener");
+      log("Companion · Open Studio");
+    } else if (action === DETECT_ACTIONS.SYNC) {
+      if (companionLayout && remoteSession?.online) {
+        remoteSession.send({
+          type: STUDIO_MSG.LAYOUT,
+          layout: companionLayout,
+          clientId: clientId || undefined,
+          t: Date.now()
+        });
+        log("Companion · Sync layout envoyé");
+      } else log("Companion · Sync · layout ou lien manquant");
+    } else if (action === DETECT_ACTIONS.MONITOR) {
+      log("Companion · Use as Monitor · P2 (pas encore câblé)");
+    } else if (action === DETECT_ACTIONS.CONTROLLER) {
+      log("Companion · Use as Controller · layout actif");
+    } else {
+      log("Companion · Ignore");
+    }
+    hideCompanionDetect();
+  });
+});
 
 try {
   const self = window.__nvdSelfTest();

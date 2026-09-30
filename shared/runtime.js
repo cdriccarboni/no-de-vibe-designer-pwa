@@ -19,6 +19,10 @@ export class Runtime {
     this.video = document.createElement("video");
     this.video.playsInline = true;
     this.video.muted = true;
+    this.remoteVideo = document.createElement("video");
+    this.remoteVideo.playsInline = true;
+    this.remoteVideo.muted = true;
+    this.remoteCamera = { state: "WAITING", live: false, videoEl: null };
     this.shaderSurface = new ShaderSurface();
     this.offscreen = document.createElement("canvas");
     this.resultCanvas = document.createElement("canvas");
@@ -151,6 +155,33 @@ export class Runtime {
     this.render();
   }
 
+  setRemoteCamera(info) {
+    this.remoteCamera = {
+      state: info?.state || "WAITING",
+      live: !!(info?.live || info?.state === "LIVE"),
+      videoEl: info?.videoEl || this.remoteVideo,
+      metrics: info?.metrics || null,
+      room: info?.room || null
+    };
+    if (info?.stream) {
+      this.remoteVideo.srcObject = info.stream;
+      this.remoteVideo.play?.().catch?.(() => {});
+    }
+    if (info?.clear) {
+      try { this.remoteVideo.pause(); } catch { /* */ }
+      this.remoteVideo.srcObject = null;
+    }
+    this.render();
+  }
+
+  stopRemoteCameraTracks() {
+    const stream = this.remoteVideo?.srcObject;
+    stream?.getTracks?.().forEach(t => { try { t.stop(); } catch { /* */ } });
+    this.remoteVideo.srcObject = null;
+    this.remoteCamera = { state: "DISCONNECTED", live: false, videoEl: this.remoteVideo };
+    this.render();
+  }
+
   play() {
     if (this.playing) return;
     this.playing = true;
@@ -179,6 +210,7 @@ export class Runtime {
   async dispose() {
     this.stop();
     this.stopCamera();
+    this.stopRemoteCameraTracks();
     this.frameScratch.clear();
     await this.audioEngine?.shutdown();
   }
@@ -209,6 +241,8 @@ export class Runtime {
       height: h,
       background: bg,
       videoEl: this.video,
+      remoteVideoEl: this.remoteVideo,
+      remoteCamera: this.remoteCamera || null,
       shaderSurface: this.shaderSurface,
       offscreen: this.offscreen,
       resultCanvas: this.resultCanvas,

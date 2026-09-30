@@ -37,6 +37,15 @@ export const EXECUTABLE_PORTS = {
     { name: "tracking", dir: "out", data: "number" },
     { name: "out", dir: "out", data: "video" }
   ],
+  "remote-camera": [
+    { name: "video", dir: "out", data: "video" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "out", dir: "out", data: "video" }
+  ],
+  "ndi-out": [
+    { name: "video", dir: "in", data: "video" },
+    { name: "status", dir: "out", data: "text" }
+  ],
   "phone-camera-front": [
     { name: "video", dir: "out", data: "video" },
     { name: "device", dir: "out", data: "text" },
