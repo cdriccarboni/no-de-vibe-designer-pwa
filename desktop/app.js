@@ -107,6 +107,7 @@ ensureRouting(project);
 
 /** Catalogue UI — mêmes groupes ; marque visuelle des nodes exécutables. */
 const LIB = NODE_GROUPS.map(([title, items]) => [title, items]);
+let showExperimental = localStorage.getItem("nvd.showExperimental") === "1";
 
 function spec(t) {
   return sharedSpec(t);
@@ -144,13 +145,17 @@ function ensurePatchWorld() {
 }
 
 function buildLibrary() {
-  $("#libraryList").innerHTML = LIB.map(([title, items]) =>
-    `<div class="lib-section"><div class="lib-title">${title}</div>${items.map(([n, t]) => {
+  $("#libraryList").innerHTML = LIB.map(([title, items]) => {
+    const visible = items.filter(([, t]) => showExperimental || isExecutable(t));
+    if (!visible.length) return "";
+    return `<div class="lib-section"><div class="lib-title">${title}</div>${visible.map(([n, t]) => {
       const ok = isExecutable(t);
-      return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${ok ? "Exécutable" : "Indisponible — représentation seule"}"><span>${n}${ok ? "" : " · indisponible"}</span><span>${ok ? "＋" : "○"}</span></div>`;
-    }).join("")}</div>`
-  ).join("");
+      return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${ok ? "Exécutable" : "Expérimental — moteur incomplet ou backend externe requis"}"><span>${n}${ok ? "" : " · expérimental"}</span><span>${ok ? "＋" : "○"}</span></div>`;
+    }).join("")}</div>`;
+  }).join("");
   qall("[data-add]").forEach(x => x.onclick = () => addNode(x.dataset.add));
+  const q = $("#search")?.value?.toLowerCase?.() || "";
+  if (q) qall(".lib-item").forEach(x => { x.style.display = x.textContent.toLowerCase().includes(q) ? "flex" : "none"; });
 }
 
 function activeGraph() {
@@ -533,11 +538,17 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="field"><label>Vitesse</label><input id="nSpeed" type="range" min="0" max="3" step=".01" value="${n.params.speed ?? 0.65}"></div>`;
     extra += `<div class="field"><label>Taille</label><input id="nSize" type="range" min="0.05" max="1" step=".01" value="${n.params.size ?? 0.58}"></div>`;
   }
-  if (n.type === "transform") {
+  if (["transform", "mapping"].includes(n.type)) {
     extra += `<div class="field"><label>Échelle</label><input id="nScale" type="number" step=".01" value="${n.params.scale ?? 1}"></div>`;
     extra += `<div class="field"><label>Rotation (rad)</label><input id="nRot" type="number" step=".01" value="${n.params.rotation ?? 0}"></div>`;
     extra += `<div class="field"><label>Décalage X</label><input id="nDx" type="number" value="${n.params.dx ?? 0}"></div>`;
     extra += `<div class="field"><label>Décalage Y</label><input id="nDy" type="number" value="${n.params.dy ?? 0}"></div>`;
+  }
+  if (["anaglyph", "creativefx", "storm", "bending", "transmute"].includes(n.type)) {
+    const label = n.type === "anaglyph" ? "Profondeur" : "Intensité";
+    const key = n.type === "anaglyph" ? "depth" : "amount";
+    const value = n.params?.[key] ?? (n.type === "anaglyph" ? 0.035 : 0.55);
+    extra += `<div class="field"><label>${label}</label><input id="nFxAmount" type="range" min="0" max="1" step=".005" value="${value}"></div>`;
   }
   if (n.type === "composite") {
     extra += `<div class="field"><label>Blend</label><select id="nBlend"><option>normal</option><option>add</option><option>multiply</option><option>screen</option></select></div>`;
@@ -613,6 +624,12 @@ function selectNode(id, { additive = false } = {}) {
   if ($("#nSize")) $("#nSize").oninput = e => { n.params.size = +e.target.value; runtime.render(); autosave(); };
   if ($("#nScale")) $("#nScale").onchange = e => { n.params.scale = +e.target.value; runtime.render(); autosave(); commitHistory(); };
   if ($("#nRot")) $("#nRot").onchange = e => { n.params.rotation = +e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nFxAmount")) $("#nFxAmount").oninput = e => {
+    const key = n.type === "anaglyph" ? "depth" : "amount";
+    n.params[key] = +e.target.value;
+    runtime.render();
+    autosave();
+  };
   if ($("#nBlend")) {
     $("#nBlend").value = n.params.blend || "normal";
     $("#nBlend").onchange = e => { n.params.blend = e.target.value; runtime.render(); autosave(); commitHistory(); };
@@ -1575,6 +1592,16 @@ qall(".collapse").forEach(b => b.onclick = () => b.closest(".panel").classList.t
 $("#search").oninput = e => qall(".lib-item").forEach(x => {
   x.style.display = x.textContent.toLowerCase().includes(e.target.value.toLowerCase()) ? "flex" : "none";
 });
+const experimentalToggle = $("#showExperimental");
+if (experimentalToggle) {
+  experimentalToggle.checked = showExperimental;
+  experimentalToggle.onchange = () => {
+    showExperimental = experimentalToggle.checked;
+    localStorage.setItem("nvd.showExperimental", showExperimental ? "1" : "0");
+    buildLibrary();
+    log(showExperimental ? "Library · expérimentaux visibles" : "Library · mode Production");
+  };
+}
 $("#termSend").onclick = runCmd;
 $("#termCmd").onkeydown = e => { if (e.key === "Enter") runCmd(); };
 
