@@ -14,7 +14,7 @@ No-de Vibe Designer est une PWA multi-interface pour la régie et la création v
 ### Test direct
 
 - Page de téléchargement stable : https://cdriccarboni.github.io/no-de-vibe-designer-pwa/downloads/
-- Les APK et builds macOS sont attachés à la dernière GitHub Release ; la page stable redirige toujours vers les derniers artefacts.
+- Les APK et builds macOS (DMG + ZIP Apple Silicon) sont attachés à la dernière GitHub Release ; la page stable redirige toujours vers les derniers artefacts.
 
 L'APK public sert uniquement aux tests directs. La distribution Google Play utilise un **AAB release signé avec la clé d'upload Play**, généré par GitHub Actions sans publier la clé dans le dépôt.
 
