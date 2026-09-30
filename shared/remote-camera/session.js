@@ -75,6 +75,8 @@ export function createRemoteCameraSession({
   let localStream = null;
   let remoteStream = null;
   let callRef = null;
+  let dataConnections = new Map();
+  let pingTimer = null;
   let roomCode = room || makeRoomCode();
   let leaving = false;
   let stopWatch = null;
@@ -89,6 +91,51 @@ export function createRemoteCameraSession({
   function clearCall() {
     try { callRef?.close?.(); } catch { /* */ }
     callRef = null;
+  }
+
+  function handleData(raw, conn) {
+    if (!raw || typeof raw !== "object" || !raw.type) return;
+    if (raw.type === "ping" && typeof raw.sentAt === "number") {
+      if (conn?.open) conn.send({ type: "pong", sentAt: raw.sentAt });
+      return;
+    }
+    if (raw.type === "pong" && typeof raw.sentAt === "number") {
+      const rtt = Math.max(0, Date.now() - raw.sentAt);
+      metrics.setRtt(rtt);
+      onState({ state, error, room: roomCode, peerId: peer?.id || null, metrics: metrics.snapshot(), rttMs: rtt });
+    }
+  }
+
+  function attachDataConnection(conn) {
+    const prev = dataConnections.get(conn.peer);
+    if (prev && prev !== conn) {
+      try { prev.close(); } catch { /* */ }
+    }
+    dataConnections.set(conn.peer, conn);
+    conn.on("data", (raw) => handleData(raw, conn));
+    conn.on("close", () => dataConnections.delete(conn.peer));
+    conn.on("error", () => dataConnections.delete(conn.peer));
+  }
+
+  function startPingProbe() {
+    if (pingTimer) clearInterval(pingTimer);
+    pingTimer = setInterval(() => {
+      const sentAt = Date.now();
+      for (const conn of dataConnections.values()) {
+        if (conn?.open) {
+          try { conn.send({ type: "ping", sentAt }); } catch { /* */ }
+        }
+      }
+    }, 1200);
+  }
+
+  function clearDataConnections() {
+    if (pingTimer) clearInterval(pingTimer);
+    pingTimer = null;
+    for (const conn of dataConnections.values()) {
+      try { conn.close(); } catch { /* */ }
+    }
+    dataConnections.clear();
   }
 
   function attachCall(call, { answerWith = null } = {}) {
@@ -159,6 +206,10 @@ export function createRemoteCameraSession({
       setState(RC_STATES.CONNECTING);
       attachCall(call, { answerWith: undefined });
     });
+    peer.on("connection", (conn) => {
+      attachDataConnection(conn);
+      startPingProbe();
+    });
     peer.on("disconnected", () => {
       if (leaving || peer.destroyed) return;
       setState(RC_STATES.RECONNECTING);
@@ -186,6 +237,11 @@ export function createRemoteCameraSession({
       const hostId = remoteCameraHostId(roomCode);
       onLog(`Remote Camera phone → ${hostId}`);
       attachCall(peer.call(hostId, localStream, { metadata: { nvdRemoteCamera: "2.2" } }));
+      try {
+        const conn = peer.connect(hostId, { reliable: true });
+        attachDataConnection(conn);
+        conn.on("open", startPingProbe);
+      } catch { /* data channel RTT is optional; media stays primary */ }
     });
     peer.on("disconnected", () => {
       if (leaving || peer.destroyed) return;
@@ -207,6 +263,7 @@ export function createRemoteCameraSession({
     stopWatch?.();
     stopWatch = null;
     clearCall();
+    clearDataConnections();
     try { peer?.destroy?.(); } catch { /* */ }
     peer = null;
     stopStream(localStream);
