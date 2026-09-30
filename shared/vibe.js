@@ -4,6 +4,7 @@ import { validateEdge } from "./graph-engine.js";
 import { deterministicVibePlan } from "./vibe-planner.js";
 import { secureVibePlan } from "./vibe-safety.js";
 import { buildLocalAiPrompt, directOllamaChat, directOllamaProbe, normalizeLocalAiConfig, sanitizeLocalAiResponse, selectLocalModels } from "./local-ai-core.js";
+import { selectLocalAgents } from "./local-agent-registry.js";
 
 /**
  * Vibe coding — génération structurée de patch.
@@ -29,6 +30,7 @@ export function readAiConfig() {
     localParallel: local.parallel,
     localTemperature: local.temperature,
     localMaxOps: local.maxOps,
+    localAgents: local.agents,
     // Cloud is opt-in. Legacy configs remain readable but are not contacted unless enabled === true.
     enabled: raw.enabled === true
   };
@@ -93,6 +95,13 @@ function parseAiOps(content, label = "IA") {
   return { ok:true, ops:parsed.ops, summary:parsed.summary || "" };
 }
 
+function localAgentTaskForText(text = "") {
+  const value = String(text || "").toLowerCase();
+  if (/\[image\s*→\s*vibe|image\s*->\s*vibe|photo|dessin|texture|vision|silhouette|image/.test(value)) return "vision";
+  if (/vite|rapide|léger|leger|draft|brouillon/.test(value)) return "fast";
+  return "patch";
+}
+
 async function callLocalAi(text, project, cfg) {
   const local = normalizeLocalAiConfig(cfg);
   if (!local.enabled) return { ok:false, unavailable:true, error:"Local AI Core désactivé" };
@@ -100,20 +109,30 @@ async function callLocalAi(text, project, cfg) {
   const probe = await probeLocalAi(cfg);
   if (!probe.ok) return { ok:false, unavailable:true, error:probe.error || "Ollama local indisponible" };
 
-  const models = (probe.localModels || [probe.model]).filter(Boolean);
+  const agentTask = localAgentTaskForText(text);
+  const routedAgents = selectLocalAgents(local.agents, {
+    task:agentTask,
+    limit:local.parallel ? 2 : 1
+  });
+  const fallbackModels = (probe.localModels || [probe.model]).filter(Boolean);
+  const targets = routedAgents.length
+    ? routedAgents.map(agent => ({ model:agent.model, baseUrl:agent.baseUrl || local.baseUrl, role:agent.role }))
+    : fallbackModels.map(model => ({ model, baseUrl:local.baseUrl, role:"legacy" }));
   const prompt = buildLocalAiPrompt(text, project);
 
-  const ask = async model => {
+  const ask = async target => {
+    const model = target.model;
+    const baseUrl = target.baseUrl || local.baseUrl;
     const raw = typeof globalThis?.nvdDesktop?.localAiChat === "function"
       ? await globalThis.nvdDesktop.localAiChat({
-          baseUrl:local.baseUrl,
+          baseUrl,
           model,
           temperature:local.temperature,
           system:prompt.system,
           user:prompt.user
         })
       : await directOllamaChat({
-          baseUrl:local.baseUrl,
+          baseUrl,
           model,
           temperature:local.temperature,
           system:prompt.system,
@@ -121,12 +140,12 @@ async function callLocalAi(text, project, cfg) {
         });
     const parsed = sanitizeLocalAiResponse(raw, { maxOps:local.maxOps });
     if (!parsed.ok) throw new Error(parsed.error || "Réponse locale inexploitable");
-    return { model, ...parsed };
+    return { model, baseUrl, role:target.role, ...parsed };
   };
 
   try {
     if (local.parallel && models.length > 1) {
-      const settled = await Promise.allSettled(models.slice(0, 2).map(ask));
+      const settled = await Promise.allSettled(targets.slice(0, 2).map(ask));
       const successes = settled.filter(x => x.status === "fulfilled").map(x => x.value);
       if (!successes.length) {
         const reasons = settled.map(x => x.reason?.message || x.reason).filter(Boolean).join(" · ");
@@ -134,26 +153,26 @@ async function callLocalAi(text, project, cfg) {
       }
       // Qwen/primary remains authoritative for graph mutation; the lightweight second model
       // acts as a fast second opinion and can fill in only when primary failed.
-      const primary = successes.find(x => x.model === models[0]) || successes[0];
+      const primary = successes.find(x => x.model === targets[0]?.model) || successes[0];
       const second = successes.find(x => x !== primary);
       return {
         ok:true,
         engine:"local-ai-duo",
         ops:primary.ops,
         summary:primary.summary || second?.summary || "",
-        note:"Local AI Core · " + successes.map(x => x.model).join(" + ") + " · OFFLINE",
+        note:"Local AI Core · " + successes.map(x => x.model).join(" + ") + ` · ${agentTask} · OFFLINE`,
         localModel:primary.model,
         localModels:successes.map(x => x.model)
       };
     }
 
-    const parsed = await ask(models[0] || local.model);
+    const parsed = await ask(targets[0] || { model:local.model, baseUrl:local.baseUrl, role:"legacy" });
     return {
       ok:true,
       engine:"local-ai",
       ops:parsed.ops,
       summary:parsed.summary,
-      note:"Local AI Core · " + parsed.model + " · OFFLINE",
+      note:"Local AI Core · " + parsed.model + ` · ${agentTask} · OFFLINE`,
       localModel:parsed.model,
       localModels:[parsed.model]
     };
