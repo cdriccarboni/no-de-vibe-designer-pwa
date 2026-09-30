@@ -34,8 +34,8 @@ if (unexpectedExperimental.length) {
   console.error("FAIL · new experimental nodes must be explicitly reviewed:", unexpectedExperimental.join(", "));
   process.exit(1);
 }
-if (executableLibrary.length < 81) {
-  console.error("FAIL · production node coverage regressed below 81");
+if (executableLibrary.length < 105) {
+  console.error("FAIL · production node coverage regressed below 105");
   process.exit(1);
 }
 console.log("OK · production Library is internally consistent");
