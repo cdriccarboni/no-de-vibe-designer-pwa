@@ -2,6 +2,10 @@ name: Build macOS Test App from Public PWA
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/macos-public-build.yml"
 
 permissions:
   contents: read
