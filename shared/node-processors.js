@@ -12,6 +12,12 @@ import { renderBlob } from "./graphics/blob.js";
 import { ndiStatusMessage } from "./remote-camera/ndi.js";
 import { anaglyphFrame, bendFrame, creativeFxFrame, stormFrame, transmuteFrame } from "./graphics/stage-fx.js";
 import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT, renderDream, renderSketch } from "./graphics/sketch-engine.js";
+import {
+  renderThreadCurtain, renderFlowField, renderRibbonTrails, fluidWarpFrame, refractionFrame,
+  renderMetaballs, renderPointCloudDepth, renderInteractiveSand, renderSwarm, renderRippleField,
+  createReactionState, stepReaction, reactionFrame, depthMaskFrame, opticalFlowMagnitude,
+  sdfField, noiseValue, curlVector
+} from "./graphics/interactive-effects.js";
 import { showManifestSummary } from "./show-importer.js";
 
 function videoVal(el, opacity = 1) {
@@ -252,6 +258,80 @@ export function createNodeProcessors() {
       showPoints: !!node.params?.showPoints
     });
     return new Map([[3, visual]]);
+  });
+
+  function pointerForInteractive(inputs, ctx, energyIndex = 2, fallbackEnergy = .65) {
+    const p = ctx.pointer || { x:.5, y:.5, speed:0 };
+    return {
+      pointer:{
+        x: inputs.get(0) ? readNum(inputs.get(0)) : Number(p.x ?? .5),
+        y: inputs.get(1) ? readNum(inputs.get(1)) : Number(p.y ?? .5),
+        speed:Number(p.speed || 0)
+      },
+      energy: inputs.get(energyIndex) ? readNum(inputs.get(energyIndex)) : Number(fallbackEnergy)
+    };
+  }
+
+  fns.set("threadcurtain", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.force ?? .85);
+    return new Map([[3, renderThreadCurtain({
+      width:Math.min(ctx.width || 640, Number(node.params?.width ?? 480)),
+      height:Math.min(ctx.height || 360, Number(node.params?.height ?? 270)),
+      time:Number(ctx.time)||0,pointer,
+      strands:Number(node.params?.strands ?? 96),force:energy,wave:Number(node.params?.wave ?? .28)
+    })]]);
+  });
+
+  fns.set("flowfield", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .65);
+    return new Map([[3, renderFlowField({
+      width:Number(node.params?.width ?? 420),height:Number(node.params?.height ?? 236),
+      time:Number(ctx.time)||0,pointer,count:Number(node.params?.count ?? 360),
+      energy,seed:Number(node.params?.seed ?? 1)
+    })]]);
+  });
+
+  fns.set("ribbontrail", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .7);
+    return new Map([[3, renderRibbonTrails({
+      width:Number(node.params?.width ?? 420),height:Number(node.params?.height ?? 236),
+      time:Number(ctx.time)||0,pointer,ribbons:Number(node.params?.ribbons ?? 9),energy
+    })]]);
+  });
+
+  fns.set("metaballs", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .65);
+    return new Map([[3, renderMetaballs({
+      width:Number(node.params?.width ?? 400),height:Number(node.params?.height ?? 225),
+      time:Number(ctx.time)||0,pointer,count:Number(node.params?.count ?? 7),
+      energy,seed:Number(node.params?.seed ?? 1)
+    })]]);
+  });
+
+  fns.set("sand", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .6);
+    return new Map([[3, renderInteractiveSand({
+      width:Number(node.params?.width ?? 420),height:Number(node.params?.height ?? 236),
+      time:Number(ctx.time)||0,pointer,grains:Number(node.params?.grains ?? 900),
+      energy,seed:Number(node.params?.seed ?? 1)
+    })]]);
+  });
+
+  fns.set("swarm", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .65);
+    return new Map([[3, renderSwarm({
+      width:Number(node.params?.width ?? 420),height:Number(node.params?.height ?? 236),
+      time:Number(ctx.time)||0,pointer,count:Number(node.params?.count ?? 220),
+      energy,seed:Number(node.params?.seed ?? 1)
+    })]]);
+  });
+
+  fns.set("ripple", (node, inputs, ctx) => {
+    const { pointer, energy } = pointerForInteractive(inputs, ctx, 2, node.params?.energy ?? .7);
+    return new Map([[3, renderRippleField({
+      width:Number(node.params?.width ?? 420),height:Number(node.params?.height ?? 236),
+      time:Number(ctx.time)||0,pointer,energy,rings:Number(node.params?.rings ?? 12)
+    })]]);
   });
 
   fns.set("shader", (node, inputs, ctx) => {
@@ -526,6 +606,49 @@ export function createNodeProcessors() {
   fns.set("threshold", (node, inputs, ctx) => {
     const frame = silhouetteFx({ ...node, params: { ...node.params, mirror: false, trail: false, dx: 0, dy: 0 } }, inputs, ctx, "threshold");
     return new Map([[2, frame]]);
+  });
+
+  fns.set("depthmask", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"depthmask");
+    const threshold=inputs.get(1)?readNum(inputs.get(1)):Number(node.params?.threshold ?? .45);
+    return new Map([[2, depthMaskFrame(source,{threshold,invert:!!node.params?.invert})]]);
+  });
+
+  fns.set("opticalflow", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"opticalflow");
+    const memory=nodeMemory(ctx),key=`opticalflow:${node.id}`,prev=memory.get(key);
+    const motion=opticalFlowMagnitude(prev,source,{step:Number(node.params?.step ?? 8)});
+    memory.set(key,source);
+    return new Map([[1,numOut(motion)],[2,source]]);
+  });
+
+  fns.set("feedbackfx", (node, inputs, ctx) => {
+    let source=fxRaster(inputs.get(0)?.value,node,ctx,"feedbackfx");
+    const decay=inputs.get(1)?readNum(inputs.get(1)):Number(node.params?.decay ?? .88);
+    const memory=nodeMemory(ctx),key=`feedbackfx:${node.id}`,prev=memory.get(key);
+    source=shadowTrail(prev,source,{decay:Math.max(0,Math.min(.985,decay))});
+    const dx=Number(node.params?.dx ?? 2),dy=Number(node.params?.dy ?? 1);
+    if(dx||dy) source=offsetFrame(source,{dx,dy});
+    memory.set(key,source);
+    return new Map([[2,source]]);
+  });
+
+  fns.set("fluidwarp", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"fluidwarp");
+    const amount=inputs.get(1)?readNum(inputs.get(1)):Number(node.params?.amount ?? .45);
+    return new Map([[2,fluidWarpFrame(source,{pointer:ctx.pointer,amount,time:Number(ctx.time)||0})]]);
+  });
+
+  fns.set("refraction", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"refraction");
+    const amount=inputs.get(1)?readNum(inputs.get(1)):Number(node.params?.amount ?? .55);
+    return new Map([[2,refractionFrame(source,{pointer:ctx.pointer,amount})]]);
+  });
+
+  fns.set("pointcloud", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"pointcloud");
+    const depth=inputs.get(1)?readNum(inputs.get(1)):Number(node.params?.depth ?? .7);
+    return new Map([[2,renderPointCloudDepth(source,{step:Number(node.params?.step ?? 7),depth})]]);
   });
 
   fns.set("mirror", (node, inputs, ctx) => {
@@ -842,6 +965,78 @@ export function createNodeProcessors() {
       : shape === "square" ? (t < 0.5 ? 0 : 1)
       : 0.5 + 0.5 * Math.sin(t * Math.PI * 2);
     return new Map([[2, numOut(value)]]);
+  });
+
+  fns.set("force", (node, inputs) => {
+    const value=readNum(inputs.get(0));
+    const strength=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.strength ?? 1);
+    return new Map([[2,numOut(value*strength)]]);
+  });
+
+  fns.set("noise", (node, inputs, ctx) => {
+    const speed=inputs.has(0)?readNum(inputs.get(0)):Number(node.params?.speed ?? 1);
+    const seed=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.seed ?? 1);
+    return new Map([[2,numOut(noiseValue(Number(ctx.time)||0,seed,speed))]]);
+  });
+
+  fns.set("curlfield", (node, inputs, ctx) => {
+    const x=inputs.has(0)?readNum(inputs.get(0)):Number(node.params?.x ?? .5);
+    const y=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.y ?? .5);
+    const strength=inputs.has(2)?readNum(inputs.get(2)):Number(node.params?.strength ?? 1);
+    const v=curlVector(x,y,Number(ctx.time)||0,strength);
+    return new Map([[3,numOut(v.x)],[4,numOut(v.y)]]);
+  });
+
+  fns.set("particle", (node, inputs, ctx) => {
+    const p=ctx.pointer||{x:.5,y:.5};
+    const x=inputs.has(0)?readNum(inputs.get(0)):Number(node.params?.x ?? p.x);
+    const y=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.y ?? p.y);
+    const size=inputs.has(2)?readNum(inputs.get(2)):Number(node.params?.size ?? .12);
+    return new Map([[3,sdfField({
+      width:Number(node.params?.width ?? 320),height:Number(node.params?.height ?? 180),
+      time:Number(ctx.time)||0,pointer:{x,y},radius:Math.max(.01,Math.min(.5,size))
+    })]]);
+  });
+
+  fns.set("trail", (node, inputs, ctx) => {
+    const source=fxRaster(inputs.get(0)?.value,node,ctx,"trail");
+    const decay=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.decay ?? .86);
+    const memory=nodeMemory(ctx),key=`trail:${node.id}`,prev=memory.get(key);
+    const out=shadowTrail(prev,source,{decay:Math.max(0,Math.min(.985,decay))});
+    memory.set(key,out);return new Map([[2,out]]);
+  });
+
+  fns.set("spring", (node, inputs, ctx) => {
+    const target=readNum(inputs.get(0));
+    const stiffness=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.stiffness ?? .14);
+    const damping=inputs.has(2)?readNum(inputs.get(2)):Number(node.params?.damping ?? .72);
+    const memory=nodeMemory(ctx),key=`spring:${node.id}`,st=memory.get(key)||{x:target,v:0};
+    st.v+=(target-st.x)*Math.max(0,Math.min(1,stiffness));
+    st.v*=Math.max(0,Math.min(.999,damping));
+    st.x+=st.v;memory.set(key,st);
+    return new Map([[3,numOut(st.x)]]);
+  });
+
+  fns.set("sdf", (node, inputs, ctx) => {
+    const p=ctx.pointer||{x:.5,y:.5};
+    const x=inputs.has(0)?readNum(inputs.get(0)):Number(node.params?.x ?? p.x);
+    const y=inputs.has(1)?readNum(inputs.get(1)):Number(node.params?.y ?? p.y);
+    const radius=inputs.has(2)?readNum(inputs.get(2)):Number(node.params?.radius ?? .22);
+    return new Map([[3,sdfField({
+      width:Number(node.params?.width ?? 320),height:Number(node.params?.height ?? 180),
+      time:Number(ctx.time)||0,pointer:{x,y},radius
+    })]]);
+  });
+
+  fns.set("reactiondiffusion", (node, _inputs, ctx) => {
+    const memory=nodeMemory(ctx),key=`reaction:${node.id}`;
+    let state=memory.get(key);
+    if(!state) state=createReactionState(Number(node.params?.width ?? 128),Number(node.params?.height ?? 72),Number(node.params?.seed ?? 1));
+    stepReaction(state,{
+      feed:Number(node.params?.feed ?? .036),kill:Number(node.params?.kill ?? .061),
+      steps:Number(node.params?.steps ?? 1),pointer:ctx.pointer
+    });
+    memory.set(key,state);return new Map([[0,reactionFrame(state)]]);
   });
 
   fns.set("datalab", (node, inputs) => {
