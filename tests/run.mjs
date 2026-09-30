@@ -5,7 +5,7 @@
 import { validateProject, exportProject, createDemoProject, newProject } from "../shared/ir.js";
 import { typesCompatible, portDataType, portDirection, isExecutable } from "../shared/ports.js";
 import { validateEdge, findCycleEdgeIds, topoOrder, evaluateGraph, findVideoOutput } from "../shared/graph-engine.js";
-import { localVibeParse, applyVibeOps, isForbiddenAiProvider, assertAiProviderAllowed } from "../shared/vibe.js";
+import { localVibeParse, applyVibeOps, isForbiddenAiProvider, assertAiProviderAllowed, runVibe, probeLocalAi } from "../shared/vibe.js";
 import { APP_VERSION } from "../shared/version.js";
 import { createHistory } from "../shared/history.js";
 import { ensureSubGraph, evaluateSubGraph, addBoxPort, wrapNodesInSubpatch, MAX_SUBPATCH_DEPTH } from "../shared/subpatch.js";
@@ -49,7 +49,7 @@ assert(portDirection("shader", 2, 3) === "out", "shader out");
 assert(portDirection("osc", 2, 3) === "in", "osc value in (sink)");
 assert(isExecutable("camera") && isExecutable("shader"), "camera+shader executable");
 assert(isExecutable("audio") && isExecutable("subpatch"), "audio+subpatch executable");
-assert(!isExecutable("millumin"), "millumin not executable yet");
+assert(isExecutable("millumin"), "millumin bridge executable");
 
 // --- ir / demo ---
 console.log("ir");
@@ -147,6 +147,49 @@ assert(isForbiddenAiProvider("https://api.x.ai/v1/chat/completions", "grok-2"), 
 assert(isForbiddenAiProvider("", "grok-beta"), "blocks grok model name");
 assert(!isForbiddenAiProvider("https://api.openai.com/v1/chat/completions", "gpt-4o-mini"), "allows OpenAI");
 assert(!assertAiProviderAllowed({ endpoint: "https://api.x.ai/v1", model: "grok" }).ok, "assert rejects xAI");
+
+// --- local generative AI ---
+console.log("local-generative-ai");
+const aiMem = new Map();
+globalThis.localStorage = {
+  getItem: key => aiMem.get(key) ?? null,
+  setItem: (key, value) => aiMem.set(key, value),
+  removeItem: key => aiMem.delete(key)
+};
+localStorage.setItem("nvd.ai", JSON.stringify({
+  localEnabled: true,
+  localBaseUrl: "http://127.0.0.1:11434",
+  localModel: "qwen2.5-coder:7b",
+  enabled: false
+}));
+globalThis.nvdDesktop = {
+  probeLocalAi: async ({ model }) => ({ ok: true, installed: true, models: [model], requested: model }),
+  localAiChat: async ({ model }) => ({
+    ok: true,
+    model,
+    content: JSON.stringify({
+      ops: [{ op: "addNode", type: "number", x: 20, y: 30 }],
+      summary: "Ajout local"
+    })
+  })
+};
+const localProbe = await probeLocalAi();
+assert(localProbe.ok && localProbe.installed, "local Ollama probe uses desktop bridge");
+const localAiRun = await runVibe("Ajoute un nombre", newProject());
+assert(localAiRun.engine === "local-ai" && localAiRun.ops[0]?.type === "number", "Vibe prioritizes local generative AI");
+
+const guardedProject = newProject();
+guardedProject.nodes.push({ id: "servo-ai", type: "servo", title: "Servo", x: 0, y: 0, params: { enabled: true, auto: false } });
+const guarded = applyVibeOps(guardedProject, [{ op: "setParam", id: "servo-ai", key: "auto", value: true }], {
+  addNode: () => { throw new Error("unused"); },
+  addClip: () => {},
+  ensureEdges: () => guardedProject.edges,
+  nodeById: id => guardedProject.nodes.find(n => n.id === id)
+});
+assert(guardedProject.nodes[0].params.auto === false, "AI cannot arm external auto-send");
+assert(guarded.errors.some(e => /Sécurité scène/.test(e)), "AI arm attempt is reported");
+
+delete globalThis.nvdDesktop;
 
 // --- subpatch serialization ---
 console.log("subpatch");
