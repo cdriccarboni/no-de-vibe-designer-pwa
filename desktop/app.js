@@ -1653,15 +1653,21 @@ $("#aiLocalProbe")?.addEventListener("click", async () => {
   if (status) status.textContent = "Test…";
   const cfg = collectAiConfig();
   saveAiConfig(cfg);
-  const result = await probeLocalAi(cfg);
+  const result = await probeLocalAi(cfg, { fresh: true });
   if (result.ok && result.available) {
     const names = Array.isArray(result.models) ? result.models : [];
-    const installed = result.installed ? "modèle prêt" : "serveur OK · modèle absent";
-    if (status) status.textContent = `${installed} · ${names.length} modèle(s)`;
-    log(`IA locale · Ollama OK · ${installed}`);
+    const selected = result.model || cfg.localModel;
+    if ($("#aiLocalModel") && selected) $("#aiLocalModel").value = selected;
+    saveAiConfig({ ...cfg, localModel: selected });
+    if (status) status.textContent = names.length
+      ? `Prêt · ${selected} · ${names.length} modèle(s)`
+      : "Ollama joignable · aucun modèle installé";
+    log(names.length
+      ? `Local AI Core · prêt · ${selected}`
+      : "Local AI Core · Ollama OK mais aucun modèle installé");
   } else {
     if (status) status.textContent = `Indisponible · ${result.error || "Ollama non joignable"}`;
-    log(`IA locale · indisponible · ${result.error || "Ollama non joignable"}`);
+    log(`Local AI Core · indisponible · ${result.error || "Ollama non joignable"}`);
   }
 });
 
