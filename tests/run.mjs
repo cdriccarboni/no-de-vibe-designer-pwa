@@ -24,6 +24,7 @@ import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } 
 import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { WebSocketBridge } from "../shared/adapters/websocket-bridge.js";
 import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "../shared/pwa-update.js";
+import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl } from "../shared/surface-switcher.js";
 import { createMemoryProjectStore } from "../shared/project-store.js";
 import { applyRemoteMessage, initialRemoteState } from "../shared/remote-protocol.js";
 import { startRemoteServer } from "../bridge/remote-server.mjs";
@@ -430,6 +431,23 @@ assert(mil.content.includes("Millumin") && mil.addresses.length === 0, "Millumin
 exportProjectGraph.nodes.push({ id: "n3", type: "osc", title: "OSC", x: 400, y: 40, params: { enabled: true, host: "127.0.0.1", port: 5000, address: "/layer/opacity" } });
 const mil2 = exportMilluminOscMap(exportProjectGraph);
 assert(mil2.addresses.some(a => a.address === "/layer/opacity"), "Millumin map lists OSC");
+
+console.log("surface-switcher");
+assert(SURFACES.length === 5, "five universal No-de surfaces are exposed");
+assert(SURFACES.some(s => s.id === "designer") && SURFACES.some(s => s.id === "mobile") && SURFACES.some(s => s.id === "regie") && SURFACES.some(s => s.id === "plateau") && SURFACES.some(s => s.id === "camera"), "Designer/Mobile/Regie/Plateau/Camera all exist");
+const surfaceMem = new Map();
+const surfaceStorage = {
+  getItem: key => surfaceMem.get(key) ?? null,
+  setItem: (key, value) => surfaceMem.set(key, value),
+  removeItem: key => surfaceMem.delete(key)
+};
+setPreferredSurface("plateau", surfaceStorage);
+assert(getPreferredSurface(surfaceStorage) === "plateau", "manual surface choice is remembered");
+setPreferredSurface("auto", surfaceStorage);
+assert(getPreferredSurface(surfaceStorage) === "", "Auto clears manual surface preference");
+assert(/desktop/.test(surfaceUrl("designer", { root: new URL("https://example.test/no-de/") })), "Designer URL is shareable");
+assert(/studio/.test(surfaceUrl("regie", { root: new URL("https://example.test/no-de/") })), "Regie URL is shareable");
+assert(/surface=plateau/.test(surfaceUrl("plateau", { root: new URL("https://example.test/no-de/") })), "Plateau URL carries explicit role");
 
 console.log("pwa-update");
 assert(shouldPromptForUpdate({ hasController: true, workerState: "installed" }) === true, "banner when a new worker is waiting");
