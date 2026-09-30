@@ -230,6 +230,8 @@ jobs:
           path: |
             dist/No-de-Vibe-Designer-${{ env.APP_VERSION }}-macOS-arm64.zip
             dist/No-de-Vibe-Designer-${{ env.APP_VERSION }}-macOS-arm64.dmg
+            dist/No-de-Vibe-Designer-macOS-arm64.zip
+            dist/No-de-Vibe-Designer-macOS-arm64.dmg
             dist/SHA256SUMS-macOS.txt
           if-no-files-found: error
 
