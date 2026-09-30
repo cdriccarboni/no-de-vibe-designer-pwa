@@ -2719,6 +2719,7 @@ function handleCompanionStudioMessage(msg) {
           .catch(e => log(`Audio P${slot} · ${e?.message || e}`));
         return sharedAudio.playerState(slot);
       },
+      stageControl: (action) => handleCueCommand(action),
       onLog: (m) => log(m)
     });
     remoteSession?.send?.({ ...feedback, clientId: msg.clientId });
