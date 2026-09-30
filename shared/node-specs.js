@@ -1,6 +1,6 @@
 
 export const NODE_GROUPS = [
- ["Interaction / corps",[["Pointer / Souris","pointer"],["Baleine interactive","whale"],["Blob organique","blob"],["Thread Curtain","threadcurtain"],["Flow Field / particules","flowfield"],["Ribbon Trails","ribbontrail"],["Metaballs / SDF","metaballs"],["Interactive Sand","sand"],["Swarm / Boids","swarm"],["Ripple Field","ripple"],["Tracking / points","tracking"],["Body Clone / Ombre","bodyclone"]]],
+ ["Interaction / corps",[["Pointer / Souris","pointer"],["Baleine interactive","whale"],["Blob organique","blob"],["Thread Curtain","threadcurtain"],["Flow Field / particules","flowfield"],["Reaction Diffusion","reactiondiffusion"],["Ribbon Trails","ribbontrail"],["Metaballs / SDF","metaballs"],["Interactive Sand","sand"],["Swarm / Boids","swarm"],["Ripple Field","ripple"],["Tracking / points","tracking"],["Body Clone / Ombre","bodyclone"]]],
  ["Magic FX",[["Threshold","threshold"],["Depth / Silhouette Mask","depthmask"],["Optical Flow","opticalflow"],["Ghost","ghost"],["Ghost Feedback","feedbackfx"],["Miroir","mirror"],["Ombre miroir","shadow"],["Fluid Warp","fluidwarp"],["Refraction / Glass","refraction"],["Point Cloud Depth","pointcloud"],["Transform","transform"],["Composite","composite"],["Trou noir","blackhole"]]],
  ["Vidéo / caméra",[["Caméra live","camera"],["Remote Camera","remote-camera"],["Fichier vidéo","videofile"],["Retour vidéo régie","videoreturn"],["Mapping vidéo","mapping"],["NDI Out (relais natif)","ndi-out"],["Anaglyphe","anaglyph"]]],
  ["Shaders / visuels",[["Shader Lab","shader"],["Creative FX","creativefx"],["Storm Forge","storm"],["Bending Lab","bending"],["Transmute","transmute"]]],
@@ -24,6 +24,7 @@ export function spec(type){
     blob:["Blob organique",["x","y","size","out"]],
     threadcurtain:["Thread Curtain",["x","y","force","out"]],
     flowfield:["Flow Field / particules",["x","y","energy","out"]],
+    reactiondiffusion:["Reaction Diffusion",["out"]],
     ribbontrail:["Ribbon Trails",["x","y","energy","out"]],
     metaballs:["Metaballs / SDF",["x","y","energy","out"]],
     sand:["Interactive Sand",["x","y","energy","out"]],
