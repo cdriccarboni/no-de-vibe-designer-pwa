@@ -50,6 +50,12 @@ npm run android:apk
 npm run android:aab
 ```
 
+APK 1.3.0 vérifié et téléchargeable :
+https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/No-de-Vibe-Designer-1.3.0-debug.apk
+
+Rapport package/version/signature :
+https://raw.githubusercontent.com/cdriccarboni/no-de-vibe-designer-pwa/main/downloads/android-verification.txt
+
 Le build AAB Play refuse volontairement de produire un faux release si la vraie clé d’upload n’est pas configurée.
 
 ## Companion Studio
