@@ -194,6 +194,7 @@ jobs:
           }
 
           app.whenReady().then(createWindow);
+
           app.on("window-all-closed", () => {
             try { server?.close(); } catch {}
             app.quit();
@@ -218,11 +219,19 @@ jobs:
           test -f "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_DIR/Contents/Info.plist" | grep -qx "fr.acousmatic.nodevibedesigner"
 
-      - name: Generate checksums
+      - name: Prepare stable aliases and checksums
         shell: bash
         run: |
+          set -euo pipefail
+          cp "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip" "dist/No-de-Vibe-Designer-macOS-arm64.zip"
+          cp "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg" "dist/No-de-Vibe-Designer-macOS-arm64.dmg"
           cd dist
-          shasum -a 256             "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"             "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"             > SHA256SUMS-macOS.txt
+          shasum -a 256 \
+            "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip" \
+            "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg" \
+            "No-de-Vibe-Designer-macOS-arm64.zip" \
+            "No-de-Vibe-Designer-macOS-arm64.dmg" \
+            > SHA256SUMS-macOS.txt
 
       - uses: actions/upload-artifact@v4
         with:
@@ -242,4 +251,10 @@ jobs:
         run: |
           set -euo pipefail
           TAG="v$APP_VERSION"
-          gh release upload "$TAG"             "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"             "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"             "dist/SHA256SUMS-macOS.txt"             --clobber
+          gh release upload "$TAG" \
+            "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip" \
+            "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg" \
+            "dist/No-de-Vibe-Designer-macOS-arm64.zip" \
+            "dist/No-de-Vibe-Designer-macOS-arm64.dmg" \
+            "dist/SHA256SUMS-macOS.txt" \
+            --clobber
