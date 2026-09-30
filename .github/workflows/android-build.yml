@@ -29,6 +29,7 @@ on:
       - "manifest.webmanifest"
       - "shared/**"
       - "icons/**"
+      - ".github/workflows/android-build.yml"
 
 permissions:
   contents: write
@@ -191,7 +192,7 @@ jobs:
           rm -f "$KEYSTORE"
 
       - name: Require signing and Play credentials when publishing
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_to_play }}
+        if: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[play-internal]')) || (github.event_name == 'workflow_dispatch' && inputs.publish_to_play) }}
         shell: bash
         run: |
           if [ "${{ steps.signing.outputs.ready }}" != "true" ]; then
@@ -204,9 +205,9 @@ jobs:
           fi
 
       - name: Publish signed AAB to Google Play
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_to_play }}
+        if: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[play-internal]')) || (github.event_name == 'workflow_dispatch' && inputs.publish_to_play) }}
         env:
-          PLAY_TRACK: ${{ inputs.track }}
+          PLAY_TRACK: ${{ github.event_name == 'push' && 'internal' || inputs.track }}
         shell: bash
         run: |
           set -euo pipefail
