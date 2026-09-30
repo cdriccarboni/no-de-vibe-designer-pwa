@@ -1,12 +1,13 @@
-import { STUDIO_MODES, normalizeWidget, validateCompanionDocument } from "/shared/companion-studio/schema.js";
-import { ensureCompanionLayout, saveCompanionLayout } from "/shared/companion-studio/store.js";
-import { createWsCompanionTransport } from "/shared/companion-studio/transport-ws.js";
-import { STUDIO_MSG, makeStudioAction, makeStudioLayout } from "/shared/companion-studio/protocol.js";
-import { findWidget } from "/shared/companion-studio/bindings.js";
-import { loadRememberedHost } from "/shared/discovery/host-card.js";
-import { CONSOLE_PROFILES, PROTOCOL_FAMILIES } from "/shared/companion-studio/console-profiles.js";
-import { mergeRegieProfiles } from "/shared/companion-studio/layout-generator.js";
-import { REGIE_PRESETS, createRegiePreset } from "/shared/companion-studio/regie-presets.js";
+import { installSurfaceSwitcher } from "../shared/surface-switcher.js";
+import { STUDIO_MODES, normalizeWidget, validateCompanionDocument } from "../shared/companion-studio/schema.js";
+import { ensureCompanionLayout, saveCompanionLayout } from "../shared/companion-studio/store.js";
+import { createWsCompanionTransport } from "../shared/companion-studio/transport-ws.js";
+import { STUDIO_MSG, makeStudioAction, makeStudioLayout } from "../shared/companion-studio/protocol.js";
+import { findWidget } from "../shared/companion-studio/bindings.js";
+import { loadRememberedHost } from "../shared/discovery/host-card.js";
+import { CONSOLE_PROFILES, PROTOCOL_FAMILIES } from "../shared/companion-studio/console-profiles.js";
+import { mergeRegieProfiles } from "../shared/companion-studio/layout-generator.js";
+import { REGIE_PRESETS, createRegiePreset } from "../shared/companion-studio/regie-presets.js";
 
 const $ = (id) => document.getElementById(id);
 const logEl = $("log");
@@ -22,6 +23,8 @@ let layoutRevision = 0;
 let monitorLastAt = 0;
 let swipeStart = null;
 const clientId = `studio-${Math.random().toString(36).slice(2, 7)}`;
+const requestedSurface = new URLSearchParams(location.search).get("surface") || "";
+installSurfaceSwitcher({ current: requestedSurface === "plateau" ? "plateau" : "regie" });
 
 function log(msg) {
   const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
@@ -551,7 +554,7 @@ try {
   $("wsUrl").value = "ws://127.0.0.1:4174";
 }
 
-setMode(STUDIO_MODES.EDITION);
+setMode(requestedSurface === "plateau" ? STUDIO_MODES.PLATEAU : STUDIO_MODES.EDITION);
 renderPageNav();
 renderGrid();
 log("Companion Studio prêt · Régie universelle · swipe horizontal entre pages");
