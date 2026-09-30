@@ -29,7 +29,13 @@
       <button type="button" id="btnConnect">Connecter</button>
       <button type="button" id="btnDisconnect" class="ghost">Déconnecter</button>
       <button type="button" id="btnSave" class="ghost">Sauver layout</button>
+      <button type="button" id="btnRequestMonitor" class="ghost">Monitor</button>
     </div>
+  </section>
+
+  <section id="monitorPanel" class="cs-monitor" hidden>
+    <div class="monitor-head"><b>Retour vidéo LAN</b><span id="monitorInfo">—</span><button type="button" id="btnStopMonitor" class="ghost">Couper</button></div>
+    <img id="monitorFrame" alt="Retour vidéo No-de" />
   </section>
 
   <main>
@@ -40,17 +46,28 @@
       <label>Nom <input id="edLabel" type="text" /></label>
       <label>Secondaire <input id="edSecondary" type="text" /></label>
       <label>Couleur <input id="edColor" type="color" value="#d7b86a" /></label>
+      <div class="row">
+        <label>Largeur <input id="edW" type="number" min="1" max="4" value="2" /></label>
+        <label>Hauteur <input id="edH" type="number" min="1" max="6" value="1" /></label>
+      </div>
       <label>Binding
         <select id="edBinding">
           <option value="action:ping">Action · ping (feedback)</option>
           <option value="stage:go">Stage · GO</option>
           <option value="stage:prev">Stage · Prev</option>
           <option value="stage:next">Stage · Next</option>
+          <option value="osc:send">OSC · envoyer</option>
+          <option value="serial:send">Serial · envoyer</option>
+          <option value="midi:send">MIDI · envoyer</option>
+          <option value="camera:toggle">Caméra · toggle</option>
+          <option value="video:toggle">Transport · play/pause</option>
         </select>
       </label>
+      <label id="edTargetWrap">Cible / commande <input id="edTarget" type="text" placeholder="/adresse@127.0.0.1:9000" /></label>
       <div class="row">
         <button type="button" id="edApply">Appliquer</button>
         <button type="button" id="edAdd" class="ghost">＋ Bouton</button>
+        <button type="button" id="edDelete" class="ghost">Supprimer</button>
       </div>
       <pre id="log" class="log"></pre>
     </aside>
