@@ -60,30 +60,35 @@ export function addTimelineClip(project, clip) {
   return value;
 }
 
-/** Démo signature : Pointer → lissages → Baleine → Transform. Aucune permission. */
+/** Démo signature : Pointer → Rideau de fils + Ondes → Composite. Aucune permission. */
 export function createDemoProject() {
   const p = newProject();
-  p.name = "Démo — Baleine interactive";
+  p.name = "EXEMPLE — Wow interactif";
   p.nodes = [
-    { id: "n1", type: "pointer", title: "Pointer / Souris", x: 38, y: 74, params: { enabled: true, duration: 5, opacity: 1 } },
-    { id: "n2", type: "smooth", title: "Lissage X", x: 230, y: 54, params: { enabled: true, duration: 5, opacity: 1, amount: 0.11 } },
-    { id: "n3", type: "smooth", title: "Lissage Y", x: 230, y: 170, params: { enabled: true, duration: 5, opacity: 1, amount: 0.09 } },
-    { id: "n4", type: "whale", title: "Baleine interactive", x: 438, y: 96, params: { enabled: true, duration: 5, opacity: 1, scale: 1, trail: 0.18, breathe: 0.035 } },
-    { id: "n5", type: "transform", title: "Transform", x: 676, y: 108, params: { enabled: true, duration: 5, opacity: 1, scale: 1, rotation: 0, dx: 0, dy: 0 } }
+    { id: "n1", type: "pointer", title: "Bouge la souris", x: 34, y: 122, params: { enabled: true, duration: 5, opacity: 1 } },
+    { id: "n2", type: "threadcurtain", title: "Rideau de fils", x: 250, y: 44, params: { enabled: true, duration: 5, opacity: 1, strands: 118, force: 0.92, wave: 0.34 } },
+    { id: "n3", type: "ripple", title: "Ondes lumineuses", x: 250, y: 214, params: { enabled: true, duration: 5, opacity: 1, energy: 0.82, rings: 15 } },
+    { id: "n4", type: "composite", title: "Fusion WOW", x: 518, y: 126, params: { enabled: true, duration: 5, opacity: 1, blend: "screen" } },
+    { id: "n5", type: "transform", title: "Sortie / Transform", x: 746, y: 126, params: { enabled: true, duration: 5, opacity: 1, scale: 1.04, rotation: 0, dx: 0, dy: 0 } }
   ];
   p.edges = [
     { id: "e1", from: { node: "n1", port: 0 }, to: { node: "n2", port: 0 } },
-    { id: "e2", from: { node: "n1", port: 1 }, to: { node: "n3", port: 0 } },
-    { id: "e3", from: { node: "n2", port: 1 }, to: { node: "n4", port: 0 } },
-    { id: "e4", from: { node: "n3", port: 1 }, to: { node: "n4", port: 1 } },
-    { id: "e5", from: { node: "n1", port: 2 }, to: { node: "n4", port: 2 } },
-    { id: "e6", from: { node: "n4", port: 3 }, to: { node: "n5", port: 0 } }
+    { id: "e2", from: { node: "n1", port: 1 }, to: { node: "n2", port: 1 } },
+    { id: "e3", from: { node: "n1", port: 2 }, to: { node: "n2", port: 2 } },
+    { id: "e4", from: { node: "n1", port: 0 }, to: { node: "n3", port: 0 } },
+    { id: "e5", from: { node: "n1", port: 1 }, to: { node: "n3", port: 1 } },
+    { id: "e6", from: { node: "n1", port: 2 }, to: { node: "n3", port: 2 } },
+    { id: "e7", from: { node: "n2", port: 3 }, to: { node: "n4", port: 0 } },
+    { id: "e8", from: { node: "n3", port: 3 }, to: { node: "n4", port: 1 } },
+    { id: "e9", from: { node: "n4", port: 2 }, to: { node: "n5", port: 0 } }
   ];
   p.timeline = [];
   p.controls = [];
   p.channels = [
-    { id: "ch-whale-scale", name: "Baleine · Échelle", nodeId: "n4", param: "scale", min: 0.5, max: 1.8, step: 0.01 },
-    { id: "ch-whale-trail", name: "Baleine · Traînée", nodeId: "n4", param: "trail", min: 0, max: 0.7, step: 0.01 }
+    { id: "ch-curtain-force", name: "Rideau · Force", nodeId: "n2", param: "force", min: 0, max: 1, step: 0.01 },
+    { id: "ch-ripple-energy", name: "Ondes · Énergie", nodeId: "n3", param: "energy", min: 0, max: 1, step: 0.01 }
   ];
+  p.meta.demo = "wow-interactive";
+  p.meta.note = "Déplace la souris dans le Preview. EXIT restaure le projet précédent.";
   return p;
 }

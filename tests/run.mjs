@@ -60,15 +60,15 @@ assert(isExecutable("millumin"), "millumin bridge executable");
 console.log("ir");
 const demo = createDemoProject();
 assert(demo.nodes.length === 5, "demo has 5 nodes");
-assert(demo.edges.length === 6, "demo has 6 edges");
+assert(demo.edges.length === 9, "demo has 9 edges");
 const round = validateProject(JSON.parse(exportProject(demo)));
-assert(round.edges.length === 6, "round-trip edges");
-assert(/Baleine|Demo|Démo/i.test(round.name), "demo name preserved");
+assert(round.edges.length === 9, "round-trip edges");
+assert(/EXEMPLE|Wow|Demo|Démo/i.test(round.name), "demo name preserved");
 
 // --- validateEdge ---
 console.log("edges");
-const ok = validateEdge(demo, { node: "n4", port: 3 }, { node: "n5", port: 0 });
-assert(ok.ok, "whale video → transform OK");
+const ok = validateEdge(demo, { node: "n4", port: 2 }, { node: "n5", port: 0 });
+assert(ok.ok, "composite video → transform OK");
 const bad = validateEdge(demo, { node: "n1", port: 0 }, { node: "n5", port: 0 });
 assert(!bad.ok, "pointer number → transform video rejected");
 
@@ -93,7 +93,9 @@ console.log("evaluate");
 const fns = new Map();
 fns.set("pointer", () => new Map([[0, { kind: "number", value: 0.5 }], [1, { kind: "number", value: 0.5 }], [2, { kind: "number", value: 0 }]]));
 fns.set("smooth", (_n, inputs) => new Map([[1, inputs.get(0)?.value || { kind: "number", value: 0 }]]));
-fns.set("whale", () => new Map([[3, { kind: "video", canvas: true, el: { width: 1 } }]]));
+fns.set("threadcurtain", () => new Map([[3, { kind: "video", canvas: true, el: { width: 1 } }]]));
+fns.set("ripple", () => new Map([[3, { kind: "video", canvas: true, el: { width: 1 } }]]));
+fns.set("composite", () => new Map([[2, { kind: "video", canvas: true, el: { width: 1 } }]]));
 fns.set("transform", (_n, inputs) => {
   const tex = inputs.get(0)?.value;
   assert(!!tex, "transform received video input during evaluate");
@@ -750,7 +752,7 @@ assert(oscBad, "unsupported osc type throws");
 
 console.log("project-format");
 const pFresh = newProject();
-assert(pFresh.version === 2 && APP_VERSION === "1.3.2", "project format 2 / app 1.3.2");
+assert(pFresh.version === 2 && APP_VERSION === "1.3.3", "project format 2 / app 1.3.3");
 const old = validateProject({ schema: "cvd.graph", version: 1, name: "old", nodes: [], edges: [] });
 assert(old.version === 2, "v1 projects migrate to format 2");
 let futureFail = false;
