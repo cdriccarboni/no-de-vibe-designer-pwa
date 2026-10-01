@@ -175,7 +175,7 @@ export function evaluateGraph(project, nodeFns, ctx, previousOutputs = new Map()
 }
 
 export function findVideoOutput(project, outputs) {
-  const prefer = ["composite", "ghost", "bodyclone", "shadow", "threshold", "mirror", "transform", "blackhole", "shader", "blob", "whale", "videofile", "camera", "phone-camera-front", "phone-camera-back"];
+  const prefer = ["transform", "composite", "ghost", "bodyclone", "shadow", "threshold", "mirror", "blackhole", "shader", "blob", "whale", "videofile", "camera", "phone-camera-front", "phone-camera-back"];
   for (const type of prefer) {
     for (const n of project.nodes || []) {
       if (n.type !== type || n.params?.enabled === false) continue;

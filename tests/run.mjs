@@ -897,7 +897,7 @@ assert(oscBad, "unsupported osc type throws");
 
 console.log("project-format");
 const pFresh = newProject();
-assert(pFresh.version === 2 && APP_VERSION === "3.1.0", "project format 2 / app 3.1.0");
+assert(pFresh.version === 2 && APP_VERSION === "3.1.1", "project format 2 / app 3.1.1");
 const old = validateProject({ schema: "cvd.graph", version: 1, name: "old", nodes: [], edges: [] });
 assert(old.version === 2, "v1 projects migrate to format 2");
 let futureFail = false;

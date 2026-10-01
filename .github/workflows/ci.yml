@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -40,4 +40,55 @@ jobs:
           test -f dist/pwa/manuel/index.html
           test -f dist/pwa/shared/image-vibe.js
           test -f dist/pwa/shared/graphics/mapping-v3.js
-          grep -q '"version": "3.0.0"' dist/pwa/build-info.json
+          node -e "const fs=require('fs');const pkg=require('./package.json');const info=JSON.parse(fs.readFileSync('dist/pwa/build-info.json','utf8'));if(info.version!==pkg.version)throw new Error('PWA version mismatch: '+info.version+' != '+pkg.version)"
+
+  macos:
+    runs-on: macos-14
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Build macOS Apple Silicon app
+        run: |
+          set -euo pipefail
+          npm run pack:mac
+          APP="$(find dist/electron -maxdepth 3 -name 'No-de Vibe Designer.app' -type d | head -n 1)"
+          test -n "$APP"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+          VERSION="$(node -p "require('./package.json').version")"
+          STAGE="$RUNNER_TEMP/no-de-$VERSION"
+          mkdir -p "$STAGE"
+          cp -R "$APP" "$STAGE/No-de Vibe Designer.app"
+          printf '%s\n'             "No-de Vibe Designer est distribué gratuitement sans abonnement Apple Developer."             "Si macOS bloque le premier lancement :"             "1. fais un clic droit sur l’app puis Ouvrir ;"             "2. si nécessaire, ouvre Réglages Système > Confidentialité et sécurité > Ouvrir quand même."             "Aucune commande Terminal n’est nécessaire."             > "$STAGE/À LIRE - PREMIER LANCEMENT.txt"
+          ZIP="dist/No-de-Vibe-Designer-$VERSION-macOS-Apple-Silicon.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$STAGE" "$ZIP"
+          shasum -a 256 "$ZIP" > "dist/No-de-Vibe-Designer-$VERSION-SHA256.txt"
+      - name: Upload macOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: No-de-Vibe-Designer-macOS-Apple-Silicon
+          path: |
+            dist/No-de-Vibe-Designer-*-macOS-Apple-Silicon.zip
+            dist/No-de-Vibe-Designer-*-SHA256.txt
+          if-no-files-found: error
+      - name: Publish GitHub release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          ZIP="dist/No-de-Vibe-Designer-$VERSION-macOS-Apple-Silicon.zip"
+          SUM="dist/No-de-Vibe-Designer-$VERSION-SHA256.txt"
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP" "$SUM" --clobber
+          else
+            gh release create "$TAG" "$ZIP" "$SUM" --title "No-de Vibe Designer $VERSION" --notes "Build macOS Apple Silicon ad hoc signé, vérifié et packagé sans Terminal."
+          fi
