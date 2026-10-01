@@ -49,6 +49,7 @@ import { RUDIMENTS, rudimentMeta, createRudimentNode } from "../shared/rudiments
 import { DEFAULT_QUAD, normalizeQuad, mappingParams } from "../shared/graphics/mapping-v3.js";
 import { superNodePreset, applySuperNodePreset } from "../shared/supernodes-v3.js";
 import { analyzeImageFile, imageVibePrompt, imageVibeOps, imageVibeSummary } from "../shared/image-vibe.js";
+import { installFloatPanels } from "./float-panels.js";
 import { scanLocalAgents, selectLocalAgents, LOCAL_AGENT_ROLES, localAgentRegistrySummary } from "../shared/local-agent-registry.js";
 
 installSurfaceSwitcher({ current:"designer" });
@@ -563,7 +564,7 @@ function isRootGraph() {
 function updateGraphBreadcrumb() {
   const el = $("#graphPath");
   if (!el) return;
-  const parts = ["Racine", ...graphPath.map(p => p.title || p.id)];
+  const parts = ["Patch", ...graphPath.map(p => p.title || p.id)];
   el.innerHTML = parts.map((p, i) =>
     `<button type="button" class="crumb" data-crumb="${i}">${p}</button>`
   ).join("<span class='crumb-sep'>/</span>");
@@ -1122,7 +1123,7 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<p class="hint">${n.params?.srcName ? "Chargé : " + n.params.srcName : "Aucun fichier — le node restera en erreur jusqu'au chargement."}</p>`;
   }
   if (n.type === "subpatch") {
-    extra += `<p class="hint">Double-clic pour éditer. Maj+clic pour sélectionner plusieurs nodes, puis « Boîte ».</p>`;
+    extra += `<p class="hint">Double-clic pour éditer. Maj+clic pour sélectionner plusieurs blocs, puis « Bloc ».</p>`;
     extra += `<button id="addInPort" class="smallbtn">＋ entrée</button><button id="addOutPort" class="smallbtn">＋ sortie</button>`;
   }
   if (n.type === "presence") {
@@ -2107,19 +2108,46 @@ setInterval(() => {
   $("#playhead").style.left = `calc(92px + ${(runtime.time / 60) * 100}% * .86)`;
 }, 100);
 
+function hideVibeThumb() {
+  const thumb = $("#vibeImageThumb");
+  if (!thumb) return;
+  thumb.onload = null;
+  thumb.onerror = null;
+  thumb.classList.remove("is-ready");
+  thumb.hidden = true;
+  thumb.alt = "";
+  thumb.removeAttribute("src");
+}
+
+function showVibeThumb(url) {
+  const thumb = $("#vibeImageThumb");
+  if (!thumb || !url) return hideVibeThumb();
+  thumb.classList.remove("is-ready");
+  thumb.hidden = true;
+  thumb.alt = "";
+  thumb.onload = () => {
+    if (!thumb.getAttribute("src")) return;
+    thumb.hidden = false;
+    thumb.classList.add("is-ready");
+    thumb.alt = "Aperçu de la référence";
+  };
+  thumb.onerror = () => hideVibeThumb();
+  thumb.src = url;
+}
+
 async function setImageVibeFile(file) {
   if (!file) return;
   try {
     if (imageVibeState.previewUrl) URL.revokeObjectURL(imageVibeState.previewUrl);
     const loaded = await analyzeImageFile(file);
     imageVibeState = loaded;
-    const thumb = $("#vibeImageThumb");
-    thumb.src = loaded.previewUrl;
-    thumb.classList.remove("hidden");
-    $("#vibeImageClear")?.classList.remove("hidden");
+    showVibeThumb(loaded.previewUrl);
+    if ($("#vibeImageClear")) $("#vibeImageClear").hidden = false;
     $("#vibeImageInfo").textContent = imageVibeSummary(loaded.analysis);
     log(`Image Vibe · ${loaded.analysis.fileName || "image"} · analyse locale prête`);
   } catch (e) {
+    hideVibeThumb();
+    if ($("#vibeImageClear")) $("#vibeImageClear").hidden = true;
     log(`Image Vibe ÉCHEC · ${e?.message || e}`);
   }
 }
@@ -2127,10 +2155,9 @@ async function setImageVibeFile(file) {
 function clearImageVibe() {
   if (imageVibeState.previewUrl) URL.revokeObjectURL(imageVibeState.previewUrl);
   imageVibeState = { analysis:null, previewUrl:"" };
-  const thumb = $("#vibeImageThumb");
-  if (thumb) { thumb.removeAttribute("src"); thumb.classList.add("hidden"); }
-  $("#vibeImageClear")?.classList.add("hidden");
-  if ($("#vibeImageInfo")) $("#vibeImageInfo").textContent = "Image optionnelle · analyse locale";
+  hideVibeThumb();
+  if ($("#vibeImageClear")) $("#vibeImageClear").hidden = true;
+  if ($("#vibeImageInfo")) $("#vibeImageInfo").textContent = "Image optionnelle";
 }
 
 $("#vibeImageFile")?.addEventListener("change", e => setImageVibeFile(e.target.files?.[0]));
@@ -2605,8 +2632,6 @@ function restoreWorkspaceLayout() {
     library: $(".library"),
     inspector: $(".inspector"),
     patch: $("#patchPanel"),
-    timeline: $("#timelinePanel"),
-    vibe: $(".vibe"),
     terminal: $(".terminal")
   };
   for (const [key, el] of Object.entries(targets)) {
@@ -2679,6 +2704,11 @@ function setZoom(next) {
   view.scale = Math.max(0.4, Math.min(2.2, next));
   applyViewTransform();
   renderWires();
+  const percent = `${Math.round(view.scale * 100)} %`;
+  if ($("#zoomReset")) {
+    $("#zoomReset").textContent = percent;
+    $("#zoomReset").title = view.scale === 1 ? "Centrer la vue" : `Centrer · revenir à 100 % (actuellement ${percent})`;
+  }
   if ($("#prefDefaultZoom")) $("#prefDefaultZoom").value = String(Math.round(view.scale * 100));
 }
 $("#zoomIn").onclick = () => setZoom(view.scale + 0.1);
@@ -2708,7 +2738,12 @@ $("#patchSpace").addEventListener("pointerup", e => {
   if (panDrag && e.pointerId === panDrag.id) panDrag = null;
 });
 
-qall(".collapse").forEach(b => b.onclick = () => b.closest(".panel").classList.toggle("collapsed"));
+const floatPanels = installFloatPanels();
+qall(".collapse").forEach(b => b.onclick = () => {
+  const panel = b.closest(".panel");
+  if (panel?.classList.contains("floatable")) floatPanels.toggleCollapse(panel);
+  else panel?.classList.toggle("collapsed");
+});
 $("#search").oninput = () => buildLibrary();
 const experimentalToggle = $("#showExperimental");
 if (experimentalToggle) {

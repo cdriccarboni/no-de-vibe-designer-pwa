@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.2.0 — 2026-10-01
+
+### Interface
+- Vibe, Timeline et Preview se déplacent depuis leur bandeau, se redimensionnent, passent au premier plan et peuvent être réancrés.
+- Le bouton Envoyer de Vibe reste visible ; le contenu défile dans le panneau.
+- L’aperçu d’image à côté de « + Image » n’apparaît que lorsqu’une image valide est chargée.
+- Les commandes du Patch Canvas utilisent des libellés compréhensibles.
+- Régie : le pont et le code de paire sont repliés. Photo → Contrôleur est centré.
+- Plateau : accès direct aux contrôles, sans création de contrôleur par photo.
+
 ## 1.4.0 — 2026-09-30
 
 ### Companion / Plug & Play

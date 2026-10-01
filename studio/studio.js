@@ -28,6 +28,27 @@ const clientId = `studio-${Math.random().toString(36).slice(2, 7)}`;
 const requestedSurface = new URLSearchParams(location.search).get("surface") || "";
 installSurfaceSwitcher({ current: requestedSurface === "plateau" ? "plateau" : "regie" });
 
+function setNetStatus(text) {
+  const raw = String(text || "").trim();
+  let label = "Non connecté";
+  let on = false;
+  if (/^ERROR/i.test(raw)) label = raw.replace(/^ERROR\s*·?\s*/i, "Erreur · ");
+  else if (/RECONNECT/i.test(raw)) label = "Reconnexion…";
+  else if (/CONNECTING/i.test(raw)) label = "Connexion…";
+  else if (/CONNECTED/i.test(raw) || /^LAN ·/i.test(raw)) {
+    on = true;
+    const ms = raw.match(/(\d+)\s*ms/);
+    label = ms ? `Connecté · ${ms[1]} ms` : "Connecté";
+  } else if (/UNAVAILABLE|PLATFORM-LIMITED/i.test(raw)) label = "Indisponible";
+  if (netStatus) netStatus.textContent = label;
+  $("netDot")?.classList.toggle("on", on);
+}
+
+function refreshSessionName() {
+  const el = $("sessionName");
+  if (el) el.textContent = doc?.name ? ` · ${doc.name}` : "";
+}
+
 function log(msg) {
   const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
   logEl.textContent = `${line}\n${logEl.textContent}`.slice(0, 4000);
@@ -301,6 +322,7 @@ function setMode(next) {
   mode = next;
   document.body.className = `mode-${mode}`;
   document.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  refreshSessionName();
   renderGrid();
   log(`Mode · ${mode}`);
 }
@@ -609,15 +631,15 @@ $("btnConnect").onclick = async () => {
       onLog: log
     });
     transport.onStatus(({ state }) => {
-      netStatus.textContent = transport.statusLine();
+      setNetStatus(transport.statusLine());
       if (state) log(`Transport · ${state}`);
     });
     await transport.connect();
     localStorage.setItem("nvd.companion.ws", url);
-    netStatus.textContent = transport.statusLine();
+    setNetStatus(transport.statusLine());
     log("Connecté");
   } catch (e) {
-    netStatus.textContent = `ERROR · ${e.message || e}`;
+    setNetStatus(`ERROR · ${e.message || e}`);
     log(e.message || String(e));
   }
 };
@@ -639,7 +661,7 @@ $("btnDisconnect").onclick = () => {
   transport?.disconnect();
   transport = null;
   hideMonitor();
-  netStatus.textContent = "DISCONNECTED";
+  setNetStatus("DISCONNECTED");
   log("Déconnecté");
 };
 
@@ -651,7 +673,18 @@ try {
   $("wsUrl").value = "ws://127.0.0.1:4174";
 }
 
+$("connectToggle")?.addEventListener("click", () => {
+  const details = $("connectDetails");
+  if (!details) return;
+  const open = details.hidden;
+  details.hidden = !open;
+  $("connectToggle").setAttribute("aria-expanded", open ? "true" : "false");
+  const chev = $("connectToggle").querySelector(".chev");
+  if (chev) chev.textContent = open ? "▴" : "▾";
+});
+
 setMode(requestedSurface === "plateau" ? STUDIO_MODES.PLATEAU : STUDIO_MODES.EDITION);
+refreshSessionName();
 renderPageNav();
 renderGrid();
 log("Companion Studio prêt · Régie universelle · swipe horizontal entre pages");

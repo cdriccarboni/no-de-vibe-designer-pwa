@@ -897,7 +897,8 @@ assert(oscBad, "unsupported osc type throws");
 
 console.log("project-format");
 const pFresh = newProject();
-assert(pFresh.version === 2 && APP_VERSION === "3.1.1", "project format 2 / app 3.1.1");
+const pkgVersion = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+assert(pFresh.version === 2 && APP_VERSION === pkgVersion, `project format 2 / app ${APP_VERSION}`);
 const old = validateProject({ schema: "cvd.graph", version: 1, name: "old", nodes: [], edges: [] });
 assert(old.version === 2, "v1 projects migrate to format 2");
 let futureFail = false;
@@ -1191,6 +1192,25 @@ assert(usbFail && /PLATFORM-LIMITED/.test(usb.statusLine()), "USB transport hone
 assert(p0Widgets().some(w => w.type === "button"), "p0 widget catalog has button");
 assert(formatDetectBanner({ name: "phone", rttMs: 4 }).includes("4 ms"), "detect banner shows rtt");
 assert(DETECT_ACTIONS.OPEN_STUDIO === "open-studio", "detect actions");
+
+console.log("ux-3.2");
+const { clampPanelRect } = await import("../desktop/float-panels.js");
+const parked = clampPanelRect({ x: -5000, y: -800, width: 9000, height: 5000 }, { width: 1440, height: 900 }, { minWidth: 320 });
+assert(parked.width <= 1440 - 16 && parked.height <= 900 - 16, "floating panel fits the viewport");
+assert(parked.x + parked.width >= 48 && parked.y >= 0 && parked.y <= 900 - 38, "floating panel stays recoverable");
+const kept = clampPanelRect({ x: 48, y: 96, width: 420, height: 240 }, { width: 1440, height: 900 });
+assert(kept.x === 48 && kept.y === 96 && kept.width === 420 && kept.height === 240, "in-view panel is left in place");
+const desktopHtml = fs.readFileSync(new URL("../desktop/index.html", import.meta.url), "utf8");
+const studioHtml = fs.readFileSync(new URL("../studio/index.html", import.meta.url), "utf8");
+const studioCss = fs.readFileSync(new URL("../studio/studio.css", import.meta.url), "utf8");
+assert(!desktopHtml.includes("source de vérité"), "patch canvas has no internal wording");
+assert(desktopHtml.includes('data-float-id="vibe"') && desktopHtml.includes('data-float-id="timeline"'), "vibe and timeline are movable panels");
+assert(desktopHtml.includes("100 %") && desktopHtml.includes(">Bloc<"), "patch canvas uses human controls");
+assert(!desktopHtml.includes('class="vibe-image-thumb hidden"'), "empty vibe image is not rendered as a visible thumb");
+assert(studioHtml.includes("connectToggle") && studioHtml.includes("Connexion / Pont WS"), "regie connection starts compact");
+assert(studioCss.includes("body.mode-PLATEAU .photo-controller"), "plateau hides photo controller creation");
+const mobileCss = fs.readFileSync(new URL("../mobile/mobile.css", import.meta.url), "utf8");
+assert(mobileCss.includes(".vibe-image-thumb.is-ready"), "mobile hides an empty vibe image");
 
 console.log(`\nRésultat : ${passed} OK · ${failed} FAIL\n`);
 process.exit(failed ? 1 : 0);
