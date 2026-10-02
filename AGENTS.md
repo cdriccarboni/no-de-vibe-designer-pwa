@@ -1,3 +1,19 @@
+# No-de Vibe Designer PWA — règles produit spécifiques
+
+Ce dépôt est la distribution PWA publique de No-de Vibe Designer, multi-interface : Designer, Mobile, Régie, Plateau et Remote Camera.
+
+Règles durables :
+- conserver l'identité autonome No-de et le package Android `fr.acousmatic.nodevibedesigner` ;
+- Designer/Mobile/Régie/Plateau/Remote Camera sont des interfaces d'un même produit, pas cinq produits divergents ;
+- préserver Graphics Engine WebGPU/WebGL2/CPU et les fallbacks réels ; ne jamais afficher un moteur fictif comme actif ;
+- Remote Camera doit rester utilisable sans scroll inutile, QR lisible et sortie claire ;
+- fenêtres/preview/timeline doivent rester visibles et manipulables ; pas de panneau essentiel caché derrière un autre ;
+- l'IA locale est prioritaire ; aucune dépendance à Cursor/Codex/GitHub pour l'usage normal ;
+- APK, AAB, PWA, DMG/ZIP et documentation doivent correspondre à la même version effective ;
+- ne pas publier une version PWA qui régresse les parcours spectacle/répétition déjà validés.
+
+---
+
 # AGENTS.md — règles durables de collaboration
 
 Ces règles s'appliquent à tout agent ou assistant qui intervient sur ce dépôt.
