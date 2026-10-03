@@ -2,8 +2,8 @@ import {
   loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow,
   fireCue, saveShow, restoreShow, askShow, setKeyframe, timelineRows, showMonitor, CX_NOTE, CX_BRIDGE_URL
 } from "../shared/show-session.js";
-import { backendStatus } from "../shared/backend-registry.js";
-import { activeAgents, nativeBridgeLabel, runShaderAgent } from "../shared/shader-agent.js";
+import { browserProbeRegistry, selectAgentsForRequest } from "../shared/agent-registry.js";
+import { executeWaveShader, nativeBridgeLabel, runShaderAgent } from "../shared/shader-agent.js";
 
 const SAVE_KEY = "nvd.show.save";
 let session = loadExampleScene();
@@ -28,53 +28,17 @@ function paint() {
 function compileInBrowser(source) {
   const canvas = $("preview");
   const gl = canvas.getContext("webgl2");
-  if (!gl) return { compile: false, observed: false, error: "WebGL2 indisponible" };
-  const make = (type, src) => {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, src);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return gl.getShaderInfoLog(shader) || "compile";
-    return shader;
-  };
-  try {
-    const vs = make(gl.VERTEX_SHADER, source.vertex);
-    const fs = make(gl.FRAGMENT_SHADER, source.fragment);
-    if (typeof vs !== "object" || typeof fs !== "object") {
-      return { compile: false, observed: false, error: [vs, fs].filter(item => typeof item === "string").join(" ") };
-    }
-    const program = gl.createProgram();
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      return { compile: false, observed: false, error: gl.getProgramInfoLog(program) || "link" };
-    }
-    gl.useProgram(program);
-    const tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([
-      220, 40, 40, 255, 40, 180, 60, 255, 40, 80, 220, 255, 230, 200, 40, 255
-    ]));
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(program, "a_position");
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    for (const [name, value] of [["u_amplitude", 0.08], ["u_frequency", 6], ["u_speed", 1.2], ["u_phase", 0.4], ["u_time", 1]]) {
-      const slot = gl.getUniformLocation(program, name);
-      if (slot) gl.uniform1f(slot, value);
-    }
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    const pixel = new Uint8Array(4);
-    gl.readPixels(160, 90, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-    return { compile: true, observed: true, pixel: Array.from(pixel), preview: "show/index.html#preview" };
-  } catch (error) {
-    return { compile: false, observed: false, error: error?.message || String(error) };
+  const result = executeWaveShader(gl, source);
+  return result.preview ? result : { ...result, preview: result.compile ? "show/index.html#preview" : "" };
+}
+
+async function registryForChat() {
+  if (typeof globalThis.nvdDesktop?.agentRegistry === "function") {
+    try { return await globalThis.nvdDesktop.agentRegistry(); }
+    catch { /* la sonde locale a échoué, le navigateur sonde ce qu'il peut */ }
   }
+  const gl = $("preview").getContext("webgl2");
+  return browserProbeRegistry(gl);
 }
 
 async function refreshNative() {
@@ -105,7 +69,7 @@ function paintMonitor() {
     ctx.fillRect(x, y, 92, 52);
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#101214";
-    ctx.fillText(String(node.title).slice(0, 12), x + 8, y + 22);
+    ctx.fillText(String(node.title), x + 6, y + 22);
     ctx.fillText(node.opacity.toFixed(2), x + 8, y + 40);
   });
 }
@@ -164,16 +128,19 @@ $("ask").onclick = async () => {
   } catch {
     cx = null;
   }
-  const result = askShow(session, text, cx);
-  const gates = activeAgents(backendStatus(), {});
-  const shader = await runShaderAgent(session, text, compileInBrowser, { eligible: gates.active.includes("shader") });
+  const registry = await registryForChat();
+  const chosen = selectAgentsForRequest(text, registry);
+  const result = askShow(session, text, cx, registry);
+  const shader = await runShaderAgent(session, text, compileInBrowser, { eligible: chosen.some(agent => agent.id === "glsl") });
   const cue = result.cueOk ? ` · cue ${result.cueId}` : "";
   const wave = shader.ran
     ? ` · ${shader.camera} → ${shader.shader} · compilé · pixel ${shader.pixel.join(",")}`
     : "";
+  const agents = chosen.length ? ` · agents ${chosen.map(agent => agent.agent).join(", ")}` : "";
+  const experimental = result.experimental ? ` · ${result.experimental}` : "";
   $("log").textContent = result.ok
-    ? `${result.added} node(s)${cue}${wave} · ${result.note}`
-    : `${result.error || "aucune opération"}${shader.ran ? "" : ""} · ${result.note}`;
+    ? `${result.added} node(s)${cue}${wave}${agents}${experimental} · ${result.note}`
+    : `${result.error || "aucune opération"}${experimental} · ${result.note}`;
   remember();
   paint();
 };

@@ -6,7 +6,8 @@ import { DeviceManager } from "../shared/device-manager.js";
 import { portDirection, portLabels, portDataType, isExecutable } from "../shared/ports.js";
 import { validateEdge } from "../shared/graph-engine.js";
 import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed, probeLocalAi } from "../shared/vibe.js";
-import { renderBackendReport, refreshBackendStatus } from "../shared/backend-registry.js";
+import { renderBackendReport } from "../shared/backend-registry.js";
+import { browserProbeRegistry } from "../shared/agent-registry.js";
 import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
 import { NODE_GROUPS, spec as sharedSpec } from "../shared/node-specs.js";
 import { createHistory } from "../shared/history.js";
@@ -169,11 +170,23 @@ function readGeneralPrefsNow() {
   }
 }
 
+let agentRegistryDoc = null;
 function paintBackendReport() {
   const box = $("#backendReport");
   if (!box) return;
-  const technical = $("#prefTechnicalMode")?.checked === true;
-  box.innerHTML = renderBackendReport(technical ? "technical" : "artist");
+  box.textContent = "Sonde des agents…";
+  const load = agentRegistryDoc
+    ? Promise.resolve(agentRegistryDoc)
+    : (globalThis.nvdDesktop?.agentRegistry
+      ? globalThis.nvdDesktop.agentRegistry()
+      : Promise.resolve(browserProbeRegistry(document.createElement("canvas").getContext("webgl2"))));
+  load.then(doc => {
+    agentRegistryDoc = doc;
+    const technical = $("#prefTechnicalMode")?.checked === true;
+    box.innerHTML = renderBackendReport(technical ? "technical" : "artist", doc);
+  }).catch(error => {
+    box.textContent = error?.message || String(error);
+  });
 }
 
 function writeGeneralPrefsFromUi() {
@@ -533,7 +546,9 @@ function buildLibrary() {
       </button>
       <div class="lib-items">${visible.map(([n, t]) => {
         const ok = isLibraryExecutable(t);
-        return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${nodeReadiness(t)}"><span>${n}${ok ? "" : " · expérimental"}</span><span>${ok ? "＋" : "○"}</span></div>`;
+        const unstable = ["depthmask","opticalflow","ndi-out","remote-camera","phone-camera-back","phone-camera-front"].includes(t);
+        const mark = (!ok || unstable) ? " · EXPÉRIMENTAL" : "";
+        return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${nodeReadiness(t)}"><span>${n}${mark}</span><span>${ok ? "＋" : "○"}</span></div>`;
       }).join("")}</div>
     </div>`;
   }).join("");
@@ -1085,6 +1100,12 @@ function selectNode(id, { additive = false } = {}) {
   }
   if (n.type === "text") {
     extra += `<div class="field"><label>Texte</label><input id="nText" value="${n.params.text || ""}"></div>`;
+    extra += `<div class="field"><label>Taille</label><input id="nTextSize" type="number" min="1" max="8" value="${n.params.size ?? 2}"></div>`;
+    extra += `<div class="field"><label>Gras</label><select id="nTextBold"><option value="false">Non</option><option value="true">Oui</option></select></div>`;
+    extra += `<div class="field"><label>Couleur</label><input id="nTextColor" value="${n.params.color || "#f4f1e8"}"></div>`;
+    extra += `<div class="field"><label>Opacité</label><input id="nTextOpacity" type="number" min="0" max="1" step="0.01" value="${n.params.opacity ?? 1}"></div>`;
+    extra += `<div class="field"><label>Position X</label><input id="nTextX" type="number" value="${n.params.x ?? 8}"></div>`;
+    extra += `<div class="field"><label>Position Y</label><input id="nTextY" type="number" value="${n.params.y ?? 8}"></div>`;
   }
   if (n.type === "blackhole") {
     extra += `<div class="field"><label>Vitesse</label><input id="nSpeed" type="range" min="0" max="3" step=".01" value="${n.params.speed ?? 0.65}"></div>`;
@@ -1103,7 +1124,7 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="field"><label>${label}</label><input id="nFxAmount" type="range" min="0" max="1" step=".005" value="${value}"></div>`;
   }
   if (n.type === "composite") {
-    extra += `<div class="field"><label>Blend</label><select id="nBlend"><option>normal</option><option>add</option><option>multiply</option><option>screen</option></select></div>`;
+    extra += `<div class="field"><label>Blend · EXPÉRIMENTAL</label><select id="nBlend"><option>normal</option><option>add</option><option>multiply</option><option>screen</option></select></div>`;
   }
   if (["shadow", "threshold", "bodyclone"].includes(n.type)) {
     extra += `<div class="field"><label>Seuil</label><input id="nThreshold" type="range" min="0" max="1" step=".01" value="${n.params.threshold ?? 0.45}"></div>`;
@@ -1301,6 +1322,11 @@ function selectNode(id, { additive = false } = {}) {
   if ($("#nOp")) { $("#nOp").value = n.params.operator || ">"; $("#nOp").onchange = e => { n.params.operator = e.target.value; runtime.render(); autosave(); commitHistory(); }; }
   if ($("#nBool")) { $("#nBool").value = String(n.params.value === true || n.params.value === "true"); $("#nBool").onchange = e => { n.params.value = e.target.value === "true"; runtime.render(); autosave(); commitHistory(); }; }
   if ($("#nText")) $("#nText").onchange = e => { n.params.text = e.target.value; runtime.render(); autosave(); commitHistory(); };
+  if ($("#nTextBold")) { $("#nTextBold").value = String(n.params.bold === true); $("#nTextBold").onchange = e => { n.params.bold = e.target.value === "true"; runtime.render(); autosave(); commitHistory(); }; }
+  for (const [id, key, numeric] of [["nTextSize","size",true],["nTextColor","color",false],["nTextOpacity","opacity",true],["nTextX","x",true],["nTextY","y",true]]) {
+    if (!$(id)) continue;
+    $(id).onchange = e => { n.params[key] = numeric ? +e.target.value : e.target.value; runtime.render(); autosave(); commitHistory(); };
+  }
   if ($("#nSpeed")) $("#nSpeed").oninput = e => { n.params.speed = +e.target.value; runtime.render(); autosave(); };
   if ($("#nSize")) $("#nSize").oninput = e => { n.params.size = +e.target.value; runtime.render(); autosave(); };
   if ($("#nScale")) $("#nScale").onchange = e => { n.params.scale = +e.target.value; runtime.render(); autosave(); commitHistory(); };
@@ -1607,6 +1633,8 @@ function drawClip(c) {
 function clipDrag(el, c) {
   let m = null, sx = 0, s = 0, d = 0;
   el.onmousedown = e => {
+    const layer = (project.layers || []).find(item => item.id === c.layerId) || (project.layers || [])[c.track];
+    if (layer?.locked) { log(`Calque verrouillé · ${layer.name}`); return; }
     m = e.target.classList.contains("resize") ? "resize" : "move";
     sx = e.clientX; s = c.start; d = c.duration; e.preventDefault();
   };
@@ -2622,7 +2650,13 @@ $("#backendReport")?.addEventListener("click", event => {
   const link = event.target?.closest?.("[data-refresh-backends]");
   if (!link) return;
   event.preventDefault();
-  refreshBackendStatus().then(() => paintBackendReport()).catch(err => log(`Registre · ${err?.message || err}`));
+  agentRegistryDoc = null;
+  if (globalThis.nvdDesktop?.agentRegistry) {
+    globalThis.nvdDesktop.agentRegistry({ refresh: true }).then(doc => { agentRegistryDoc = doc; paintBackendReport(); }).catch(err => log(`Registre · ${err?.message || err}`));
+  } else {
+    agentRegistryDoc = browserProbeRegistry(document.createElement("canvas").getContext("webgl2"));
+    paintBackendReport();
+  }
 });
 $("#prefPlugAndPlay")?.addEventListener("change", async () => {
   const next = writeGeneralPrefsFromUi();

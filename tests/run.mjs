@@ -7,7 +7,9 @@ import { typesCompatible, portDataType, portDirection, isExecutable, EXECUTABLE_
 import { validateEdge, findCycleEdgeIds, topoOrder, evaluateGraph, findVideoOutput } from "../shared/graph-engine.js";
 import { localVibeParse, applyVibeOps, isForbiddenAiProvider, assertAiProviderAllowed, runVibe, probeLocalAi } from "../shared/vibe.js";
 import { performAction } from "../shared/action-intents.js";
-import { artistBackends, technicalRows, proposeArchitectures, BACKEND_STATUSES } from "../shared/backend-registry.js";
+import { artistBackends, technicalRows, proposeArchitectures } from "../shared/backend-registry.js";
+import { selectAgentsForRequest, AGENT_STATUSES, defaultRegistry } from "../shared/agent-registry.js";
+import { probeAgentRegistry } from "../bridge/probe-agents.mjs";
 import { APP_VERSION } from "../shared/version.js";
 import { createHistory } from "../shared/history.js";
 import { ensureSubGraph, evaluateSubGraph, addBoxPort, wrapNodesInSubpatch, MAX_SUBPATCH_DEPTH } from "../shared/subpatch.js";
@@ -34,7 +36,6 @@ import { WebSocketBridge } from "../shared/adapters/websocket-bridge.js";
 import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "../shared/pwa-update.js";
 import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl, navigateSurface } from "../shared/surface-switcher.js";
 import { createShowSession, loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow, fireCue, saveShow, restoreShow, askShow, sampleCurve, setKeyframe, applyCurves, showMonitor, CX_NOTE } from "../shared/show-session.js";
-import { backendStatus } from "../shared/backend-registry.js";
 import { activeAgents, nativeBridgeLabel, runShaderAgent, WAVE_PARAMS } from "../shared/shader-agent.js";
 import { probeFortyTwo, compileWaveWithChrome } from "../bridge/agent-runners.mjs";
 import { createMemoryProjectStore } from "../shared/project-store.js";
@@ -1304,20 +1305,33 @@ function listSafe(session) { return session.project.cues?.length > 0; }
 }
 
 console.log("agents");
+let probedRegistry = null;
 {
   const phrase = "Ajoute une caméra et fais onduler son image";
+  probedRegistry = await probeAgentRegistry();
   const probes = probeFortyTwo();
-  const gates = activeAgents(backendStatus(), probes);
+  const gates = activeAgents(probedRegistry, probes);
+  const chosen = selectAgentsForRequest(phrase, probedRegistry);
   assert(probes.python === 42 && probes.javascript === 42, "python and javascript still return 42");
   assert(gates.active.includes("python") && gates.active.includes("javascript") && gates.active.includes("shader"), "proven agents stay active");
-  assert(["faust", "rust", "touchdesigner"].every(id => gates.inactive.includes(id) && !gates.active.includes(id)), "faust rust and touchdesigner stay inactive");
+  assert(["faust", "rust", "touchdesigner", "vvvv"].every(id => !gates.active.includes(id)), "unproven agents stay inactive");
+  assert(chosen.length > 0 && chosen.every(agent => agent.status === "DISPONIBLE"), "the sentence picks only available agents");
+  assert(chosen.some(agent => agent.id === "glsl") && chosen.some(agent => agent.id === "webgl"), "the wave sentence picks the proven shader path");
+  assert(!chosen.some(agent => /webcam|vvvv|faust|unity|processing/i.test(agent.id + agent.agent)), "no webcam and no unproven engine is chosen");
+  const blind = selectAgentsForRequest(phrase, defaultRegistry());
+  assert(blind.length === 0, "a config file cannot activate an agent");
+  const forced = {
+    probed: true,
+    rows: [{ id: "vvvv", agent: "vvvv/VL", status: "DISPONIBLE", value: 1, executable: true, priority: 3, windowsTested: false, capabilities: [] }]
+  };
+  assert(!selectAgentsForRequest("vvvv", forced).some(agent => agent.id === "vvvv"), "vvvv stays out without a Windows test");
   assert(nativeBridgeLabel(null).includes("indisponibles"), "public page marks the bridge unavailable");
   const refused = createShowSession();
-  askShow(refused, phrase);
+  askShow(refused, phrase, null, probedRegistry);
   const missed = await runShaderAgent(refused, phrase, async () => ({ compile: false, observed: false, error: "syntax" }), { eligible: true });
   assert(missed.ran === false && missed.steps.some(step => step.stage === "diagnose") && missed.steps.some(step => step.stage === "correct"), "a failed compile is not a success");
   const repaired = createShowSession();
-  askShow(repaired, phrase);
+  askShow(repaired, phrase, null, probedRegistry);
   let attempts = 0;
   const fixed = await runShaderAgent(repaired, phrase, async () => {
     attempts += 1;
@@ -1329,42 +1343,53 @@ console.log("agents");
   const shaderNode = repaired.project.nodes.find(node => node.type === "shader");
   assert(shaderNode.params.amplitude === WAVE_PARAMS.amplitude && shaderNode.params.frequency === WAVE_PARAMS.frequency && shaderNode.params.speed === WAVE_PARAMS.speed && shaderNode.params.phase === WAVE_PARAMS.phase, "wave parameters are on the shader node");
   const live = createShowSession();
-  const asked = askShow(live, phrase);
-  assert(asked.ok && live.project.nodes.some(node => node.type === "camera") && live.project.nodes.some(node => node.type === "shader"), "the sentence creates a camera and a shader");
+  const asked = askShow(live, phrase, null, probedRegistry);
+  assert(asked.ok && asked.registryConsulted === true && asked.claimsWebcam === false, "the chat consults the registry and does not claim a webcam");
+  assert(asked.agents.every(id => probedRegistry.rows.find(row => row.id === id)?.status === "DISPONIBLE"), "chat agents are available");
+  assert(!/webcam/i.test(JSON.stringify({ note: asked.note, agents: asked.agents, plan: asked.plan?.note || "" })), "the reply never says webcam");
+  assert(live.project.nodes.some(node => node.type === "camera") && live.project.nodes.some(node => node.type === "shader"), "the sentence creates a camera and a shader");
   const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
   if (fs.existsSync(chrome)) {
     const preview = path.resolve("show/shader-preview.png");
-    const ran = await runShaderAgent(live, phrase, source => compileWaveWithChrome(source, preview), { eligible: gates.active.includes("shader") });
+    const ran = await runShaderAgent(live, phrase, source => compileWaveWithChrome(source, preview), { eligible: chosen.some(agent => agent.id === "glsl") });
     assert(ran.ran === true && ran.compile === true && ran.pixel.length === 4, "shader compile and frame were observed: " + (ran.error || ran.pixel));
     assert(fs.existsSync(preview) && fs.statSync(preview).size > 0, "shader preview file exists");
     assert(live.project.edges.length > 0, "camera is attached to the shader");
   }
 }
+
 function pathDir(src) { return src.replace(/\/src$/, ""); }
 
 console.log("backends");
 {
-  const rows = technicalRows();
+  const registry = probedRegistry;
+  const rows = technicalRows(registry);
   const byId = Object.fromEntries(rows.map(row => [row.id, row]));
-  const fields = ["name", "version", "state", "platform", "capabilities", "detect", "install", "test", "launch", "talk"];
-  assert(rows.every(row => BACKEND_STATUSES.includes(row.state) && fields.every(field => field in row)), "every backend is an extensible record");
-  for (const id of ["python", "node", "javascript", "typescript", "cpp", "swift", "webgl", "glsl"]) {
-    assert(byId[id].state === "DISPONIBLE" && byId[id].version && byId[id].proof, `${id} is proven available`);
+  const fields = ["agent", "language", "engine", "version", "status", "capabilities", "lastTest", "error"];
+  assert(registry.probed === true, "the registry comes from a probe");
+  assert(rows.every(row => AGENT_STATUSES.includes(row.status) && fields.every(field => field in row)), "every agent row has the registry columns");
+  assert(rows.every(row => row.status !== "DISPONIBLE" || (row.value !== null && row.value !== "" && row.executable !== false)), "available means the probe returned a value");
+  for (const id of ["python", "node", "javascript", "typescript"]) {
+    assert(byId[id].status === "DISPONIBLE" && byId[id].value === 42, `${id} returned 42`);
   }
-  assert(byId.metal.state === "DISPONIBLE AVEC LIMITATIONS", "metal ran but is limited");
-  assert(byId.ndi.state === "DISPONIBLE AVEC LIMITATIONS" && byId.ndi.version.includes("6.3.0"), "ndi library initialized");
-  assert(byId.touchdesigner.state === "NON DISPONIBLE" && byId.touchdesigner.version === "2025.33230", "touchdesigner test did not complete");
-  for (const id of ["java", "processing", "rust", "faust", "unity", "unreal", "ffmpeg", "webgpu", "wgsl"]) {
-    assert(byId[id].state === "NON DISPONIBLE", `${id} stays unavailable`);
+  assert(byId.glsl.status === "DISPONIBLE" && byId.webgl.status === "DISPONIBLE", "glsl compiled on the WebGL path");
+  assert(byId.java.status === "NON DISPONIBLE", "java runtime is not available");
+  assert(byId.vvvv.status === "NON DISPONIBLE" && byId.vvvv.windowsTested !== true && byId.vvvv.executable === false, "vvvv is known but not an executable backend");
+  for (const id of ["godot", "unreal", "openframeworks", "cinder", "juce", "faust", "supercollider", "puredata", "processing", "p5", "unity"]) {
+    assert(byId[id].status !== "DISPONIBLE", `${id} stays unavailable without a functional test`);
   }
-  const artist = artistBackends();
-  assert(artist.every(row => row.state === "DISPONIBLE"), "artist list is only proven backends");
-  assert(!artist.some(row => ["faust", "unity", "unreal", "rust", "metal", "touchdesigner", "webgpu", "ndi"].includes(row.id)), "unproven backends stay out of the artist list");
-  const proposal = proposeArchitectures("Scène temps réel : vidéo shader GPU, audio et OSC");
+  const config = fs.readFileSync(new URL("../shared/backend-status.js", import.meta.url), "utf8");
+  assert(!config.includes("DISPONIBLE") && config.includes("probed: false"), "the status file does not mark an agent available");
+  const artist = artistBackends(registry);
+  assert(artist.every(row => row.status === "DISPONIBLE"), "artist list is only proven agents");
+  assert(!artist.some(row => ["faust", "unity", "unreal", "rust", "vvvv", "processing", "touchdesigner"].includes(row.id) && byId[row.id].status !== "DISPONIBLE"), "unproven agents stay out of the artist list");
+  assert(artistBackends().length === 0, "the default registry activates nothing");
+  const proposal = proposeArchitectures("Scène temps réel : vidéo shader GPU, audio et OSC", registry);
   assert(proposal.options.length >= 2 && proposal.options.length <= 3, "complex prompt returns two or three real options");
-  assert(proposal.options.every(option => artist.some(row => row.id === option.id)), "options come from proven backends");
+  assert(proposal.options.every(option => artist.some(row => row.id === option.id)), "options come from proven agents");
   assert(proposal.options.some(option => option.preview), "at least one option can preview");
   assert(proposal.fusionRan === false, "no hybrid fusion is claimed");
+  assert(proposeArchitectures("shader", defaultRegistry()).options.length === 0, "an unprobed registry proposes nothing");
 }
 
 console.log(`\nRésultat : ${passed} OK · ${failed} FAIL\n`);

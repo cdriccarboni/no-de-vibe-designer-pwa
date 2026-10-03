@@ -4,6 +4,7 @@ import { createNodeProcessors } from "./node-processors.js";
 import { evaluateSubGraph } from "./subpatch.js";
 import { sharedAudio } from "./audio-engine.js";
 import { createMlRuntime } from "./ml-runtime.js";
+import { renderTextPlate } from "./composition.js";
 
 export class Runtime {
   constructor(canvas, { destination = "main-output", onGraphEvent = null } = {}) {
@@ -339,6 +340,15 @@ export class Runtime {
     });
 
     // Error banner (non-blocking)
+    for (const node of this.project.nodes || []) {
+      if (node.type !== "text" || !node.params?.text) continue;
+      const plate = renderTextPlate({ ...node.params, width: w, height: h });
+      if (!plate.drawn) continue;
+      const image = c.createImageData(plate.width, plate.height);
+      image.data.set(plate.pixels);
+      c.putImageData(image, 0, 0);
+    }
+
     if (result.errors.length) {
       c.fillStyle = "rgba(120,30,30,.75)";
       c.fillRect(0, 0, w, 36);

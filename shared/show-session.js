@@ -7,6 +7,7 @@
 import { newProject, openProject, exportProject, createDemoProject } from "./ir.js";
 import { applyCue, listCues, setCuePlayhead, advanceCuePlayhead } from "./stage/cues.js";
 import { performAction } from "./action-intents.js";
+import { consultAgents } from "./agent-registry.js";
 
 export const CX_BRIDGE_URL = "http://127.0.0.1:4877/chat";
 export const CX_NOTE = "Le navigateur public ne peut pas importer le moteur CX ni joindre 127.0.0.1. Les agents et la mémoire tournent seulement si le pont local est lancé sur ce Mac.";
@@ -180,7 +181,8 @@ export function showMonitor(session) {
   };
 }
 
-export function askShow(session, text, cx = null) {
+export function askShow(session, text, cx = null, registry = null) {
+  const consultation = consultAgents(text, registry);
   const before = session.project.nodes.length;
   const result = performAction("patch-from-text", { project: session.project, text });
   let cue = null;
@@ -209,7 +211,11 @@ export function askShow(session, text, cx = null) {
     cueOk: Boolean(cue?.ok),
     cx: linked,
     chain: linked ? cx.chain : "",
-    note: linked ? `CX ${cx.chain}` : CX_NOTE
+    note: [linked ? `CX ${cx.chain}` : CX_NOTE, consultation.notice].filter(Boolean).join(" · "),
+    registryConsulted: consultation.consulted,
+    claimsWebcam: false,
+    experimental: consultation.notice || "",
+    agents: consultation.agents.map(agent => agent.id)
   };
 }
 
@@ -228,6 +234,14 @@ export function timelineRows(session) {
     time: clip.start,
     duration: clip.duration
   }));
+  const layers = (session.project.layers || []).map(layer => ({
+    kind: "layer",
+    id: layer.id,
+    label: layer.name,
+    hidden: layer.hidden === true,
+    locked: layer.locked === true,
+    order: layer.order
+  }));
   const curves = (session.project.curves || []).map(curve => ({
     kind: "curve",
     id: `${curve.nodeId}:${curve.param}`,
@@ -235,5 +249,5 @@ export function timelineRows(session) {
     nodeId: curve.nodeId,
     keys: curve.keys
   }));
-  return [...cues, ...clips, ...curves];
+  return [...layers, ...cues, ...clips, ...curves];
 }

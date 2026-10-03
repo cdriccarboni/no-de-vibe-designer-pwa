@@ -1,5 +1,5 @@
 /**
- * Agent shader. Il n'est actif que si GLSL et WebGL sont déjà prouvés.
+ * Agent shader. Il n'est actif que si une sonde a prouvé GLSL et WebGL.
  * Le succès exige une compilation observée et une image exécutée, jamais le texte seul.
  */
 export const WAVE_PARAMS = Object.freeze({
@@ -18,12 +18,63 @@ export function nativeBridgeLabel(health) {
 }
 
 export function activeAgents(doc, probes = {}) {
-  const rows = Object.fromEntries((doc?.rows || []).map(row => [row.id, row.state || row.status]));
+  if (!doc?.probed) return { active: [], inactive: [...BLOCKED] };
+  const rows = Object.fromEntries((doc?.rows || []).map(row => [row.id, row.status || row.state]));
   const active = [];
-  if (rows.python === "DISPONIBLE" && probes.python === 42) active.push("python");
-  if (rows.javascript === "DISPONIBLE" && probes.javascript === 42) active.push("javascript");
-  if (rows.glsl === "DISPONIBLE" && rows.webgl === "DISPONIBLE") active.push("shader");
+  if (rows.python === "VALIDÉ" && probes.python === 42) active.push("python");
+  if (rows.javascript === "VALIDÉ" && probes.javascript === 42) active.push("javascript");
+  if (rows.glsl === "VALIDÉ" && rows.webgl === "VALIDÉ") active.push("shader");
   return { active, inactive: BLOCKED.filter(id => !active.includes(id)) };
+}
+
+export function executeWaveShader(gl, source = waveShaderSource()) {
+  if (!gl) return { compile: false, observed: false, error: "WebGL2 indisponible" };
+  const make = (type, src) => {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, src);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return gl.getShaderInfoLog(shader) || "compile";
+    return shader;
+  };
+  try {
+    const vs = make(gl.VERTEX_SHADER, source.vertex);
+    const fs = make(gl.FRAGMENT_SHADER, source.fragment);
+    if (typeof vs !== "object" || typeof fs !== "object") {
+      return { compile: false, observed: false, error: [vs, fs].filter(item => typeof item === "string").join(" ") };
+    }
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      return { compile: false, observed: false, error: gl.getProgramInfoLog(program) || "link" };
+    }
+    gl.useProgram(program);
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([
+      220, 40, 40, 255, 40, 180, 60, 255, 40, 80, 220, 255, 230, 200, 40, 255
+    ]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "a_position");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    for (const [name, value] of [["u_amplitude", 0.08], ["u_frequency", 6], ["u_speed", 1.2], ["u_phase", 0.4], ["u_time", 1]]) {
+      const slot = gl.getUniformLocation(program, name);
+      if (slot) gl.uniform1f(slot, value);
+    }
+    gl.viewport(0, 0, gl.drawingBufferWidth || 320, gl.drawingBufferHeight || 180);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    const pixel = new Uint8Array(4);
+    gl.readPixels(160, 90, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    return { compile: true, observed: true, pixel: Array.from(pixel), preview: "" };
+  } catch (error) {
+    return { compile: false, observed: false, error: error?.message || String(error) };
+  }
 }
 
 export function waveShaderSource() {

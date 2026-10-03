@@ -7,6 +7,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { pathToFileURL } = require("url");
+const { spawn } = require("child_process");
 
 const APP_NAME = "No[co]de Vibe Designer";
 
@@ -292,6 +293,20 @@ ipcMain.handle("nvd:sacn-udp", async (_event, message = {}) => {
 ipcMain.handle("nvd:host-card", async () => {
   if (!hostCard) throw new Error("Carte hôte indisponible");
   return hostCard;
+});
+
+let agentRegistryPromise = null;
+ipcMain.handle("nvd:agent-registry", async (_event, options = {}) => {
+  if (options?.refresh) agentRegistryPromise = null;
+  if (!agentRegistryPromise) {
+    agentRegistryPromise = import(pathToFileURL(path.join(__dirname, "..", "bridge", "probe-agents.mjs")).href)
+      .then(mod => mod.probeAgentRegistry({ refresh: options?.refresh === true }))
+      .catch(error => {
+        agentRegistryPromise = null;
+        throw error;
+      });
+  }
+  return agentRegistryPromise;
 });
 
 ipcMain.handle("nvd:local-ai-probe", async (_event, options = {}) => {

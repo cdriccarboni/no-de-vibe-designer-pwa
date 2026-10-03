@@ -6,6 +6,8 @@ import http from "node:http";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { probeAgentRegistry } from "./probe-agents.mjs";
+import { selectAgentsForRequest } from "../shared/agent-registry.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const script = path.join(root, "cx_show_bridge.py");
@@ -39,11 +41,27 @@ function ask(text) {
   });
 }
 
+let registryPromise = null;
+function agentRegistry(refresh = false) {
+  if (refresh || !registryPromise) registryPromise = probeAgentRegistry({ refresh });
+  return registryPromise;
+}
+
 export function startCxShowBridge({ port = Number(process.env.CX_SHOW_PORT || 4877), host = "127.0.0.1" } = {}) {
   const server = http.createServer((req, res) => {
     if (req.method === "OPTIONS") {
       res.writeHead(204, headers());
       res.end();
+      return;
+    }
+    if (req.method === "GET" && (req.url === "/agents" || req.url === "/agents?refresh=1")) {
+      agentRegistry(req.url.includes("refresh=1")).then(payload => {
+        res.writeHead(200, headers());
+        res.end(JSON.stringify(payload));
+      }).catch(error => {
+        res.writeHead(500, headers());
+        res.end(JSON.stringify({ ok: false, probed: false, error: error?.message || String(error) }));
+      });
       return;
     }
     if (req.method === "GET" && req.url === "/health") {
@@ -66,7 +84,20 @@ export function startCxShowBridge({ port = Number(process.env.CX_SHOW_PORT || 48
     req.on("end", async () => {
       let text = "";
       try { text = String(JSON.parse(body).text || ""); } catch { text = ""; }
-      const payload = await ask(text.slice(0, 2000));
+      const prompt = text.slice(0, 2000);
+      let registry = null;
+      try { registry = await agentRegistry(); } catch { registry = null; }
+      const chosen = selectAgentsForRequest(prompt, registry);
+      const payload = await ask(prompt);
+      payload.registryConsulted = Boolean(registry?.probed);
+      payload.claimsWebcam = false;
+      payload.agents = chosen.map(agent => ({
+        id: agent.id,
+        agent: agent.agent,
+        language: agent.language,
+        engine: agent.engine,
+        status: agent.status
+      }));
       res.writeHead(payload.ok ? 200 : 400, headers());
       res.end(JSON.stringify(payload));
     });
