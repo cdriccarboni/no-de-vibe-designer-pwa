@@ -33,6 +33,7 @@ import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { WebSocketBridge } from "../shared/adapters/websocket-bridge.js";
 import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "../shared/pwa-update.js";
 import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl, navigateSurface } from "../shared/surface-switcher.js";
+import { loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow, fireCue, saveShow, restoreShow, askShow, sampleCurve, setKeyframe, applyCurves, CX_NOTE } from "../shared/show-session.js";
 import { createMemoryProjectStore } from "../shared/project-store.js";
 import { applyRemoteMessage, initialRemoteState } from "../shared/remote-protocol.js";
 import { startRemoteServer } from "../bridge/remote-server.mjs";
@@ -533,8 +534,9 @@ const mil2 = exportMilluminOscMap(exportProjectGraph);
 assert(mil2.addresses.some(a => a.address === "/layer/opacity"), "Millumin map lists OSC");
 
 console.log("surface-switcher");
-assert(SURFACES.length === 5, "five universal No-de surfaces are exposed");
-assert(SURFACES.some(s => s.id === "designer") && SURFACES.some(s => s.id === "mobile") && SURFACES.some(s => s.id === "regie") && SURFACES.some(s => s.id === "plateau") && SURFACES.some(s => s.id === "camera"), "Designer/Mobile/Regie/Plateau/Camera all exist");
+assert(SURFACES.length === 6, "Designer and Show are exposed with the other surfaces");
+assert(SURFACES.some(s => s.id === "designer") && SURFACES.some(s => s.id === "show") && SURFACES.some(s => s.id === "mobile") && SURFACES.some(s => s.id === "regie") && SURFACES.some(s => s.id === "plateau") && SURFACES.some(s => s.id === "camera"), "Designer/Show/Mobile/Regie/Plateau/Camera all exist");
+assert(/show\/index.html/.test(surfaceUrl("show", { root: new URL("https://example.test/no-de/") })), "Show URL is shareable");
 const surfaceMem = new Map();
 const surfaceStorage = {
   getItem: key => surfaceMem.get(key) ?? null,
@@ -1234,24 +1236,62 @@ console.log("actions");
 }
 
 
+console.log("show");
+{
+  const session = loadExampleScene();
+  assert(session.sceneName.length > 0, "show loads a scene");
+  assert(listSafe(session), "show scene has a cue");
+  startShow(session);
+  assert(session.running && !session.paused, "show starts");
+  pauseShow(session);
+  assert(session.paused, "show pauses");
+  const frozen = session.time;
+  tickShow(session, 1);
+  assert(session.time === frozen, "pause holds the clock");
+  pauseShow(session);
+  tickShow(session, 0.5);
+  assert(session.time > frozen, "show advances while running");
+  const fired = fireCue(session, "1");
+  assert(fired.ok && fired.project.nodes[0].params.opacity === 0.35, "show fires a cue onto a node");
+  stopShow(session);
+  assert(!session.running && session.time === 0, "show stops");
+  const saved = saveShow(session);
+  const restored = restoreShow(saved);
+  assert(restored.project.nodes.length === session.project.nodes.length, "show restores a project");
+  const asked = askShow(restored, "Crée une caméra reliée à un shader");
+  assert(asked.ok && asked.cx === false && asked.note === CX_NOTE, "show chat uses the local graph path");
+  assert(restored.project.nodes.some(node => node.type === "camera"), "show chat adds a real camera node");
+  const linear = sampleCurve([{ time: 0, value: 0, ease: "linear" }, { time: 2, value: 1, ease: "linear" }], 1);
+  const easeIn = sampleCurve([{ time: 0, value: 0, ease: "linear" }, { time: 2, value: 1, ease: "ease-in" }], 1);
+  const easeOut = sampleCurve([{ time: 0, value: 0, ease: "linear" }, { time: 2, value: 1, ease: "ease-out" }], 1);
+  assert(linear === 0.5 && easeIn < linear && easeOut > linear, "curves interpolate linear, ease in and ease out");
+  setKeyframe(session.project, session.project.nodes[0].id, "opacity", 0, 1, "linear");
+  setKeyframe(session.project, session.project.nodes[0].id, "opacity", 2, 0.2, "ease-in");
+  applyCurves(session, 2);
+  assert(Math.abs(session.project.nodes[0].params.opacity - 0.2) < 1e-9, "curve is bound to a node parameter");
+  loadScene(session);
+  assert(session.sceneName, "scene can be loaded again");
+}
+function listSafe(session) { return session.project.cues?.length > 0; }
+
 console.log("backends");
 {
   const rows = technicalRows();
   const byId = Object.fromEntries(rows.map(row => [row.id, row]));
-  assert(rows.every(row => BACKEND_STATUSES.includes(row.status)), "every backend has one allowed status");
+  const fields = ["name", "version", "state", "platform", "capabilities", "detect", "install", "test", "launch", "talk"];
+  assert(rows.every(row => BACKEND_STATUSES.includes(row.state) && fields.every(field => field in row)), "every backend is an extensible record");
   for (const id of ["python", "node", "javascript", "typescript", "cpp", "swift", "webgl", "glsl"]) {
-    assert(byId[id].status === "DISPONIBLE" && byId[id].version && byId[id].proof, `${id} is proven available`);
+    assert(byId[id].state === "DISPONIBLE" && byId[id].version && byId[id].proof, `${id} is proven available`);
   }
-  assert(byId.metal.status === "DISPONIBLE AVEC LIMITATIONS", "metal ran but is limited");
-  assert(byId.touchdesigner.status === "INSTALLÉ / NON TESTÉ", "touchdesigner is installed and not execution-tested");
-  assert(byId.ndi.status === "INSTALLÉ / NON TESTÉ", "ndi is installed and not execution-tested");
-  for (const id of ["java", "processing", "rust", "faust", "unity", "unreal", "ffmpeg"]) {
-    assert(byId[id].status === "NON INSTALLÉ", `${id} is not installed`);
+  assert(byId.metal.state === "DISPONIBLE AVEC LIMITATIONS", "metal ran but is limited");
+  assert(byId.ndi.state === "DISPONIBLE AVEC LIMITATIONS" && byId.ndi.version.includes("6.3.0"), "ndi library initialized");
+  assert(byId.touchdesigner.state === "NON DISPONIBLE" && byId.touchdesigner.version === "2025.33230", "touchdesigner test did not complete");
+  for (const id of ["java", "processing", "rust", "faust", "unity", "unreal", "ffmpeg", "webgpu", "wgsl"]) {
+    assert(byId[id].state === "NON DISPONIBLE", `${id} stays unavailable`);
   }
-  assert(byId.webgpu.status === "ERREUR" && byId.wgsl.status === "ERREUR", "webgpu and wgsl failed their execution test");
   const artist = artistBackends();
-  assert(artist.every(row => row.status === "DISPONIBLE"), "artist list is only proven backends");
-  assert(!artist.some(row => ["faust", "unity", "unreal", "rust", "metal", "touchdesigner", "webgpu"].includes(row.id)), "unproven backends stay out of the artist list");
+  assert(artist.every(row => row.state === "DISPONIBLE"), "artist list is only proven backends");
+  assert(!artist.some(row => ["faust", "unity", "unreal", "rust", "metal", "touchdesigner", "webgpu", "ndi"].includes(row.id)), "unproven backends stay out of the artist list");
   const proposal = proposeArchitectures("Scène temps réel : vidéo shader GPU, audio et OSC");
   assert(proposal.options.length >= 2 && proposal.options.length <= 3, "complex prompt returns two or three real options");
   assert(proposal.options.every(option => artist.some(row => row.id === option.id)), "options come from proven backends");

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>No[co]de Vibe Designer</title>
+<link rel="stylesheet" href="./show.css">
+</head>
+<body>
+<aside>
+  <p class="brand">No<span class="co">[co]</span>de Vibe Designer</p>
+  <p class="nav"><a href="../desktop/index.html">Designer</a> · <b>Show</b></p>
+  <h1>Chat</h1>
+  <p id="cxNote"></p>
+  <textarea id="chat" rows="5" placeholder="Décris le patch à modifier"></textarea>
+  <button id="ask" type="button">Envoyer</button>
+  <p id="log"></p>
+</aside>
+<main>
+  <header>
+    <b id="sceneName">Scène</b>
+    <span id="runState">Arrêt</span>
+    <span id="clock">0.00 s</span>
+    <span id="bound"></span>
+  </header>
+  <div class="transport">
+    <label>Ouvrir <input id="openFile" type="file" accept=".json,application/json"></label>
+    <button id="loadScene" type="button">Charger la scène</button>
+    <button id="start" type="button">Lecture</button>
+    <button id="pause" type="button">Pause</button>
+    <button id="stop" type="button">Stop</button>
+    <button id="go" type="button">Cue</button>
+    <button id="save" type="button">Enregistrer</button>
+    <button id="restore" type="button">Restaurer</button>
+  </div>
+  <pre id="timeline"></pre>
+  <form class="curve">
+    <span>Courbe · opacité</span>
+    <label>temps <input id="keyTime" type="number" step="0.1" value="1"></label>
+    <label>valeur <input id="keyValue" type="number" step="0.05" min="0" max="1" value="0.5"></label>
+    <label>interpolation <select id="keyEase"><option>linear</option><option>ease-in</option><option>ease-out</option></select></label>
+    <button id="addKey" type="button">Point</button>
+  </form>
+</main>
+<script type="module" src="./show.js"></script>
+</body>
+</html>

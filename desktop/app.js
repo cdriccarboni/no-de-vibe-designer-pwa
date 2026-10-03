@@ -2361,13 +2361,13 @@ $("#outputBtn").onclick = openOutput;
 
 function setWorkspaceMode(mode) {
   document.body.dataset.workspace = mode;
-  $("#modeBureau").classList.toggle("active", mode === "bureau");
-  $("#modePlateau").classList.toggle("active", mode === "plateau");
+  $("#modeBureau")?.classList.toggle("active", mode === "bureau");
+  $("#modePlateau")?.classList.toggle("active", mode === "plateau");
   localStorage.setItem("cvd.workspace", mode);
   log(`Mode ${mode === "bureau" ? "Bureau" : "Plateau"}`);
 }
-$("#modeBureau").onclick = () => setWorkspaceMode("bureau");
-$("#modePlateau").onclick = () => setWorkspaceMode("plateau");
+if ($("#modeBureau")) $("#modeBureau").onclick = () => setWorkspaceMode("bureau");
+if ($("#modePlateau")) $("#modePlateau").onclick = () => setWorkspaceMode("plateau");
 
 function applyAppearance(a) {
   const r = document.documentElement;

@@ -100,6 +100,7 @@ write("mobile/mobile.js", mobileJs);
 
 copyDir(path.join(root, "studio"), path.join(dist, "studio"));
 copyDir(path.join(root, "companion"), path.join(dist, "companion"));
+copyDir(path.join(root, "show"), path.join(dist, "show"));
 
 const assets = walk(dist)
   .filter((rel) => rel !== "sw.js")
@@ -125,7 +126,7 @@ const stamp = {
   builtAt: new Date().toISOString(),
   files: assets.length,
   cacheRevision,
-  surfaces: ["designer", "mobile", "regie", "plateau", "camera"]
+  surfaces: ["designer", "show", "mobile", "regie", "plateau", "camera"]
 };
 write("build-info.json", JSON.stringify(stamp, null, 2) + "\n");
 
