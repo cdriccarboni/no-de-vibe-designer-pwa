@@ -1,11 +1,12 @@
 {
   "name": "No[co]de Vibe Designer",
   "version": "3.2.0",
-  "builtAt": "2026-10-03T19:47:34.719Z",
-  "files": 123,
-  "cacheRevision": "e3ac7413f6",
+  "builtAt": "2026-10-03T20:01:39.864Z",
+  "files": 127,
+  "cacheRevision": "3d31a17848",
   "surfaces": [
     "designer",
+    "show",
     "mobile",
     "regie",
     "plateau",

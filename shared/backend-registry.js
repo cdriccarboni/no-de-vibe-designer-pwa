@@ -5,8 +5,7 @@
 import { BACKEND_STATUS as snapshot } from "./backend-status.js";
 
 export const BACKEND_STATUSES = Object.freeze([
-  "NON INSTALLÉ",
-  "INSTALLÉ / NON TESTÉ",
+  "NON DISPONIBLE",
   "DISPONIBLE",
   "DISPONIBLE AVEC LIMITATIONS",
   "INCOMPATIBLE",
@@ -28,7 +27,7 @@ export async function refreshBackendStatus() {
 }
 
 export function artistBackends(doc = current) {
-  return (doc?.rows || []).filter(row => row.status === "DISPONIBLE");
+  return (doc?.rows || []).filter(row => (row.state || row.status) === "DISPONIBLE");
 }
 
 export function technicalRows(doc = current) {
@@ -45,10 +44,11 @@ export function renderBackendReport(mode = "artist", doc = current) {
     return `<p>Moteurs prêts : ${esc(names.join(", "))}.</p>`;
   }
   const lines = (doc?.rows || []).map(row => {
-    const link = row.status === "NON INSTALLÉ" && row.installUrl
+    const state = row.state || row.status;
+    const link = state === "NON DISPONIBLE" && row.installUrl
       ? ` <a href="${esc(row.installUrl)}" target="_blank" rel="noopener noreferrer">Installer maintenant</a>`
       : "";
-    return `<li><b>${esc(row.label)}</b> · ${esc(row.status)}${row.version ? " · " + esc(row.version) : ""}${row.proof ? " · " + esc(row.proof) : ""}${link}</li>`;
+    return `<li><b>${esc(row.name || row.label)}</b> · ${esc(state)}${row.version ? " · " + esc(row.version) : ""}${link}</li>`;
   });
   return `<p>Relevé ${esc(doc?.probedAt || "")} · ${esc(doc?.os || "")} · <a href="../shared/backend-status.json" data-refresh-backends>Relire le relevé</a></p><ul>${lines.join("")}</ul>`;
 }

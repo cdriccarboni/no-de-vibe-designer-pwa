@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.2.0-multi-e3ac7413f6";
+const CACHE = "nvd-3.2.0-multi-3d31a17848";
 const ASSETS = [
   "./companion/companion.css",
   "./companion/companion.js",
@@ -116,6 +116,7 @@ const ASSETS = [
   "./shared/session-recovery.js",
   "./shared/session-store.js",
   "./shared/show-importer.js",
+  "./shared/show-session.js",
   "./shared/stage/cues.js",
   "./shared/subpatch.js",
   "./shared/supernodes-v3.js",
@@ -125,6 +126,9 @@ const ASSETS = [
   "./shared/vibe-planner.js",
   "./shared/vibe-safety.js",
   "./shared/vibe.js",
+  "./show/index.html",
+  "./show/show.css",
+  "./show/show.js",
   "./studio/index.html",
   "./studio/studio.css",
   "./studio/studio.js"
