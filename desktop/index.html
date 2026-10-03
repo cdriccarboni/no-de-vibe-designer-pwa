@@ -41,7 +41,7 @@
 <div id="app">
   <header class="topbar">
     <div class="brand"><div class="brandmark" title="No-de Vibe Designer">◒</div><div><b>No-de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v3.1.0</span>
+    <span class="badge">v3.2.0</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
     <div class="themes workspace-modes"><button id="modeBureau" class="active">Bureau</button><button id="modePlateau">Plateau</button></div>
@@ -64,54 +64,60 @@
     <main class="center">
       <div class="upper">
         <section class="panel patch resizable-both" id="patchPanel">
-          <div class="panel-head">Patch Canvas <span class="sub">source de vérité · molette = zoom · clic milieu = pan</span>
+          <div class="panel-head">Patch Canvas <span class="sub" title="Molette : zoom · Clic milieu ou Alt + glisser : déplacer le canevas · Clic : sélectionner">Patch actuel</span>
             <div class="tools">
               <button type="button" id="zoomOut" class="iconbtn" title="Zoom −">−</button>
-              <button type="button" id="zoomReset" class="iconbtn" title="Reset zoom">1:1</button>
+              <button type="button" id="zoomReset" class="iconbtn canvas-zoom" title="Centrer la vue">100 %</button>
               <button type="button" id="zoomIn" class="iconbtn" title="Zoom +">+</button>
-              <button type="button" id="wrapBtn" class="iconbtn" title="Mettre la sélection dans une boîte">Boîte</button>
-              <button type="button" class="iconbtn collapse">−</button>
+              <button type="button" id="wrapBtn" class="iconbtn" title="Regrouper la sélection dans un bloc">Bloc</button>
+              <button type="button" class="iconbtn collapse" title="Réduire">−</button>
             </div>
           </div>
           <div id="graphPath" class="graph-path"></div>
           <div id="patchSpace" class="panel-body patch-space"></div>
         </section>
 
-        <section class="panel preview resizable-both">
-          <div class="panel-head">Preview <span class="sub"><span class="live">● RENDER</span> · clic = point</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
+        <section class="panel preview floatable" id="previewPanel" data-float-id="preview" data-dock-axis="float" data-min-w="300">
+          <div class="panel-head">Preview <span class="sub"><span class="live">● Aperçu</span> · clic : placer un point</span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
           <div class="panel-body preview-body">
             <canvas id="previewCanvas" width="1280" height="720"></canvas>
             <div id="previewOverlay" class="preview-overlay"></div>
-            <div class="preview-foot"><span id="previewInfo">1280×720 · 60 fps</span><span class="spacer"></span><button id="magicFxBtn" class="smallbtn">✦ Magic FX</button><button id="clearPoints" class="smallbtn">Effacer points</button></div>
+            <div class="preview-foot"><span id="previewInfo">1280×720 · 60 fps</span><span class="spacer"></span><button id="magicFxBtn" class="smallbtn">✦ Magic FX</button><button id="clearPoints" class="smallbtn">Effacer les points</button></div>
           </div>
+          <div class="float-resize" title="Redimensionner"></div>
         </section>
       </div>
 
-      <section class="panel vibe resizable-y">
-        <div class="panel-head">Vibe <span class="sub">Entrée = envoyer · Shift+Entrée = nouvelle ligne</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
+      <section class="panel vibe floatable" id="vibePanel" data-float-id="vibe" data-min-w="320">
+        <div class="panel-head">Vibe <span class="sub">Entrée : envoyer · Maj+Entrée : nouvelle ligne</span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
         <div class="panel-body vibe-body">
           <div class="vibe-reference">
             <label for="vibeImageFile" class="smallbtn vibe-image-pick">＋ Image</label>
             <input id="vibeImageFile" type="file" accept="image/*" hidden>
-            <img id="vibeImageThumb" class="vibe-image-thumb hidden" alt="Référence Image Vibe">
-            <select id="vibeImageTarget" aria-label="Cible Image Vibe">
+            <img id="vibeImageThumb" class="vibe-image-thumb" alt="" hidden>
+            <select id="vibeImageTarget" aria-label="Cible de l’image">
               <option value="auto">Auto</option>
-              <option value="p5">p5 / Canvas</option>
-              <option value="glsl">GLSL</option>
+              <option value="p5">Dessin</option>
+              <option value="glsl">Lumière</option>
               <option value="particles">Particules</option>
-              <option value="sdf">SDF / Metaballs</option>
+              <option value="sdf">Formes</option>
             </select>
-            <button id="vibeImageClear" type="button" class="smallbtn hidden">Retirer</button>
-            <span id="vibeImageInfo" class="sub">Image optionnelle · analyse locale</span>
+            <button id="vibeImageClear" type="button" class="smallbtn" hidden>Retirer</button>
+            <span id="vibeImageInfo" class="sub">Image optionnelle</span>
           </div>
-          <textarea id="vibeText" placeholder="Ex. : Fais réagir le rideau de fils à la souris">Fais réagir le rideau de fils à la souris et ajoute des ondes lumineuses.</textarea>
-          <button id="applyVibe" class="generate">Envoyer ↵</button>
-          <div id="vibePreview" class="vibe-preview hidden"></div>
+          <div class="vibe-scroll">
+            <textarea id="vibeText" placeholder="Ex. : Fais réagir le rideau de fils à la souris">Fais réagir le rideau de fils à la souris et ajoute des ondes lumineuses.</textarea>
+            <div id="vibePreview" class="vibe-preview hidden"></div>
+          </div>
+          <div class="vibe-actions">
+            <button id="applyVibe" class="generate" type="button">Envoyer</button>
+          </div>
         </div>
+        <div class="float-resize" title="Redimensionner"></div>
       </section>
 
-      <section class="panel timeline resizable-y" id="timelinePanel">
-        <div class="panel-head">Timeline <span class="sub">déplacer · retimer · réduire</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
+      <section class="panel timeline floatable" id="timelinePanel" data-float-id="timeline" data-min-w="420">
+        <div class="panel-head">Timeline <span class="sub">glisser les clips · ajuster la durée</span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
         <div class="panel-body timeline-shell">
           <div class="timeline-toolbar">
             <button id="play" class="smallbtn">▶</button>
@@ -131,7 +137,7 @@
                 <div id="playhead" class="playhead"></div>
                 <div class="track-labels">
                   <div class="track-label">Vidéo</div><div class="track-label">Effets</div><div class="track-label">Shader</div>
-                  <div class="track-label">Ombre</div><div class="track-label">Cues</div><div class="track-label">Bridges</div>
+                  <div class="track-label">Ombre</div><div class="track-label">Cues</div><div class="track-label">Liaisons</div>
                 </div>
                 <div id="tracks" class="tracks">
                   <div class="track" data-track="0"></div><div class="track" data-track="1"></div><div class="track" data-track="2"></div>
@@ -150,11 +156,12 @@
             </div>
           </div>
         </div>
+        <div class="float-resize" title="Redimensionner"></div>
       </section>
     </main>
 
     <aside class="panel inspector resizable-x">
-      <div class="panel-head">Inspector <span id="inspectorType" class="sub">Aucun</span><div class="tools"><button class="iconbtn collapse">−</button></div></div>
+      <div class="panel-head">Inspecteur <span id="inspectorType" class="sub">Aucun</span><div class="tools"><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
       <div id="inspectorBody" class="panel-body inspector-body">
         <p>Sélectionne un node.</p>
       </div>
@@ -196,7 +203,7 @@
         <div class="preferences-actions"><button id="appearanceReset" class="smallbtn" type="button">Thème No-de Vibe Designer</button></div>
       </div>
       <div data-pref-panel="canvas" class="hidden">
-        <p class="hint">Zoom molette · pan clic milieu ou Alt+glisser · Undo ⌘Z / Ctrl+Z · Redo ⌘⇧Z · Dupliquer ⌘D · Supprimer ⌫</p>
+        <p class="hint">Zoom : molette. Déplacer le canevas : clic milieu ou Alt + glisser. Sélectionner : clic. Centrer : bouton 100 %.</p>
         <label>Zoom par défaut <input id="prefDefaultZoom" type="range" min="50" max="150" value="100"></label>
       </div>
       <div data-pref-panel="ai" class="hidden">

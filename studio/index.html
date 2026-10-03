@@ -13,7 +13,7 @@
   <header class="cs-head">
     <div>
       <p class="brand">No-de Companion Studio</p>
-      <p id="netStatus" class="net">DISCONNECTED</p>
+      <p class="net"><span id="netDot" class="net-dot" aria-hidden="true"></span><span id="netStatus">Non connecté</span><span id="sessionName" class="session-name"></span></p>
     </div>
     <div class="modes" role="tablist">
       <button type="button" data-mode="EDITION" class="active">Édition</button>
@@ -22,15 +22,21 @@
     </div>
   </header>
 
-  <section class="cs-connect">
-    <label>Pont WS <input id="wsUrl" type="url" placeholder="ws://192.168.x.x:4174" autocomplete="off" /></label>
-    <label>Code pair <input id="pairCode" type="text" maxlength="8" placeholder="optionnel" autocomplete="off" /></label>
-    <div class="row">
-      <button type="button" id="btnConnect">Connecter</button>
-      <button type="button" id="btnDisconnect" class="ghost">Déconnecter</button>
-      <button type="button" id="btnSave" class="ghost">Sauver layout</button>
-      <button type="button" id="btnRegie" class="ghost">Régie universelle</button>
-      <button type="button" id="btnRequestMonitor" class="ghost">Monitor</button>
+  <section class="cs-connect" id="connectPanel">
+    <button type="button" class="cs-connect-toggle" id="connectToggle" aria-expanded="false" aria-controls="connectDetails">
+      <span>Connexion / Pont WS</span>
+      <span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <div id="connectDetails" class="cs-connect-details" hidden>
+      <label>Adresse du pont <input id="wsUrl" type="url" placeholder="ws://192.168.x.x:4174" autocomplete="off" /></label>
+      <label>Code de paire <input id="pairCode" type="text" maxlength="8" placeholder="optionnel" autocomplete="off" /></label>
+      <div class="row">
+        <button type="button" id="btnConnect">Connecter</button>
+        <button type="button" id="btnDisconnect" class="ghost">Déconnecter</button>
+        <button type="button" id="btnSave" class="ghost">Enregistrer</button>
+        <button type="button" id="btnRegie" class="ghost">Régie universelle</button>
+        <button type="button" id="btnRequestMonitor" class="ghost">Retour vidéo</button>
+      </div>
     </div>
   </section>
 
@@ -39,17 +45,17 @@
     <img id="monitorFrame" alt="Retour vidéo No-de" />
   </section>
 
-  <section class="photo-controller">
-    <div>
-      <p class="brand">Photo → Controller</p>
-      <p class="hint">Prends une photo/capture d’une interface : No-de prépare localement un layout éditable. Aucune image n’est envoyée au cloud.</p>
+  <section class="photo-controller" id="photoController">
+    <div class="photo-copy">
+      <p class="brand">Photo → Contrôleur</p>
+      <p class="hint">Prendre une photo ou une capture d’interface. No-de prépare un contrôleur éditable sur cette machine.</p>
     </div>
     <div class="row">
-      <label class="photo-pick">Photo / caméra<input id="photoControllerInput" type="file" accept="image/*" capture="environment" /></label>
-      <button type="button" id="photoControllerGenerate">Générer le contrôleur</button>
-      <button type="button" id="photoControllerClear" class="ghost">Retirer le gabarit</button>
+      <label class="photo-pick">Prendre une photo<input id="photoControllerInput" type="file" accept="image/*" capture="environment" /></label>
+      <button type="button" id="photoControllerGenerate">Créer le contrôleur</button>
+      <button type="button" id="photoControllerClear" class="ghost">Retirer l’image</button>
     </div>
-    <label class="photo-opacity">Opacité du gabarit <input id="photoControllerOpacity" type="range" min="0" max="0.85" step="0.05" value="0.35" /></label>
+    <label class="photo-opacity">Opacité de l’image <input id="photoControllerOpacity" type="range" min="0" max="0.85" step="0.05" value="0.35" /></label>
     <p id="photoControllerStatus" class="hint">Aucune photo chargée.</p>
   </section>
 

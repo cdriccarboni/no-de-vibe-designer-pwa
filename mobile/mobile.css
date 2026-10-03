@@ -132,4 +132,6 @@ body[data-mobile-mode="plateau"] #goBtn{box-shadow:0 0 0 1px var(--accent)}
 .vibe-image-pick,.vibe-image-row button,.vibe-image-row select{min-height:42px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;color:var(--text);padding:0 10px;font-size:12px}
 .vibe-image-pick{display:inline-flex;align-items:center;font-weight:650;white-space:nowrap}
 .vibe-image-row select{flex:1;min-width:0}
-.vibe-image-thumb{width:54px;height:42px;object-fit:cover;border:1px solid var(--line);border-radius:8px;background:#000;flex:none}
+.vibe-image-thumb{display:none;width:54px;height:42px;object-fit:cover;border:1px solid var(--line);border-radius:8px;background:#000;flex:none}
+.vibe-image-thumb.is-ready{display:block}
+#vibeImageClear.hidden{display:none}

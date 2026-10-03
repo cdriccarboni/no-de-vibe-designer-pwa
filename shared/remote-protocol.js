@@ -7,7 +7,8 @@
 
 import { addNode, addTimelineClip, newProject, validateProject } from "./ir.js";
 import { validateEdge } from "./graph-engine.js";
-import { ensureSubGraph } from "./subpatch.js";\nimport { validateQuad, mappingParams } from "./graphics/mapping-v3.js";
+import { ensureSubGraph } from "./subpatch.js";
+import { validateQuad, mappingParams } from "./graphics/mapping-v3.js";
 
 export const REMOTE_PORT = 4174;
 

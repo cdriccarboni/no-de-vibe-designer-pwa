@@ -844,19 +844,43 @@ function connectRemoteUi() {
   });
 }
 
+function hideVibeThumb() {
+  const thumb = $("#vibeImageThumb");
+  if (!thumb) return;
+  thumb.onload = null;
+  thumb.onerror = null;
+  thumb.classList.remove("is-ready");
+  thumb.alt = "";
+  thumb.removeAttribute("src");
+}
+
+function showVibeThumb(url) {
+  const thumb = $("#vibeImageThumb");
+  if (!thumb || !url) return hideVibeThumb();
+  thumb.classList.remove("is-ready");
+  thumb.alt = "";
+  thumb.onload = () => {
+    if (!thumb.getAttribute("src")) return;
+    thumb.classList.add("is-ready");
+    thumb.alt = "Aperçu de la référence";
+  };
+  thumb.onerror = () => hideVibeThumb();
+  thumb.src = url;
+}
+
 async function setImageVibeFile(file) {
   if (!file) return;
   try {
     if (imageVibeState.previewUrl) URL.revokeObjectURL(imageVibeState.previewUrl);
     const loaded = await analyzeImageFile(file);
     imageVibeState = loaded;
-    const thumb = $("#vibeImageThumb");
-    thumb.src = loaded.previewUrl;
-    thumb.classList.remove("hidden");
+    showVibeThumb(loaded.previewUrl);
     $("#vibeImageClear")?.classList.remove("hidden");
     $("#vibeImageInfo").textContent = imageVibeSummary(loaded.analysis);
     pushAlert("ok", "Image Vibe · analyse locale prête");
   } catch (e) {
+    hideVibeThumb();
+    $("#vibeImageClear")?.classList.add("hidden");
     pushAlert("error", `Image Vibe · ${e?.message || e}`);
   }
 }
@@ -864,8 +888,7 @@ async function setImageVibeFile(file) {
 function clearImageVibe() {
   if (imageVibeState.previewUrl) URL.revokeObjectURL(imageVibeState.previewUrl);
   imageVibeState = { analysis:null, previewUrl:"" };
-  const thumb = $("#vibeImageThumb");
-  if (thumb) { thumb.removeAttribute("src"); thumb.classList.add("hidden"); }
+  hideVibeThumb();
   $("#vibeImageClear")?.classList.add("hidden");
   if ($("#vibeImageInfo")) $("#vibeImageInfo").textContent = "Image optionnelle · analyse locale";
 }

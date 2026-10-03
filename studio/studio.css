@@ -22,12 +22,15 @@ html, body {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: flex-start;
-  padding: calc(12px + var(--safe-top)) 14px 10px;
+  align-items: center;
+  padding: calc(8px + var(--safe-top)) 14px 8px;
   border-bottom: 1px solid var(--line);
 }
 .brand { margin: 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.net { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.net { margin: 2px 0 0; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; min-width: 0; }
+.net-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); flex: none; }
+.net-dot.on { background: var(--ok); box-shadow: 0 0 0 3px rgba(143,167,157,.18); }
+.session-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .modes { display: flex; gap: 6px; flex-wrap: wrap; }
 .modes button, .cs-connect button, .cs-editor button {
   border: 1px solid var(--line);
@@ -41,10 +44,32 @@ html, body {
 .modes button.active { border-color: var(--accent); color: var(--accent); }
 .cs-connect {
   display: grid;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 0;
+  padding: 0;
   border-bottom: 1px solid var(--line);
 }
+button.cs-connect-toggle {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 650;
+  text-align: left;
+}
+.cs-connect-toggle .chev { color: var(--muted); }
+.cs-connect-details {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+.cs-connect-details[hidden] { display: none; }
 .cs-connect label, .cs-editor label {
   display: grid;
   gap: 4px;
@@ -120,7 +145,9 @@ main {
   color: var(--ok);
 }
 body.mode-PLATEAU .cs-editor,
-body.mode-PLATEAU .cs-connect { display: none; }
+body.mode-PLATEAU .cs-connect,
+body.mode-PLATEAU .photo-controller { display: none; }
+body.mode-PLATEAU main { grid-template-columns: 1fr; }
 body.mode-PLATEAU .cs-head .modes button[data-mode="EDITION"],
 body.mode-PLATEAU .cs-head .modes button[data-mode="TEST"] { opacity: .55; }
 
@@ -265,14 +292,19 @@ body.mode-PLATEAU .cs-head>div:first-child{display:none}
 
 /* Photo -> Controller */
 .photo-controller{
-  margin:12px 14px 0;
-  padding:12px;
+  width:min(680px,calc(100% - 28px));
+  margin:18px auto 0;
+  padding:16px 18px;
   border:1px solid var(--line);
   border-radius:16px;
   background:rgba(20,24,29,.78);
   display:grid;
-  gap:9px;
+  gap:12px;
+  justify-items:stretch;
+  text-align:center;
 }
+.photo-controller .photo-copy{display:grid;gap:4px;justify-items:center}
+.photo-controller .row{justify-content:center}
 .photo-controller .photo-pick{
   display:grid;gap:4px;font-size:12px;color:var(--muted);
   min-width:min(100%,220px);
@@ -311,7 +343,7 @@ body.mode-PLATEAU .cs-head>div:first-child{display:none}
 }
 
 @media(max-width:720px){
-  .photo-controller{margin-left:8px;margin-right:8px;padding:10px;border-radius:12px}
+  .photo-controller{width:min(680px,calc(100% - 16px));margin:12px auto 0;padding:10px;border-radius:12px}
   .photo-controller .row{display:grid;grid-template-columns:1fr 1fr}
   .photo-controller .photo-pick{grid-column:1/-1}
   .cs-editor .row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}

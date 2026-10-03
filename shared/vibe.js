@@ -144,7 +144,7 @@ async function callLocalAi(text, project, cfg) {
   };
 
   try {
-    if (local.parallel && models.length > 1) {
+    if (local.parallel && targets.length > 1) {
       const settled = await Promise.allSettled(targets.slice(0, 2).map(ask));
       const successes = settled.filter(x => x.status === "fulfilled").map(x => x.value);
       if (!successes.length) {
