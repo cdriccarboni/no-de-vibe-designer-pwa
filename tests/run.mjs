@@ -1461,3 +1461,38 @@ afm.analyzeMultimodal(null, 'Analyse cette image').then(res => {
 });
 
 console.log(' OK   Depth Universal, Apple Vision & Foundation Models tests passed');
+
+
+// ============================================================================
+// TESTS NO[CO]DE v3.3.1 (RenderRecorder, ChromaKey, Morphology, MultiSurface, AudioChain, PerfMonitor)
+// ============================================================================
+import { RenderRecorder } from "../src/core/RenderRecorder.js";
+import { ChromaKeyProcessor, MaskMorphology } from "../src/core/ChromaKeyProcessor.js";
+import { FeedbackEngine, MultiSurfaceManager } from "../src/core/FeedbackEngine.js";
+import { AudioAnalyzerChain, PerformanceMonitor } from "../src/core/PerformanceMonitor.js";
+
+const recorder = new RenderRecorder();
+assert(recorder.status === "READY", "RenderRecorder initializes in READY state");
+assert(recorder.startRecord({}) === true, "RenderRecorder enters RECORDING state");
+
+const chromaRes = ChromaKeyProcessor.process({}, "GREEN", { tolerance: 0.3 });
+assert(chromaRes && chromaRes.targetColor === "GREEN", "ChromaKeyProcessor computes mask parameters");
+
+const morphRes = MaskMorphology.process({}, "erode", 2);
+assert(morphRes && morphRes.operation === "erode", "MaskMorphology applies erosion correctly");
+
+const fb = new FeedbackEngine();
+assert(fb.process({}).type === "feedback_frame", "FeedbackEngine produces feedback frame");
+
+const msm = new MultiSurfaceManager();
+const surf = msm.addSurface("s1", "Écran Central");
+assert(surf && surf.name === "Écran Central", "MultiSurfaceManager registers custom projection surface");
+
+const audioChain = new AudioAnalyzerChain();
+const audioRes = audioChain.analyze(null);
+assert(audioRes.bands.bass > 0, "AudioAnalyzerChain extracts bass/mid/high bands");
+
+const perf = new PerformanceMonitor();
+assert(perf.getMetrics().fps === 60, "PerformanceMonitor collects live metrics");
+
+console.log(" OK   All v3.3.1 artistic and technical feature tests passed");
