@@ -14,25 +14,28 @@ function headers() {
   return {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "POST, OPTIONS",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
     "access-control-allow-headers": "content-type"
   };
 }
 
-function ask(text) {
+function runPython(args) {
   return new Promise(resolve => {
-    const child = spawn("python3", [script, "--remember", text], { env: process.env });
+    const child = spawn("python3", [script, ...args], { env: process.env });
     let out = "";
     let err = "";
     child.stdout.on("data", chunk => { out += chunk; });
     child.stderr.on("data", chunk => { err += chunk; });
     child.on("close", code => {
-      try {
-        resolve(JSON.parse(out));
-      } catch {
-        resolve({ ok: false, error: err.trim() || `pont CX arrêté (${code})` });
-      }
+      try { resolve(JSON.parse(out)); }
+      catch { resolve({ ok: false, error: err.trim() || `pont CX arrêté (${code})` }); }
     });
+  });
+}
+
+function ask(text) {
+  return new Promise(resolve => {
+    runPython(["--remember", text]).then(resolve);
   });
 }
 
@@ -41,6 +44,13 @@ export function startCxShowBridge({ port = Number(process.env.CX_SHOW_PORT || 48
     if (req.method === "OPTIONS") {
       res.writeHead(204, headers());
       res.end();
+      return;
+    }
+    if (req.method === "GET" && req.url === "/health") {
+      runPython(["--health"]).then(payload => {
+        res.writeHead(payload.ok ? 200 : 503, headers());
+        res.end(JSON.stringify(payload));
+      });
       return;
     }
     if (req.method !== "POST" || req.url !== "/chat") {

@@ -43,7 +43,7 @@ const INTENTS = [
   ["storm", ["storm","orage","tempete","tempête"]],
   ["bending", ["bending","deformation","déformation","distorsion"]],
   ["transmute", ["transmute","transmutation","mutation couleur"]],
-  ["shader", ["shader","glsl"]],
+  ["shader", ["shader","glsl","ondul"]],
   ["mapping", ["mapping","projection mapping"]],
   ["videoreturn", ["retour video","retour vidéo","monitor video","monitor vidéo"]],
   ["midi", ["midi"]],

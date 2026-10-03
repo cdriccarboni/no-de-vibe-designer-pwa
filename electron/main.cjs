@@ -186,12 +186,38 @@ function startLocalServer(root) {
 }
 
 
+function cxHealth() {
+  return new Promise(resolve => {
+    const req = http.get("http://127.0.0.1:4877/health", res => {
+      let body = "";
+      res.on("data", chunk => { body += chunk; });
+      res.on("end", () => {
+        try {
+          const json = JSON.parse(body);
+          resolve(json?.ok && json.commit ? json : null);
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+    req.setTimeout(4000, () => { req.destroy(); resolve(null); });
+    req.on("error", () => resolve(null));
+  });
+}
+
 async function startCxShowBridge() {
   if (cxShowBridge?.server) return;
   try {
-    const mod = await import(pathToFileURL(path.join(__dirname, "..", "bridge", "cx-show-server.mjs")).href);
-    cxShowBridge = await mod.startCxShowBridge();
-    console.log("CX_BRIDGE", cxShowBridge.url, cxShowBridge.already ? "already" : "started");
+    let health = await cxHealth();
+    if (!health) {
+      const mod = await import(pathToFileURL(path.join(__dirname, "..", "bridge", "cx-show-server.mjs")).href);
+      cxShowBridge = await mod.startCxShowBridge();
+      health = await cxHealth();
+    } else {
+      cxShowBridge = { url: "http://127.0.0.1:4877/chat", already: true, server: null };
+    }
+    if (health?.commit) console.log("CX_BRIDGE", health.commit, health.chain || "");
+    else console.error("CX_BRIDGE_UNHEALTHY");
   } catch (err) {
     console.error("CX_BRIDGE_FAILED", err?.message || err);
   }

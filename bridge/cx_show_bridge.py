@@ -43,8 +43,26 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("prompt", nargs="*")
     parser.add_argument("--remember", action="store_true")
+    parser.add_argument("--health", action="store_true")
     parser.add_argument("--src", default=os.environ.get("CX_HUB_SRC"))
     args = parser.parse_args()
+    if args.health:
+        src = resolve_src(args.src)
+        if not os.path.isdir(src):
+            print(json.dumps({"ok": False, "error": "source CX introuvable", "source": src}, ensure_ascii=False))
+            return 1
+        sys.path.insert(0, src)
+        from cx_orchestra import build_orchestra_plan
+        plan = build_orchestra_plan("health", available_engines=[], health={"cpu_count": os.cpu_count() or 1}, cloud_enabled=False)
+        print(json.dumps({
+            "ok": True,
+            "engine": "cx-hub",
+            "source": src,
+            "commit": source_commit(src),
+            "chain": plan.compact_chain(),
+            "roles": [item.role.value for item in plan.assignments],
+        }, ensure_ascii=False))
+        return 0
     prompt = " ".join(args.prompt).strip() or sys.stdin.read().strip()
     if not prompt:
         print(json.dumps({"ok": False, "error": "prompt vide"}, ensure_ascii=False))

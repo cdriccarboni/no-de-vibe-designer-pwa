@@ -33,7 +33,10 @@ import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { WebSocketBridge } from "../shared/adapters/websocket-bridge.js";
 import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "../shared/pwa-update.js";
 import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl, navigateSurface } from "../shared/surface-switcher.js";
-import { loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow, fireCue, saveShow, restoreShow, askShow, sampleCurve, setKeyframe, applyCurves, showMonitor, CX_NOTE } from "../shared/show-session.js";
+import { createShowSession, loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow, fireCue, saveShow, restoreShow, askShow, sampleCurve, setKeyframe, applyCurves, showMonitor, CX_NOTE } from "../shared/show-session.js";
+import { backendStatus } from "../shared/backend-registry.js";
+import { activeAgents, nativeBridgeLabel, runShaderAgent, WAVE_PARAMS } from "../shared/shader-agent.js";
+import { probeFortyTwo, compileWaveWithChrome } from "../bridge/agent-runners.mjs";
 import { createMemoryProjectStore } from "../shared/project-store.js";
 import { applyRemoteMessage, initialRemoteState } from "../shared/remote-protocol.js";
 import { startRemoteServer } from "../bridge/remote-server.mjs";
@@ -1297,7 +1300,45 @@ function listSafe(session) { return session.project.cues?.length > 0; }
   assert(started.url === "http://127.0.0.1:4877/chat", "cx bridge entry is the local chat port");
   if (started.server) await new Promise(resolve => started.server.close(resolve));
   const electronMain = fs.readFileSync(new URL("../electron/main.cjs", import.meta.url), "utf8");
-  assert(electronMain.includes("await startCxShowBridge()"), "electron starts the cx bridge with the app");
+  assert(electronMain.includes("await startCxShowBridge()") && electronMain.includes("await cxHealth()"), "electron starts the cx bridge and health-checks CX");
+}
+
+console.log("agents");
+{
+  const phrase = "Ajoute une caméra et fais onduler son image";
+  const probes = probeFortyTwo();
+  const gates = activeAgents(backendStatus(), probes);
+  assert(probes.python === 42 && probes.javascript === 42, "python and javascript still return 42");
+  assert(gates.active.includes("python") && gates.active.includes("javascript") && gates.active.includes("shader"), "proven agents stay active");
+  assert(["faust", "rust", "touchdesigner"].every(id => gates.inactive.includes(id) && !gates.active.includes(id)), "faust rust and touchdesigner stay inactive");
+  assert(nativeBridgeLabel(null).includes("indisponibles"), "public page marks the bridge unavailable");
+  const refused = createShowSession();
+  askShow(refused, phrase);
+  const missed = await runShaderAgent(refused, phrase, async () => ({ compile: false, observed: false, error: "syntax" }), { eligible: true });
+  assert(missed.ran === false && missed.steps.some(step => step.stage === "diagnose") && missed.steps.some(step => step.stage === "correct"), "a failed compile is not a success");
+  const repaired = createShowSession();
+  askShow(repaired, phrase);
+  let attempts = 0;
+  const fixed = await runShaderAgent(repaired, phrase, async () => {
+    attempts += 1;
+    return attempts === 1
+      ? { compile: false, observed: false, error: "syntax" }
+      : { compile: true, observed: true, pixel: [8, 9, 10, 255], preview: "memory" };
+  }, { eligible: true });
+  assert(fixed.ran === true && fixed.camera === "Caméra" && fixed.shader === "Ondulation", "one correction can produce a real frame");
+  const shaderNode = repaired.project.nodes.find(node => node.type === "shader");
+  assert(shaderNode.params.amplitude === WAVE_PARAMS.amplitude && shaderNode.params.frequency === WAVE_PARAMS.frequency && shaderNode.params.speed === WAVE_PARAMS.speed && shaderNode.params.phase === WAVE_PARAMS.phase, "wave parameters are on the shader node");
+  const live = createShowSession();
+  const asked = askShow(live, phrase);
+  assert(asked.ok && live.project.nodes.some(node => node.type === "camera") && live.project.nodes.some(node => node.type === "shader"), "the sentence creates a camera and a shader");
+  const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  if (fs.existsSync(chrome)) {
+    const preview = path.resolve("show/shader-preview.png");
+    const ran = await runShaderAgent(live, phrase, source => compileWaveWithChrome(source, preview), { eligible: gates.active.includes("shader") });
+    assert(ran.ran === true && ran.compile === true && ran.pixel.length === 4, "shader compile and frame were observed: " + (ran.error || ran.pixel));
+    assert(fs.existsSync(preview) && fs.statSync(preview).size > 0, "shader preview file exists");
+    assert(live.project.edges.length > 0, "camera is attached to the shader");
+  }
 }
 function pathDir(src) { return src.replace(/\/src$/, ""); }
 

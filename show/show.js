@@ -2,6 +2,8 @@ import {
   loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow,
   fireCue, saveShow, restoreShow, askShow, setKeyframe, timelineRows, showMonitor, CX_NOTE, CX_BRIDGE_URL
 } from "../shared/show-session.js";
+import { backendStatus } from "../shared/backend-registry.js";
+import { activeAgents, nativeBridgeLabel, runShaderAgent } from "../shared/shader-agent.js";
 
 const SAVE_KEY = "nvd.show.save";
 let session = loadExampleScene();
@@ -21,6 +23,67 @@ function paint() {
   }).join("\n");
   $("cxNote").textContent = CX_NOTE;
   paintMonitor();
+}
+
+function compileInBrowser(source) {
+  const canvas = $("preview");
+  const gl = canvas.getContext("webgl2");
+  if (!gl) return { compile: false, observed: false, error: "WebGL2 indisponible" };
+  const make = (type, src) => {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, src);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return gl.getShaderInfoLog(shader) || "compile";
+    return shader;
+  };
+  try {
+    const vs = make(gl.VERTEX_SHADER, source.vertex);
+    const fs = make(gl.FRAGMENT_SHADER, source.fragment);
+    if (typeof vs !== "object" || typeof fs !== "object") {
+      return { compile: false, observed: false, error: [vs, fs].filter(item => typeof item === "string").join(" ") };
+    }
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      return { compile: false, observed: false, error: gl.getProgramInfoLog(program) || "link" };
+    }
+    gl.useProgram(program);
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([
+      220, 40, 40, 255, 40, 180, 60, 255, 40, 80, 220, 255, 230, 200, 40, 255
+    ]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "a_position");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    for (const [name, value] of [["u_amplitude", 0.08], ["u_frequency", 6], ["u_speed", 1.2], ["u_phase", 0.4], ["u_time", 1]]) {
+      const slot = gl.getUniformLocation(program, name);
+      if (slot) gl.uniform1f(slot, value);
+    }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    const pixel = new Uint8Array(4);
+    gl.readPixels(160, 90, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    return { compile: true, observed: true, pixel: Array.from(pixel), preview: "show/index.html#preview" };
+  } catch (error) {
+    return { compile: false, observed: false, error: error?.message || String(error) };
+  }
+}
+
+async function refreshNative() {
+  let health = null;
+  try {
+    const res = await fetch(CX_BRIDGE_URL.replace(/\/chat$/, "/health"), { signal: AbortSignal.timeout(800) });
+    if (res.ok) health = await res.json();
+  } catch { health = null; }
+  $("native").textContent = nativeBridgeLabel(health?.ok ? health : null);
 }
 
 function paintMonitor() {
@@ -102,10 +165,15 @@ $("ask").onclick = async () => {
     cx = null;
   }
   const result = askShow(session, text, cx);
+  const gates = activeAgents(backendStatus(), {});
+  const shader = await runShaderAgent(session, text, compileInBrowser, { eligible: gates.active.includes("shader") });
   const cue = result.cueOk ? ` · cue ${result.cueId}` : "";
+  const wave = shader.ran
+    ? ` · ${shader.camera} → ${shader.shader} · compilé · pixel ${shader.pixel.join(",")}`
+    : "";
   $("log").textContent = result.ok
-    ? `${result.added} node(s)${cue} · ${result.note}`
-    : `${result.error || "aucune opération"} · ${result.note}`;
+    ? `${result.added} node(s)${cue}${wave} · ${result.note}`
+    : `${result.error || "aucune opération"}${shader.ran ? "" : ""} · ${result.note}`;
   remember();
   paint();
 };
@@ -131,3 +199,4 @@ if (saved) {
   try { session = restoreShow(saved); loadScene(session); } catch { session = loadExampleScene(); }
 }
 paint();
+refreshNative();
