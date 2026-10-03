@@ -1,13 +1,15 @@
 /**
  * Conduite Show, indépendante du Designer.
  * Les cues passent par le moteur existant. Le langage naturel passe par la couche d'actions.
- * Les agents et la mémoire CX ne sont pas dans ce dépôt.
+ * Le graphe et les cues restent dans ce dépôt.
+ * Les agents et la mémoire CX passent par le pont local, jamais par le site public.
  */
 import { newProject, openProject, exportProject, createDemoProject } from "./ir.js";
 import { applyCue, listCues, setCuePlayhead, advanceCuePlayhead } from "./stage/cues.js";
 import { performAction } from "./action-intents.js";
 
-export const CX_NOTE = "Les agents et la mémoire CX ne sont pas dans ce dépôt.";
+export const CX_BRIDGE_URL = "http://127.0.0.1:4877/chat";
+export const CX_NOTE = "Le navigateur public ne peut pas importer le moteur CX ni joindre 127.0.0.1. Les agents et la mémoire tournent seulement si le pont local est lancé sur ce Mac.";
 
 export function createShowSession(raw) {
   const project = raw ? openProject(raw).project : newProject();
@@ -160,14 +162,54 @@ export function restoreShow(text) {
   return session;
 }
 
-export function askShow(session, text) {
+export function showMonitor(session) {
+  return {
+    sceneName: session.sceneName || "",
+    running: Boolean(session.running),
+    paused: Boolean(session.paused),
+    time: session.time,
+    edges: session.project.edges?.length || 0,
+    nodes: (session.project.nodes || []).map(node => ({
+      id: node.id,
+      type: node.type,
+      title: node.title || node.type,
+      opacity: Number(node.params?.opacity ?? 1)
+    })),
+    cues: listCues(session.project).map(cue => ({ id: cue.id, label: cue.label, time: cue.time })),
+    fired: [...(session.fired || [])]
+  };
+}
+
+export function askShow(session, text, cx = null) {
   const before = session.project.nodes.length;
   const result = performAction("patch-from-text", { project: session.project, text });
+  let cue = null;
+  if (result.ok) {
+    const node = session.project.nodes.at(-1);
+    if (node) {
+      const id = `cx-${node.id}`;
+      if (!(session.project.cues || []).some(item => item.id === id)) {
+        session.project.cues = [...(session.project.cues || []), {
+          id,
+          number: String((session.project.cues || []).length + 1),
+          label: "CX",
+          time: session.time,
+          armed: true,
+          actions: [{ type: "set-param", nodeId: node.id, key: "opacity", value: 1 }]
+        }];
+      }
+      cue = fireCue(session, id);
+    }
+  }
+  const linked = Boolean(cx?.ok && Array.isArray(cx.roles) && cx.roles.includes("Conductor"));
   return {
     ...result,
     added: session.project.nodes.length - before,
-    cx: false,
-    note: CX_NOTE
+    cueId: cue?.cue?.id || null,
+    cueOk: Boolean(cue?.ok),
+    cx: linked,
+    chain: linked ? cx.chain : "",
+    note: linked ? `CX ${cx.chain}` : CX_NOTE
   };
 }
 

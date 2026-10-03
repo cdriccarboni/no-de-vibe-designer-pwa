@@ -33,7 +33,7 @@ import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { WebSocketBridge } from "../shared/adapters/websocket-bridge.js";
 import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "../shared/pwa-update.js";
 import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl, navigateSurface } from "../shared/surface-switcher.js";
-import { loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow, fireCue, saveShow, restoreShow, askShow, sampleCurve, setKeyframe, applyCurves, CX_NOTE } from "../shared/show-session.js";
+import { loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow, fireCue, saveShow, restoreShow, askShow, sampleCurve, setKeyframe, applyCurves, showMonitor, CX_NOTE } from "../shared/show-session.js";
 import { createMemoryProjectStore } from "../shared/project-store.js";
 import { applyRemoteMessage, initialRemoteState } from "../shared/remote-protocol.js";
 import { startRemoteServer } from "../bridge/remote-server.mjs";
@@ -1261,6 +1261,9 @@ console.log("show");
   const asked = askShow(restored, "Crée une caméra reliée à un shader");
   assert(asked.ok && asked.cx === false && asked.note === CX_NOTE, "show chat uses the local graph path");
   assert(restored.project.nodes.some(node => node.type === "camera"), "show chat adds a real camera node");
+  assert(asked.cueOk && restored.project.cues.some(cue => cue.label === "CX"), "show chat creates and fires a cue");
+  const monitor = showMonitor(restored);
+  assert(monitor.nodes.some(node => node.type === "camera") && monitor.fired.includes(asked.cueId), "show monitor follows graph and cue state");
   const linear = sampleCurve([{ time: 0, value: 0, ease: "linear" }, { time: 2, value: 1, ease: "linear" }], 1);
   const easeIn = sampleCurve([{ time: 0, value: 0, ease: "linear" }, { time: 2, value: 1, ease: "ease-in" }], 1);
   const easeOut = sampleCurve([{ time: 0, value: 0, ease: "linear" }, { time: 2, value: 1, ease: "ease-out" }], 1);
@@ -1273,6 +1276,17 @@ console.log("show");
   assert(session.sceneName, "scene can be loaded again");
 }
 function listSafe(session) { return session.project.cues?.length > 0; }
+
+{
+  const hub = process.env.CX_HUB_SRC || "/Users/cedriccarboni/Projects/cx-hub/src";
+  if (fs.existsSync(hub + "/cx_orchestra.py") && fs.existsSync(hub + "/cx_memory.py")) {
+    const ran = spawnSync("python3", ["bridge/cx_show_bridge.py", "Crée une caméra reliée à un shader"], { encoding: "utf8" });
+    assert(ran.status === 0, ran.status === 0 ? "cx bridge runs" : ("cx bridge " + (ran.stderr || ran.stdout || ran.status)));
+    const plan = JSON.parse(ran.stdout);
+    assert(plan.ok && plan.roles.includes("Conductor") && plan.roles.includes("Visual / Shader") && plan.chain.includes("Conductor"), "cx orchestra plan is real");
+    assert(typeof plan.memoryChars === "number", "cx memory context is read");
+  }
+}
 
 console.log("backends");
 {

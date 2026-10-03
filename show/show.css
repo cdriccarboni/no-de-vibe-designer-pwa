@@ -8,3 +8,5 @@ pre{margin:0;white-space:pre-wrap;background:#171b1f;border-radius:8px;padding:1
 .co{font-size:.62em;vertical-align:.2em}
 .nav a{color:#d7b86a}
 header,.transport,.curve{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+#monitor{width:min(100%,680px);height:auto;background:#0b0d10;border-radius:8px}
