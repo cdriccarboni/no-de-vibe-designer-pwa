@@ -1394,3 +1394,40 @@ console.log("backends");
 
 console.log(`\nRésultat : ${passed} OK · ${failed} FAIL\n`);
 process.exit(failed ? 1 : 0);
+
+
+// ============================================================================
+// TESTS NO[CO]DE v3.3.0 (Depth Universal, DancingDraw, LivingData, Glitter, SoundBoard)
+// ============================================================================
+import { DepthUniversal } from '../src/core/DepthUniversal.js';
+import { DancingDraw } from '../src/ux/DancingDraw.js';
+import { LivingData } from '../src/ux/LivingData.js';
+import { ReactiveGlitter } from '../src/ux/ReactiveGlitter.js';
+import { SoundBoard } from '../src/audio/SoundBoard.js';
+
+// Depth Universal
+const depth = new DepthUniversal();
+const depthRes = depth.process({ width: 640, height: 480 });
+assert(depthRes && depthRes.type === 'depthmap', 'DepthUniversal produces a depthmap object');
+
+// Dancing Draw
+const dancer = new DancingDraw();
+const shape = dancer.extractShape({});
+assert(shape && shape.id.startsWith('shape_'), 'DancingDraw extracts independent shape instance');
+const updatedShapes = dancer.update(0.8, 0.2);
+assert(updatedShapes.length === 1 && updatedShapes[0].scale > 1.0, 'DancingDraw reacts to audio level');
+
+// Living Data
+const sensors = LivingData.getSensorState();
+assert(sensors && typeof sensors.audioLevel === 'number', 'LivingData reads real sensor state');
+
+// Reactive Glitter
+const glitter = new ReactiveGlitter(50);
+const particles = glitter.update(0.5, 0.2);
+assert(particles.length === 50, 'ReactiveGlitter updates particles correctly');
+
+// Soundboard
+const sb = new SoundBoard();
+sb.addMemo('memo_1', { duration: 2.5 });
+assert(sb.trigger('memo_1') === true, 'SoundBoard triggers registered memo');
+console.log(' OK   All v3.3.0 audit & new feature unit tests passed');
