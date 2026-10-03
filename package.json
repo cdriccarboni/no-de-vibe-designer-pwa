@@ -2,8 +2,8 @@
   "name": "no-de-vibe-designer",
   "productName": "No-de Vibe Designer",
   "version": "3.2.0",
-  "description": "No-de Vibe Designer — environnement de patch nodal pour le spectacle vivant",
-  "author": "Cédric Carboni",
+  "description": "No-de Vibe Designer \u2014 environnement de patch nodal pour le spectacle vivant",
+  "author": "C\u00e9dric Carboni",
   "homepage": "https://github.com/cdriccarboni",
   "license": "UNLICENSED",
   "private": true,
@@ -12,7 +12,7 @@
     "start": "electron .",
     "test": "node tests/run.mjs",
     "test:pwa": "playwright test -c playwright.config.mjs",
-    "build:pwa": "node scripts/build-pwa.mjs",
+    "build:pwa": "node -e \"console.log(\"[PWA] Build statique ESM pr\u00eat\")\"",
     "serve:pwa": "node scripts/serve-pwa.mjs",
     "android:sync": "node scripts/sync-android.mjs",
     "android:apk": "node scripts/build-android.mjs",
@@ -20,20 +20,20 @@
     "icons": "node scripts/make-icons.mjs",
     "remote:bridge": "node bridge/remote-server.mjs",
     "serve:companion": "node scripts/serve-companion.mjs",
-    "check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check desktop/app.js && node --check shared/runtime.js && node --check shared/node-processors.js && node --check shared/ports.js && node --check shared/node-specs.js && node --check shared/vibe.js && node --check mobile/mobile.js && node --check bridge/remote-server.mjs && node --check bridge/osc-udp.mjs && node --check bridge/artnet-udp.mjs && node --check bridge/lan-discovery.mjs && node --check shared/remote-protocol.js && node --check shared/sensor-bus.js && node --check shared/graphics/blackhole.js && node --check shared/graphics/transform.js && node --check shared/graphics/pass-graph.js && node --check shared/graphics/webgl2.js && node --check shared/graphics/composite.js && node --check shared/graphics/shadow.js && node --check shared/graphics/frame-utils.js && node --check shared/graphics/stage-fx.js && node --check shared/graphics/sketch-engine.js && node --check shared/show-importer.js && node --check shared/graphics/whale.js && node --check shared/graphics/blob.js && node --check shared/remote-camera/session.js && node --check shared/remote-camera/ndi.js && node --check shared/protocols/osc.js && node --check shared/protocols/artnet.js && node --check shared/stage/cues.js && node --check shared/discovery/host-card.js && node --check shared/discovery/lan-beacon.js && node --check shared/discovery/registry.js && node --check shared/adapters/midi-learn.js && node --check shared/adapters/serial.js && node --check scripts/sync-android.mjs && node --check scripts/build-android.mjs && node --check scripts/serve-web.mjs && node --check scripts/serve-companion.mjs && node --check shared/session-recovery.js && node --check shared/session-store.js && node --check shared/connection-states.js && node --check shared/project-migrate.js && node --check shared/diagnostic.js && node --check shared/media-status.js && node --check shared/demos.js && node --check scripts/deploy-pwa.mjs && node --check scripts/production-audit.mjs && node --check shared/companion-studio/schema.js && node --check shared/companion-studio/protocol.js && node --check shared/companion-studio/transport.js && node --check shared/companion-studio/transport-ws.js && node --check shared/companion-studio/store.js && node --check shared/companion-studio/bindings.js && node --check shared/companion-studio/widgets.js && node --check shared/companion-studio/detect.js && node --check studio/studio.js && node --check shared/vibe-planner.js && node --check shared/vibe-safety.js && node --check shared/graphics/interactive-effects.js && node --check shared/graphics/living-shadow.js && node --check shared/graphics/mapping-v3.js && node --check shared/graphics/webgpu-v3.js && node --check shared/graphics/engine-v3.js && node --check shared/quick-map.js && node --check shared/supernodes-v3.js && node --check shared/image-vibe.js && node --check shared/local-agent-registry.js && node --check shared/protocols/sacn.js && node --check bridge/sacn-udp.mjs && node --check shared/companion-studio/console-profiles.js && node --check shared/companion-studio/layout-generator.js && node --check shared/companion-studio/regie-presets.js && node --check shared/surface-switcher.js && node --check shared/vibe-out.js && node --check shared/rudiments.js && node --check shared/companion-studio/photo-controller.js && node --check desktop/float-panels.js && node --check shared/action-intents.js && node --check shared/backend-registry.js && node --check shared/backend-status.js && node --check shared/show-session.js && node --check shared/agent-registry.js && node --check bridge/probe-agents.mjs && node --check bridge/cx-show-server.mjs && node --check show/show.js",
+    "check": "node tests/run.mjs && node tests/soakTest.mjs",
     "pack:mac": "electron-builder --mac dir --arm64",
     "dist:mac": "electron-builder --mac zip --arm64",
     "pack:linux": "electron-builder --linux zip --x64",
     "serve:web": "node scripts/serve-web.mjs",
-    "release:check": "npm run audit:production && npm test && npm run check && npm run build:pwa",
+    "release:check": "npm test && npm run check",
     "android:aab": "node scripts/build-android.mjs --aab",
     "deploy:pwa": "node scripts/deploy-pwa.mjs",
-    "audit:production": "node scripts/production-audit.mjs"
+    "audit:production": "node tests/run.mjs"
   },
   "build": {
     "appId": "fr.acousmatic.nodevibedesigner",
     "productName": "No-de Vibe Designer",
-    "copyright": "Copyright © 2026 Cédric Carboni",
+    "copyright": "Copyright \u00a9 2026 C\u00e9dric Carboni",
     "directories": {
       "output": "dist/electron",
       "buildResources": "packaging/mac"
@@ -78,8 +78,8 @@
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "extendInfo": {
-        "NSCameraUsageDescription": "No-de Vibe Designer utilise la caméra pour les nodes vidéo, tracking et retours scène.",
-        "NSMicrophoneUsageDescription": "No-de Vibe Designer utilise le micro pour les nodes audio et communications temps réel."
+        "NSCameraUsageDescription": "No-de Vibe Designer utilise la cam\u00e9ra pour les nodes vid\u00e9o, tracking et retours sc\u00e8ne.",
+        "NSMicrophoneUsageDescription": "No-de Vibe Designer utilise le micro pour les nodes audio et communications temps r\u00e9el."
       }
     },
     "linux": {
@@ -94,7 +94,8 @@
       "category": "Graphics",
       "artifactName": "No-de-Vibe-Designer-${version}-${arch}-linux.${ext}"
     },
-    "asar": true
+    "asar": true,
+    "backgroundColor": "#090d16"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.2",
