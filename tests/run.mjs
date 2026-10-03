@@ -1496,3 +1496,26 @@ const perf = new PerformanceMonitor();
 assert(perf.getMetrics().fps === 60, "PerformanceMonitor collects live metrics");
 
 console.log(" OK   All v3.3.1 artistic and technical feature tests passed");
+
+
+// ============================================================================
+// TESTS KIT SÉCURITÉ RÉGIE (StageSafety)
+// ============================================================================
+import { StageSafety } from "../src/core/StageSafety.js";
+
+const mockRuntime = {
+  blackoutState: false,
+  cueFired: false,
+  setGlobalBlackout(v) { this.blackoutState = v; },
+  fireNextCue() { this.cueFired = true; }
+};
+
+const safety = new StageSafety(mockRuntime);
+assert(safety.toggleBlackout() === true, "StageSafety activates global blackout");
+assert(mockRuntime.blackoutState === true, "StageSafety passes blackout to runtime");
+assert(safety.toggleLock() === true, "StageSafety engages Show Lock");
+
+safety.triggerNextCue();
+assert(mockRuntime.cueFired === true, "StageSafety triggers NEXT CUE (GO)");
+
+console.log(" OK   StageSafety rehearsal guardrails unit tests passed");
