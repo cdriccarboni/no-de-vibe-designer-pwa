@@ -1278,15 +1278,28 @@ console.log("show");
 function listSafe(session) { return session.project.cues?.length > 0; }
 
 {
-  const hub = process.env.CX_HUB_SRC || "/Users/cedriccarboni/Projects/cx-hub/src";
+  const newer = "/Users/cedriccarboni/Projects/cx-hub-wt-549/src";
+  const older = "/Users/cedriccarboni/Projects/cx-hub/src";
+  const hub = process.env.CX_HUB_SRC || (fs.existsSync(newer + "/cx_orchestra.py") ? newer : older);
   if (fs.existsSync(hub + "/cx_orchestra.py") && fs.existsSync(hub + "/cx_memory.py")) {
     const ran = spawnSync("python3", ["bridge/cx_show_bridge.py", "Crée une caméra reliée à un shader"], { encoding: "utf8" });
     assert(ran.status === 0, ran.status === 0 ? "cx bridge runs" : ("cx bridge " + (ran.stderr || ran.stdout || ran.status)));
     const plan = JSON.parse(ran.stdout);
     assert(plan.ok && plan.roles.includes("Conductor") && plan.roles.includes("Visual / Shader") && plan.chain.includes("Conductor"), "cx orchestra plan is real");
     assert(typeof plan.memoryChars === "number", "cx memory context is read");
+    if (!process.env.CX_HUB_SRC && fs.existsSync(newer + "/cx_orchestra.py")) {
+      const expected = spawnSync("git", ["-C", pathDir(newer), "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).stdout.trim();
+      assert(plan.commit === expected && plan.source === newer, "cx bridge prefers the newer hub");
+    }
   }
+  const bridge = await import("../bridge/cx-show-server.mjs");
+  const started = await bridge.startCxShowBridge();
+  assert(started.url === "http://127.0.0.1:4877/chat", "cx bridge entry is the local chat port");
+  if (started.server) await new Promise(resolve => started.server.close(resolve));
+  const electronMain = fs.readFileSync(new URL("../electron/main.cjs", import.meta.url), "utf8");
+  assert(electronMain.includes("await startCxShowBridge()"), "electron starts the cx bridge with the app");
 }
+function pathDir(src) { return src.replace(/\/src$/, ""); }
 
 console.log("backends");
 {

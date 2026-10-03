@@ -8,25 +8,52 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 
-DEFAULT_SRC = os.environ.get("CX_HUB_SRC", "/Users/cedriccarboni/Projects/cx-hub/src")
+NEWER_SRC = "/Users/cedriccarboni/Projects/cx-hub-wt-549/src"
+OLDER_SRC = "/Users/cedriccarboni/Projects/cx-hub/src"
+
+
+def resolve_src(explicit):
+    ordered = [explicit] if explicit else [NEWER_SRC, OLDER_SRC]
+    if explicit:
+        for extra in (NEWER_SRC, OLDER_SRC):
+            if extra not in ordered:
+                ordered.append(extra)
+    for src in ordered:
+        if src and os.path.isfile(os.path.join(src, "cx_orchestra.py")) and os.path.isfile(os.path.join(src, "cx_memory.py")):
+            return src
+    return explicit or NEWER_SRC
+
+
+def source_commit(src):
+    repo = os.path.dirname(src.rstrip(os.sep))
+    try:
+        done = subprocess.run(
+            ["git", "-C", repo, "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return done.stdout.strip() if done.returncode == 0 else ""
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("prompt", nargs="*")
     parser.add_argument("--remember", action="store_true")
-    parser.add_argument("--src", default=DEFAULT_SRC)
+    parser.add_argument("--src", default=os.environ.get("CX_HUB_SRC"))
     args = parser.parse_args()
     prompt = " ".join(args.prompt).strip() or sys.stdin.read().strip()
     if not prompt:
         print(json.dumps({"ok": False, "error": "prompt vide"}, ensure_ascii=False))
         return 1
-    if not os.path.isdir(args.src):
-        print(json.dumps({"ok": False, "error": "source CX introuvable", "source": args.src}, ensure_ascii=False))
+    src = resolve_src(args.src)
+    if not os.path.isdir(src):
+        print(json.dumps({"ok": False, "error": "source CX introuvable", "source": src}, ensure_ascii=False))
         return 1
-    sys.path.insert(0, args.src)
+    sys.path.insert(0, src)
     from cx_memory import memory_prompt_context, remember_success
     from cx_orchestra import build_orchestra_plan
 
@@ -42,7 +69,8 @@ def main() -> int:
     print(json.dumps({
         "ok": True,
         "engine": "cx-hub",
-        "source": args.src,
+        "source": src,
+        "commit": source_commit(src),
         "chain": plan.compact_chain(),
         "roles": [item.role.value for item in plan.assignments],
         "memoryChars": len(memory),

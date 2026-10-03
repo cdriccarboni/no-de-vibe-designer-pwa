@@ -97,6 +97,7 @@ async function localAiRequest(pathname, { baseUrl = LOCAL_AI_DEFAULT_BASE, metho
 
 let mainWindow = null;
 let httpServer = null;
+let cxShowBridge = null;
 let httpPort = 0;
 let hostCard = null;
 let sendOscUdp = null;
@@ -182,6 +183,18 @@ function startLocalServer(root) {
     });
     server.on("error", reject);
   });
+}
+
+
+async function startCxShowBridge() {
+  if (cxShowBridge?.server) return;
+  try {
+    const mod = await import(pathToFileURL(path.join(__dirname, "..", "bridge", "cx-show-server.mjs")).href);
+    cxShowBridge = await mod.startCxShowBridge();
+    console.log("CX_BRIDGE", cxShowBridge.url, cxShowBridge.already ? "already" : "started");
+  } catch (err) {
+    console.error("CX_BRIDGE_FAILED", err?.message || err);
+  }
 }
 
 async function startRemoteBridge() {
@@ -459,6 +472,7 @@ ipcMain.handle("nvd:local-ai-chat", async (_event, options = {}) => {
 
 
 async function createWindow() {
+  await startCxShowBridge();
   await startRemoteBridge();
   const root = appRoot();
   const port = await startLocalServer(root);
@@ -553,6 +567,8 @@ async function createWindow() {
 }
 
 function shutdown() {
+  try { cxShowBridge?.server?.close(); } catch { /* */ }
+  cxShowBridge = null;
   try { httpServer?.close(); } catch { /* */ }
   httpServer = null;
 }
