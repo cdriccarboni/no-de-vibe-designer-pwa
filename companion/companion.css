@@ -21,7 +21,7 @@ body {
   display: grid;
   gap: .75rem;
 }
-.brand { margin: 0; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-size: .72rem; }
+.brand { margin: 0; letter-spacing: .02em; text-transform: none; color: var(--accent); font-size: .72rem; }.brand .co{font-size:.68em;vertical-align:.16em;letter-spacing:0}
 h1 { margin: 0; font-size: 1.6rem; font-weight: 600; }
 .hint, .fine { margin: 0; color: var(--muted); font-size: .85rem; }
 .state {

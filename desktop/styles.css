@@ -19,7 +19,7 @@ button,input,textarea,select{font:inherit;color:inherit}.spacer{flex:1}
 #app{height:100vh;display:grid;grid-template-rows:50px minmax(0,1fr) 118px}
 .topbar{display:flex;align-items:center;gap:9px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:8px;white-space:nowrap}.brandmark{width:26px;height:26px;border:1px solid var(--line2);border-radius:8px;display:grid;place-items:center;color:var(--accent)}
-.brand span{margin-left:8px;color:var(--muted);font-size:10px;letter-spacing:.16em}.badge{font-size:9px;border:1px solid var(--line);border-radius:99px;padding:3px 6px;color:var(--muted)}
+.brand span{margin-left:8px;color:var(--muted);font-size:10px;letter-spacing:.16em}.brand .co{margin-left:0;color:inherit;font-size:.62em;letter-spacing:0;vertical-align:.2em}.badge{font-size:9px;border:1px solid var(--line);border-radius:99px;padding:3px 6px;color:var(--muted)}
 .btn,.smallbtn,.iconbtn,.generate{background:var(--panel2);border:1px solid var(--line);border-radius:7px;cursor:pointer}.btn{padding:6px 9px;font-size:11px}.btn.primary{border-color:var(--accent)}
 .themes{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.themes button{border:0;background:transparent;padding:6px 8px;font-size:11px;color:var(--muted)}.themes button.active{background:var(--panel2);color:var(--text)}
 .workspace{min-height:0;display:grid;grid-template-columns:220px minmax(0,1fr) 275px;gap:8px;padding:8px;overflow:hidden}

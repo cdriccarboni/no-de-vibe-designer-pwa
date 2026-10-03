@@ -6,6 +6,7 @@ import { validateProject, exportProject, createDemoProject, newProject } from ".
 import { typesCompatible, portDataType, portDirection, isExecutable, EXECUTABLE_TYPES } from "../shared/ports.js";
 import { validateEdge, findCycleEdgeIds, topoOrder, evaluateGraph, findVideoOutput } from "../shared/graph-engine.js";
 import { localVibeParse, applyVibeOps, isForbiddenAiProvider, assertAiProviderAllowed, runVibe, probeLocalAi } from "../shared/vibe.js";
+import { performAction } from "../shared/action-intents.js";
 import { APP_VERSION } from "../shared/version.js";
 import { createHistory } from "../shared/history.js";
 import { ensureSubGraph, evaluateSubGraph, addBoxPort, wrapNodesInSubpatch, MAX_SUBPATCH_DEPTH } from "../shared/subpatch.js";
@@ -47,7 +48,7 @@ function assert(cond, msg) {
   else { failed++; console.error(" FAIL ", msg); }
 }
 
-console.log(`\nNo-de Vibe Designer ${APP_VERSION} — System Test P00/P01\n`);
+console.log(`\nNo[co]de Vibe Designer ${APP_VERSION} — System Test P00/P01\n`);
 
 // --- ports ---
 console.log("ports");
@@ -1211,6 +1212,25 @@ assert(studioHtml.includes("connectToggle") && studioHtml.includes("Connexion / 
 assert(studioCss.includes("body.mode-PLATEAU .photo-controller"), "plateau hides photo controller creation");
 const mobileCss = fs.readFileSync(new URL("../mobile/mobile.css", import.meta.url), "utf8");
 assert(mobileCss.includes(".vibe-image-thumb.is-ready"), "mobile hides an empty vibe image");
+
+
+console.log("actions");
+{
+  const opened = performAction("open-project", { raw: JSON.parse(exportProject(createDemoProject())) });
+  assert(opened.ok && opened.project.nodes.length === 5, "open project uses the existing loader");
+  const base = newProject();
+  base.nodes.push({ id: "n1", type: "shader", title: "Shader", x: 0, y: 0, params: { opacity: 1 } });
+  base.cues = [{ id: "c1", number: "1", label: "TOP", actions: [{ type: "set-param", nodeId: "n1", key: "opacity", value: 0.25 }] }];
+  const cued = performAction("cue", { project: base, cue: "1" });
+  assert(cued.ok && cued.project.nodes.find(n => n.id === "n1").params.opacity === 0.25, "cue changes a real node parameter");
+  const preset = performAction("preset", { id: "lumiere" });
+  assert(preset.ok && preset.preset.meta.presetId === "lumiere", "preset uses the existing régie factory");
+  const patch = newProject();
+  const spoken = performAction("patch-from-text", { project: patch, text: "Crée une caméra reliée à un shader" });
+  assert(spoken.ok, "natural language returns applied graph ops");
+  assert(patch.nodes.some(n => n.type === "camera") && patch.nodes.some(n => n.type === "shader"), "natural language adds camera and shader");
+  assert(patch.edges.length > 0, "natural language connects the patch");
+}
 
 console.log(`\nRésultat : ${passed} OK · ${failed} FAIL\n`);
 process.exit(failed ? 1 : 0);

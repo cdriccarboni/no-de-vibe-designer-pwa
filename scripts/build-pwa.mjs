@@ -62,8 +62,8 @@ write("index.html", read("index.html"));
 
 const rootManifest = {
   id: "./",
-  name: "No-de Vibe Designer",
-  short_name: "No-de",
+  name: "No[co]de Vibe Designer",
+  short_name: "No[co]de",
   description: "VIBE · PATCH · STAGE — Designer, Mobile, Régie, Plateau et Remote Camera",
   lang: "fr",
   start_url: "./",
@@ -120,7 +120,7 @@ let sw = read("mobile/sw.js")
 write("sw.js", sw);
 
 const stamp = {
-  name: "No-de Vibe Designer",
+  name: "No[co]de Vibe Designer",
   version,
   builtAt: new Date().toISOString(),
   files: assets.length,

@@ -49,7 +49,7 @@ fs.writeFileSync(path.join(work, ".nojekyll"), "");
 const version = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
 fs.writeFileSync(
   path.join(work, "README.md"),
-  `# No-de Vibe Designer — public PWA\n\nBuilt artifacts only. Source: private \`no-de-vibe-designer\`.\n\n- Public URL: ${PUBLIC_URL}\n- Version: ${version}\n`
+  `# No[co]de Vibe Designer — public PWA\n\nBuilt artifacts only. Source: private \`no-de-vibe-designer\`.\n\n- Public URL: ${PUBLIC_URL}\n- Version: ${version}\n`
 );
 
 run("git", ["add", "-A"], { cwd: work });
@@ -57,7 +57,7 @@ const diff = spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: work });
 if (diff.status !== 0) {
   run(
     "git",
-    ["-c", "user.email=cdriccarboni@users.noreply.github.com", "-c", "user.name=cdriccarboni", "commit", "-m", `deploy: No-de Vibe Designer PWA ${version}`],
+    ["-c", "user.email=cdriccarboni@users.noreply.github.com", "-c", "user.name=cdriccarboni", "commit", "-m", `deploy: No[co]de Vibe Designer PWA ${version}`],
     { cwd: work }
   );
   run("git", ["push", "origin", "HEAD:main"], { cwd: work });

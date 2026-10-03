@@ -36,8 +36,8 @@ test.beforeEach(async ({ page }) => {
 
 test("manifest, service worker and installability", async ({ page, request }) => {
   const manifest = await (await request.get("/manifest.webmanifest")).json();
-  expect(manifest.name).toBe("No-de Vibe Designer");
-  expect(manifest.short_name).toBe("No-de Vibe Designer");
+  expect(manifest.name).toBe("No[co]de Vibe Designer");
+  expect(manifest.short_name).toBe("No[co]de Vibe Designer");
   expect(manifest.display).toBe("standalone");
   expect(manifest.theme_color).toBe("#0f1113");
   const sizes = manifest.icons.map((icon) => `${icon.sizes}:${icon.purpose}`);
@@ -49,7 +49,7 @@ test("manifest, service worker and installability", async ({ page, request }) =>
   expect(sw).toContain("SKIP_WAITING");
 
   await page.goto("/");
-  await expect(page.locator("header b")).toHaveText("No-de Vibe Designer");
+  await expect(page.locator("header b")).toHaveText("No[co]de Vibe Designer");
   await page.waitForFunction(() => navigator.serviceWorker?.controller);
   const display = await page.evaluate(() => ({
     manifestDisplay: "standalone",
@@ -65,7 +65,7 @@ test("offline shell after the service worker is active", async ({ page, context 
   await page.waitForFunction(() => navigator.serviceWorker?.controller);
   await context.setOffline(true);
   await page.reload();
-  await expect(page.locator("header b")).toHaveText("No-de Vibe Designer");
+  await expect(page.locator("header b")).toHaveText("No[co]de Vibe Designer");
   await expect(page.locator("#mobilePlateau")).toBeVisible();
   await context.setOffline(false);
 });

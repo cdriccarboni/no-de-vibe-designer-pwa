@@ -8,7 +8,39 @@ const fs = require("fs");
 const path = require("path");
 const { pathToFileURL } = require("url");
 
-const APP_NAME = "No-de Vibe Designer";
+const APP_NAME = "No[co]de Vibe Designer";
+
+
+function appleHelperPath() {
+  return path.join(__dirname, "..", "native", "apple", "nvd-apple-intel");
+}
+
+function runAppleHelper(args, timeoutMs = 60000) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(appleHelperPath(), args, { stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    let err = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("Apple Intelligence : délai dépassé"));
+    }, timeoutMs);
+    child.stdout.on("data", chunk => { out += chunk; });
+    child.stderr.on("data", chunk => { err += chunk; });
+    child.on("error", error => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", code => {
+      clearTimeout(timer);
+      if (code !== 0 && !out.trim()) {
+        reject(new Error(err.trim() || `Apple Intelligence : sortie ${code}`));
+        return;
+      }
+      try { resolve(JSON.parse(out)); }
+      catch { reject(new Error(err.trim() || "Apple Intelligence : réponse illisible")); }
+    });
+  });
+}
 
 const LOCAL_AI_DEFAULT_BASE = "http://127.0.0.1:11434";
 
@@ -285,6 +317,14 @@ ipcMain.handle("nvd:ai-node-request", async (_event, options = {}) => {
   const prompt = String(options.prompt || "").slice(0, 30000);
   const system = String(options.system || "Tu es un moteur créatif relié à No-de Vibe Designer.").slice(0, 12000);
   if (!prompt.trim()) throw new Error("Prompt IA vide");
+
+  if (protocol === "apple") {
+    const result = await runAppleHelper(["respond", prompt]);
+    if (!result?.ok || !String(result.content || "").trim()) {
+      throw new Error(result?.reason || result?.error || "Apple Intelligence indisponible");
+    }
+    return { ok: true, protocol, model: "foundation-models", content: String(result.content).trim() };
+  }
 
   if (protocol === "ollama") {
     const data = await localAiRequest("/api/chat", {
