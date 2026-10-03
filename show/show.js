@@ -1,6 +1,6 @@
 import {
   loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow,
-  fireCue, saveShow, restoreShow, askShow, setKeyframe, timelineRows, CX_NOTE
+  fireCue, saveShow, restoreShow, askShow, setKeyframe, timelineRows, showMonitor, CX_NOTE, CX_BRIDGE_URL
 } from "../shared/show-session.js";
 
 const SAVE_KEY = "nvd.show.save";
@@ -20,6 +20,31 @@ function paint() {
     return `${row.kind} ${row.number || ""} ${row.label || row.id} · ${row.time ?? 0}s`;
   }).join("\n");
   $("cxNote").textContent = CX_NOTE;
+  paintMonitor();
+}
+
+function paintMonitor() {
+  const state = showMonitor(session);
+  const canvas = $("monitor");
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#0b0d10";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#9aa3ab";
+  ctx.font = "13px sans-serif";
+  const transport = !state.running ? "arrêt" : state.paused ? "pause" : "lecture";
+  ctx.fillText(`${state.sceneName || "Scène"} · ${transport} · ${state.time.toFixed(2)} s · ${state.edges} lien(s) · ${state.cues.length} cue(s)`, 16, 22);
+  state.nodes.forEach((node, index) => {
+    const x = 16 + (index % 6) * 102;
+    const y = 40 + Math.floor(index / 6) * 72;
+    ctx.globalAlpha = Math.max(0.18, Math.min(1, node.opacity));
+    ctx.fillStyle = node.type === "camera" ? "#d7b86a" : node.type === "shader" ? "#3d7ea6" : "#2f6b4f";
+    ctx.fillRect(x, y, 92, 52);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#101214";
+    ctx.fillText(String(node.title).slice(0, 12), x + 8, y + 22);
+    ctx.fillText(node.opacity.toFixed(2), x + 8, y + 40);
+  });
 }
 
 function remember() {
@@ -61,12 +86,25 @@ $("restore").onclick = () => {
   loadScene(session);
   paint();
 };
-$("ask").onclick = () => {
+$("ask").onclick = async () => {
   const text = $("chat").value.trim();
   if (!text) return;
-  const result = askShow(session, text);
+  let cx = null;
+  try {
+    const res = await fetch(CX_BRIDGE_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(2500)
+    });
+    if (res.ok) cx = await res.json();
+  } catch {
+    cx = null;
+  }
+  const result = askShow(session, text, cx);
+  const cue = result.cueOk ? ` · cue ${result.cueId}` : "";
   $("log").textContent = result.ok
-    ? `${result.added} node(s) · ${result.note}`
+    ? `${result.added} node(s)${cue} · ${result.note}`
     : `${result.error || "aucune opération"} · ${result.note}`;
   remember();
   paint();
