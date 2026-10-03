@@ -7,6 +7,7 @@ import { typesCompatible, portDataType, portDirection, isExecutable, EXECUTABLE_
 import { validateEdge, findCycleEdgeIds, topoOrder, evaluateGraph, findVideoOutput } from "../shared/graph-engine.js";
 import { localVibeParse, applyVibeOps, isForbiddenAiProvider, assertAiProviderAllowed, runVibe, probeLocalAi } from "../shared/vibe.js";
 import { performAction } from "../shared/action-intents.js";
+import { artistBackends, technicalRows, proposeArchitectures, BACKEND_STATUSES } from "../shared/backend-registry.js";
 import { APP_VERSION } from "../shared/version.js";
 import { createHistory } from "../shared/history.js";
 import { ensureSubGraph, evaluateSubGraph, addBoxPort, wrapNodesInSubpatch, MAX_SUBPATCH_DEPTH } from "../shared/subpatch.js";
@@ -1230,6 +1231,32 @@ console.log("actions");
   assert(spoken.ok, "natural language returns applied graph ops");
   assert(patch.nodes.some(n => n.type === "camera") && patch.nodes.some(n => n.type === "shader"), "natural language adds camera and shader");
   assert(patch.edges.length > 0, "natural language connects the patch");
+}
+
+
+console.log("backends");
+{
+  const rows = technicalRows();
+  const byId = Object.fromEntries(rows.map(row => [row.id, row]));
+  assert(rows.every(row => BACKEND_STATUSES.includes(row.status)), "every backend has one allowed status");
+  for (const id of ["python", "node", "javascript", "typescript", "cpp", "swift", "webgl", "glsl"]) {
+    assert(byId[id].status === "DISPONIBLE" && byId[id].version && byId[id].proof, `${id} is proven available`);
+  }
+  assert(byId.metal.status === "DISPONIBLE AVEC LIMITATIONS", "metal ran but is limited");
+  assert(byId.touchdesigner.status === "INSTALLÉ / NON TESTÉ", "touchdesigner is installed and not execution-tested");
+  assert(byId.ndi.status === "INSTALLÉ / NON TESTÉ", "ndi is installed and not execution-tested");
+  for (const id of ["java", "processing", "rust", "faust", "unity", "unreal", "ffmpeg"]) {
+    assert(byId[id].status === "NON INSTALLÉ", `${id} is not installed`);
+  }
+  assert(byId.webgpu.status === "ERREUR" && byId.wgsl.status === "ERREUR", "webgpu and wgsl failed their execution test");
+  const artist = artistBackends();
+  assert(artist.every(row => row.status === "DISPONIBLE"), "artist list is only proven backends");
+  assert(!artist.some(row => ["faust", "unity", "unreal", "rust", "metal", "touchdesigner", "webgpu"].includes(row.id)), "unproven backends stay out of the artist list");
+  const proposal = proposeArchitectures("Scène temps réel : vidéo shader GPU, audio et OSC");
+  assert(proposal.options.length >= 2 && proposal.options.length <= 3, "complex prompt returns two or three real options");
+  assert(proposal.options.every(option => artist.some(row => row.id === option.id)), "options come from proven backends");
+  assert(proposal.options.some(option => option.preview), "at least one option can preview");
+  assert(proposal.fusionRan === false, "no hybrid fusion is claimed");
 }
 
 console.log(`\nRésultat : ${passed} OK · ${failed} FAIL\n`);
