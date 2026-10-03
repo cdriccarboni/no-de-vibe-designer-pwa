@@ -26,7 +26,7 @@ html, body {
   padding: calc(8px + var(--safe-top)) 14px 8px;
   border-bottom: 1px solid var(--line);
 }
-.brand { margin: 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.brand { margin: 0; font-size: 11px; letter-spacing: .02em; text-transform: none; color: var(--accent); }.brand .co{font-size:.68em;vertical-align:.16em;letter-spacing:0}
 .net { margin: 2px 0 0; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; min-width: 0; }
 .net-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); flex: none; }
 .net-dot.on { background: var(--ok); box-shadow: 0 0 0 3px rgba(143,167,157,.18); }

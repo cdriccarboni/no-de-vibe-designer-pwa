@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "No-de Vibe Designer",
-  "short_name": "No-de Vibe Designer",
+  "name": "No[co]de Vibe Designer",
+  "short_name": "No[co]de Vibe Designer",
   "description": "Patch nodal pour le spectacle vivant — Bureau et Plateau",
   "lang": "fr",
   "start_url": "./index.html",

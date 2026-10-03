@@ -1,4 +1,4 @@
-# No-de Vibe Designer — public PWA
+# No[co]de Vibe Designer — public PWA
 
 Built artifacts only. Source: private `no-de-vibe-designer`.
 

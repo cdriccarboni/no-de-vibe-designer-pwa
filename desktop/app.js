@@ -303,6 +303,7 @@ async function requestAiForNode(options = {}) {
   }
   const protocol = String(options.protocol || "ollama").toLowerCase();
   const prompt = String(options.prompt || "");
+  if (protocol === "apple") throw new Error("Apple Intelligence ne tourne pas dans la PWA : uniquement l'application macOS peut appeler le modèle local.");
   if (protocol === "ollama") {
     const base = String(options.baseUrl || cfg.localBaseUrl || "http://127.0.0.1:11434").replace(/\/+$/, "");
     const res = await fetch(base + "/api/chat", {
@@ -943,7 +944,8 @@ function selectNode(id, { additive = false } = {}) {
     const endpoint = n.params.endpoint || (media ? (cfg.mediaEndpoint || cfg.endpoint || "") : (cfg.endpoint || ""));
     const baseUrl = n.params.baseUrl || cfg.localBaseUrl || "http://127.0.0.1:11434";
     const model = n.params.model || (n.type === "ai" ? (cfg.localModel || "qwen2.5-coder:7b") : "");
-    extra += `<div class="field"><label>Mode IA</label><select id="nAiProtocol"><option value="ollama">Ollama local / LAN</option><option value="openai">OpenAI-compatible</option><option value="generic">HTTP générique</option></select></div>`;
+    const appleChoice = typeof window.nvdDesktop?.aiNodeRequest === "function" ? `<option value="apple">Apple Intelligence</option>` : "";
+    extra += `<div class="field"><label>Mode IA</label><select id="nAiProtocol"><option value="ollama">Ollama local / LAN</option>${appleChoice}<option value="openai">OpenAI-compatible</option><option value="generic">HTTP générique</option></select></div>`;
     extra += `<div class="field"><label>Adresse Ollama</label><input id="nAiBase" value="${htmlSafe(baseUrl)}" placeholder="http://192.168.1.20:11434"></div>`;
     extra += `<div class="field"><label>Endpoint externe</label><input id="nAiEndpoint" value="${htmlSafe(endpoint)}" placeholder="https://…"></div>`;
     extra += `<div class="field"><label>Modèle</label><input id="nAiModel" value="${htmlSafe(model)}" placeholder="${media ? "nom du modèle média" : "qwen2.5-coder:7b"}"></div>`;
