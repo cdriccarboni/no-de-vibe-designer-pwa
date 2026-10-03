@@ -1,0 +1,167 @@
+{
+  "probedAt": "2026-10-03T21:46:00+02:00",
+  "host": "MacBook-Air-M4",
+  "os": "macOS 26.6.2",
+  "rows": [
+    {
+      "id": "python",
+      "label": "Python",
+      "status": "DISPONIBLE",
+      "version": "3.9.6",
+      "proof": "/usr/bin/python3 -c 'print(6*7)' a affiché 42",
+      "installUrl": ""
+    },
+    {
+      "id": "node",
+      "label": "Node",
+      "status": "DISPONIBLE",
+      "version": "v24.21.0",
+      "proof": "node -e 'console.log(6*7)' a affiché 42",
+      "installUrl": ""
+    },
+    {
+      "id": "javascript",
+      "label": "JavaScript",
+      "status": "DISPONIBLE",
+      "version": "v24.21.0",
+      "proof": "le même processus Node a exécuté l'expression 6*7 et a affiché 42",
+      "installUrl": ""
+    },
+    {
+      "id": "typescript",
+      "label": "TypeScript",
+      "status": "DISPONIBLE",
+      "version": "5.9.3",
+      "proof": "node_modules/.bin/tsc --strict a compilé add.ts, node add.js a affiché 42",
+      "installUrl": ""
+    },
+    {
+      "id": "java",
+      "label": "Java",
+      "status": "NON INSTALLÉ",
+      "version": "",
+      "proof": "java -version : Unable to locate a Java Runtime",
+      "installUrl": "https://adoptium.net/temurin/releases/"
+    },
+    {
+      "id": "processing",
+      "label": "Processing",
+      "status": "NON INSTALLÉ",
+      "version": "",
+      "proof": "aucun binaire ni application Processing",
+      "installUrl": "https://processing.org/download"
+    },
+    {
+      "id": "cpp",
+      "label": "C/C++",
+      "status": "DISPONIBLE",
+      "version": "Apple clang 21.0.0",
+      "proof": "clang++ a compilé add.cpp et le binaire a affiché 42 ; clang add.c s'est terminé 0",
+      "installUrl": ""
+    },
+    {
+      "id": "rust",
+      "label": "Rust",
+      "status": "NON INSTALLÉ",
+      "version": "",
+      "proof": "rustc absent",
+      "installUrl": "https://rustup.rs/"
+    },
+    {
+      "id": "faust",
+      "label": "Faust",
+      "status": "NON INSTALLÉ",
+      "version": "",
+      "proof": "faust absent",
+      "installUrl": "https://faust.grame.fr/downloads/"
+    },
+    {
+      "id": "swift",
+      "label": "Swift",
+      "status": "DISPONIBLE",
+      "version": "6.4",
+      "proof": "swiftc 6.4 a compilé un programme Metal et le binaire a affiché METAL Apple M4 42",
+      "installUrl": ""
+    },
+    {
+      "id": "metal",
+      "label": "Metal",
+      "status": "DISPONIBLE AVEC LIMITATIONS",
+      "version": "Apple M4",
+      "proof": "un calcul Metal 20+22 a affiché 42 ; xcrun metal échoue : MetalToolchain absent ; l'application n'a pas d'appel Metal",
+      "installUrl": ""
+    },
+    {
+      "id": "touchdesigner",
+      "label": "TouchDesigner",
+      "status": "INSTALLÉ / NON TESTÉ",
+      "version": "2025.33230",
+      "proof": "application présente ; toeexpand a répondu Error opening file, aucun réseau exécuté",
+      "installUrl": ""
+    },
+    {
+      "id": "unity",
+      "label": "Unity",
+      "status": "NON INSTALLÉ",
+      "version": "",
+      "proof": "Unity.app absent",
+      "installUrl": "https://unity.com/download"
+    },
+    {
+      "id": "unreal",
+      "label": "Unreal",
+      "status": "NON INSTALLÉ",
+      "version": "",
+      "proof": "UnrealEditor absent",
+      "installUrl": "https://www.unrealengine.com/en-US/download"
+    },
+    {
+      "id": "webgl",
+      "label": "WebGL",
+      "status": "DISPONIBLE",
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "proof": "Chrome 154.0.8037.97 headless, compile=true",
+      "installUrl": ""
+    },
+    {
+      "id": "webgpu",
+      "label": "WebGPU",
+      "status": "ERREUR",
+      "version": "Chrome 154.0.8037.97",
+      "proof": "navigator.gpu a répondu no-adapter sans GPU ; avec GPU le test ne s'est pas terminé",
+      "installUrl": ""
+    },
+    {
+      "id": "wgsl",
+      "label": "WGSL",
+      "status": "ERREUR",
+      "version": "Chrome 154.0.8037.97",
+      "proof": "aucune compilation WGSL terminée",
+      "installUrl": ""
+    },
+    {
+      "id": "glsl",
+      "label": "GLSL",
+      "status": "DISPONIBLE",
+      "version": "WebGL 2.0",
+      "proof": "fragment shader compilé dans Chrome, compile=true",
+      "installUrl": ""
+    },
+    {
+      "id": "ffmpeg",
+      "label": "FFmpeg",
+      "status": "NON INSTALLÉ",
+      "version": "",
+      "proof": "ffmpeg absent",
+      "installUrl": "https://ffmpeg.org/download.html"
+    },
+    {
+      "id": "ndi",
+      "label": "NDI",
+      "status": "INSTALLÉ / NON TESTÉ",
+      "version": "6.3.0",
+      "proof": "NDI Launcher et Video Monitor 6.3.0 présents ; aucun appel SDK exécuté",
+      "installUrl": ""
+    }
+  ]
+}

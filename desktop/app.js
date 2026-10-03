@@ -6,6 +6,7 @@ import { DeviceManager } from "../shared/device-manager.js";
 import { portDirection, portLabels, portDataType, isExecutable } from "../shared/ports.js";
 import { validateEdge } from "../shared/graph-engine.js";
 import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed, probeLocalAi } from "../shared/vibe.js";
+import { renderBackendReport, refreshBackendStatus } from "../shared/backend-registry.js";
 import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
 import { NODE_GROUPS, spec as sharedSpec } from "../shared/node-specs.js";
 import { createHistory } from "../shared/history.js";
@@ -162,10 +163,17 @@ const devices = new DeviceManager(e => {
 
 function readGeneralPrefsNow() {
   try {
-    return { restoreAutosave:true, loadDemo:true, plugAndPlay:true, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") };
+    return { restoreAutosave:true, loadDemo:true, plugAndPlay:true, technicalMode:false, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") };
   } catch {
-    return { restoreAutosave:true, loadDemo:true, plugAndPlay:true };
+    return { restoreAutosave:true, loadDemo:true, plugAndPlay:true, technicalMode:false };
   }
+}
+
+function paintBackendReport() {
+  const box = $("#backendReport");
+  if (!box) return;
+  const technical = $("#prefTechnicalMode")?.checked === true;
+  box.innerHTML = renderBackendReport(technical ? "technical" : "artist");
 }
 
 function writeGeneralPrefsFromUi() {
@@ -174,7 +182,8 @@ function writeGeneralPrefsFromUi() {
     ...previous,
     restoreAutosave: $("#prefRestoreAutosave")?.checked !== false,
     loadDemo: $("#prefLoadDemo")?.checked !== false,
-    plugAndPlay: $("#prefPlugAndPlay")?.checked !== false
+    plugAndPlay: $("#prefPlugAndPlay")?.checked !== false,
+    technicalMode: $("#prefTechnicalMode")?.checked === true
   };
   localStorage.setItem("nvd.general", JSON.stringify(next));
   return next;
@@ -2470,6 +2479,8 @@ function openPreferences(tab = "general") {
     if ($("#prefRestoreAutosave")) $("#prefRestoreAutosave").checked = g.restoreAutosave !== false;
     if ($("#prefPlugAndPlay")) $("#prefPlugAndPlay").checked = g.plugAndPlay !== false;
     if ($("#prefLoadDemo")) $("#prefLoadDemo").checked = g.loadDemo !== false;
+    if ($("#prefTechnicalMode")) $("#prefTechnicalMode").checked = g.technicalMode === true;
+    paintBackendReport();
   } catch { /* */ }
   if ($("#prefDefaultZoom")) $("#prefDefaultZoom").value = String(Math.round(view.scale * 100));
 }
@@ -2606,6 +2617,13 @@ $("#clearAutosave")?.addEventListener("click", () => {
 });
 $("#prefRestoreAutosave")?.addEventListener("change", () => { writeGeneralPrefsFromUi(); });
 $("#prefLoadDemo")?.addEventListener("change", () => { writeGeneralPrefsFromUi(); });
+$("#prefTechnicalMode")?.addEventListener("change", () => { writeGeneralPrefsFromUi(); paintBackendReport(); });
+$("#backendReport")?.addEventListener("click", event => {
+  const link = event.target?.closest?.("[data-refresh-backends]");
+  if (!link) return;
+  event.preventDefault();
+  refreshBackendStatus().then(() => paintBackendReport()).catch(err => log(`Registre · ${err?.message || err}`));
+});
 $("#prefPlugAndPlay")?.addEventListener("change", async () => {
   const next = writeGeneralPrefsFromUi();
   renderPnpStatus();

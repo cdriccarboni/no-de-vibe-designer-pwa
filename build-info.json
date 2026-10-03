@@ -1,9 +1,9 @@
 {
   "name": "No[co]de Vibe Designer",
   "version": "3.2.0",
-  "builtAt": "2026-10-03T19:39:33.832Z",
-  "files": 120,
-  "cacheRevision": "c513316e1a",
+  "builtAt": "2026-10-03T19:47:34.719Z",
+  "files": 123,
+  "cacheRevision": "e3ac7413f6",
   "surfaces": [
     "designer",
     "mobile",
