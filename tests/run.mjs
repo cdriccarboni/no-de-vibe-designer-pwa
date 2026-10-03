@@ -1431,3 +1431,33 @@ const sb = new SoundBoard();
 sb.addMemo('memo_1', { duration: 2.5 });
 assert(sb.trigger('memo_1') === true, 'SoundBoard triggers registered memo');
 console.log(' OK   All v3.3.0 audit & new feature unit tests passed');
+
+
+// ============================================================================
+// TESTS DEPTH UNIVERSAL, APPLE VISION & FOUNDATION MODELS
+// ============================================================================
+import { DepthUniversal, DepthMaskProcessor } from '../src/core/DepthUniversal.js';
+import { AppleVisionBridge } from '../src/core/AppleVisionBridge.js';
+import { AppleFoundationModels } from '../src/core/AppleFoundationModels.js';
+
+// Depth Universal
+const du = new DepthUniversal();
+const depthSrc = du.processFrame({ width: 1280, height: 720 });
+assert(depthSrc.width === 1280 && depthSrc.realDepth === false, 'DepthUniversal correctly identifies ESTIMATED DEPTH mode');
+
+const maskOut = DepthMaskProcessor.process(depthSrc, { near: 0.2, far: 0.7, softness: 0.3 });
+assert(maskOut && maskOut.params.near === 0.2, 'DepthMaskProcessor computes Millumin-style depth mask params');
+
+// Apple Vision Bridge
+const vision = new AppleVisionBridge();
+vision.segmentTapToSelect(null, [{ x: 0.5, y: 0.5 }]).then(res => {
+  assert(res && res.type === 'vision_mask', 'AppleVisionBridge falls back cleanly on local contour when native bridge is absent');
+});
+
+// Apple Foundation Models
+const afm = new AppleFoundationModels();
+afm.analyzeMultimodal(null, 'Analyse cette image').then(res => {
+  assert(res && res.suggestedNodes.includes('Camera'), 'AppleFoundationModels generates valid structured output');
+});
+
+console.log(' OK   Depth Universal, Apple Vision & Foundation Models tests passed');
