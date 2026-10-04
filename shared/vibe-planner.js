@@ -1,4 +1,5 @@
 import { isExecutable, portLabels, portMeta, typesCompatible } from "./ports.js";
+import { mergeRunnableSources } from "./cx-source.js";
 
 export function normalizeVibeText(text) {
   return String(text || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -358,10 +359,14 @@ export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
     notes.push("Millumin reste désarmé : aucun envoi sans Trigger ou armement manuel.");
   }
 
+  const merged = mergeRunnableSources(text, ops);
   return {
     engine:"local-planner",
-    ops,
-    note: ops.length ? "Planner local déterministe · intentions + câblage typé." : "Planner local : aucune intention reconnue.",
-    diagnostics:{ requested:requested.map(x => x.type), notes }
+    ops:merged.ops,
+    note:[
+      merged.ops.length ? "Planner local déterministe · intentions + câblage typé." : "Planner local : aucune intention reconnue.",
+      merged.summary
+    ].filter(Boolean).join(" · "),
+    diagnostics:{ requested:requested.map(x => x.type), notes, engines:merged.engines, unavailable:merged.unavailable }
   };
 }

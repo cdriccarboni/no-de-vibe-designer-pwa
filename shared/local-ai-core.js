@@ -117,6 +117,10 @@ export function buildLocalAiPrompt(text, project = {}) {
       "Tu n'actives jamais automatiquement caméra, micro, MIDI, Serial, OSC, Art-Net ou tout autre accès matériel.",
       "Tu peux préparer ces nodes, mais les permissions et sorties externes restent explicitement déclenchées par l'humain.",
       "N'invente aucun type de node hors catalogue.",
+      "Si la demande nomme plusieurs sorties, par exemple un shader et Processing, produis toutes ces sorties dans le même tableau ops, reliées entre elles.",
+      "Un node shader doit avoir params.glsl : fragment WebGL1 avec precision mediump float, varying vec2 v_uv, uniforms u_time u_intensity u_resolution, et gl_FragColor. Pas de #version 300 es.",
+      "Un node p5 ou sketch doit avoir params.script composé uniquement de background(), fill(), circle(), rect(), line() et wave(). Pas de setup/draw JavaScript.",
+      "Pour mélanger deux images, ajoute un node composite et connecte les sorties vidéo sur ses entrées.",
       "Ne produis jamais de code shell, de commande système, de chemin privé, de clé ni de secret."
     ].join("\n"),
     user: JSON.stringify({

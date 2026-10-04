@@ -6,6 +6,7 @@ import { DeviceManager } from "../shared/device-manager.js";
 import { portDirection, portLabels, portDataType, isExecutable } from "../shared/ports.js";
 import { validateEdge } from "../shared/graph-engine.js";
 import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed, probeLocalAi } from "../shared/vibe.js";
+import { cxChatReply } from "../shared/cx-source.js";
 import { directOllamaProbe } from "../shared/local-ai-core.js";
 import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError } from "../shared/local-ai-diagnostic.js";
 import { renderBackendReport } from "../shared/backend-registry.js";
@@ -2418,54 +2419,70 @@ $("#vibeImageClear")?.addEventListener("click", () => {
   if ($("#vibeImageFile")) $("#vibeImageFile").value = "";
 });
 
+function showVibePreview(result, logPrefix) {
+  if (!result?.ops?.length) {
+    log(`${logPrefix} · aucune opération générée (pas de réussite simulée)`);
+    pendingVibe = null;
+    $("#vibePreview")?.classList.add("hidden");
+    return result;
+  }
+  pendingVibe = result;
+  const box = $("#vibePreview");
+  if (box) {
+    box.classList.remove("hidden");
+    box.innerHTML = `<div class="vibe-preview-head"><b>Aperçu Vibe</b> · ${htmlSafe(result.engine || "")} · ${result.ops.length} op(s)</div>
+      <pre class="vibe-preview-ops">${result.ops.map(o => htmlSafe(JSON.stringify(o))).join("\n")}</pre>
+      <div class="vibe-preview-actions">
+        <button type="button" id="vibeConfirm" class="smallbtn">Appliquer</button>
+        <button type="button" id="vibeCancel" class="smallbtn">Annuler</button>
+      </div>`;
+    $("#vibeConfirm").onclick = () => confirmPendingVibe();
+    $("#vibeCancel").onclick = () => {
+      pendingVibe = null;
+      box.classList.add("hidden");
+      log(`${logPrefix} · aperçu annulé (aucune modification)`);
+    };
+  }
+  return result;
+}
+
+async function proposeVibe(rawText, { logPrefix = "Vibe", image = null } = {}) {
+  const text = String(rawText || "").trim();
+  if (!text && !image?.analysis) {
+    log(`${logPrefix} · texte ou image requis`);
+    return { ops: [], note: "texte requis", engine: "none", unavailableHosts: [] };
+  }
+  log(image?.analysis ? `${logPrefix} · analyse + génération…` : `${logPrefix} · analyse…`);
+  const target = image?.target || "auto";
+  const promptText = image?.analysis ? imageVibePrompt(text, image.analysis, target) : text;
+  let result = await runVibe(promptText, project);
+  if (image?.analysis) {
+    const seedOps = imageVibeOps(image.analysis, target, text);
+    result = {
+      ...result,
+      engine: `image-vibe+${result.engine || "local"}`,
+      ops: [...seedOps, ...(result.ops || [])],
+      note: `Image → Vibe · ${target} · ${result.note || "analyse locale"}`
+    };
+  }
+  if (result.aiError) log(`${logPrefix} · IA indisponible · ${result.aiError}`);
+  if (result.aiUnavailable) log(`${logPrefix} · ${result.note}`);
+  else log(`${logPrefix} · ${result.note || result.engine}`);
+  const preview = showVibePreview(result, logPrefix);
+  if (!preview?.ops?.length) return result;
+  if (!$("#vibePreview")) await confirmPendingVibe();
+  return result;
+}
+
 async function applyVibeFromUi() {
-  const text = $("#vibeText").value.trim();
-  if (!text && !imageVibeState.analysis) { log("Vibe · texte ou image requis"); return; }
-  log(imageVibeState.analysis ? "Image Vibe · analyse + génération…" : "Vibe · analyse…");
   $("#applyVibe").disabled = true;
   try {
+    const text = $("#vibeText").value.trim();
     const target = $("#vibeImageTarget")?.value || "auto";
-    const promptText = imageVibeState.analysis ? imageVibePrompt(text, imageVibeState.analysis, target) : text;
-    let result = await runVibe(promptText, project);
-    if (imageVibeState.analysis) {
-      const seedOps = imageVibeOps(imageVibeState.analysis, target, text);
-      result = {
-        ...result,
-        engine: `image-vibe+${result.engine || "local"}`,
-        ops: [...seedOps, ...(result.ops || [])],
-        note: `Image → Vibe · ${target} · ${result.note || "analyse locale"}`
-      };
-    }
-    if (result.aiError) log(`Vibe · IA indisponible · ${result.aiError}`);
-    if (result.aiUnavailable) log(`Vibe · ${result.note}`);
-    else log(`Vibe · ${result.note || result.engine}`);
-
-    if (!result.ops?.length) {
-      log("Vibe · aucune opération générée (pas de réussite simulée)");
-      pendingVibe = null;
-      $("#vibePreview")?.classList.add("hidden");
-      return;
-    }
-
-    pendingVibe = result;
-    const box = $("#vibePreview");
-    if (box) {
-      box.classList.remove("hidden");
-      box.innerHTML = `<div class="vibe-preview-head"><b>Aperçu Vibe</b> · ${result.engine} · ${result.ops.length} op(s)</div>
-        <pre class="vibe-preview-ops">${result.ops.map(o => JSON.stringify(o)).join("\n")}</pre>
-        <div class="vibe-preview-actions">
-          <button type="button" id="vibeConfirm" class="smallbtn">Appliquer</button>
-          <button type="button" id="vibeCancel" class="smallbtn">Annuler</button>
-        </div>`;
-      $("#vibeConfirm").onclick = () => confirmPendingVibe();
-      $("#vibeCancel").onclick = () => {
-        pendingVibe = null;
-        box.classList.add("hidden");
-        log("Vibe · aperçu annulé (aucune modification)");
-      };
-    } else {
-      await confirmPendingVibe();
-    }
+    await proposeVibe(text, {
+      logPrefix: "Vibe",
+      image: imageVibeState.analysis ? { analysis: imageVibeState.analysis, target } : null
+    });
   } catch (e) {
     log(`Vibe ÉCHEC · ${e.message || e}`);
   } finally {
@@ -2507,6 +2524,81 @@ $("#vibeText").addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     applyVibeFromUi();
+  }
+});
+
+function showRightPane(id) {
+  const inspector = $("#inspectorBody");
+  const chat = $("#cxChatPane");
+  if (!inspector || !chat) return;
+  const cx = id === "cx";
+  inspector.classList.toggle("pane-hidden", cx);
+  chat.classList.toggle("pane-hidden", !cx);
+  chat.hidden = !cx;
+  qall("[data-right-pane]").forEach(btn => {
+    const on = btn.dataset.rightPane === id;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+}
+qall("[data-right-pane]").forEach(btn => btn.addEventListener("click", () => showRightPane(btn.dataset.rightPane)));
+
+function appendCxMessage(role, text) {
+  const logEl = $("#cxChatLog");
+  if (!logEl) return null;
+  const row = document.createElement("div");
+  row.className = `cx-msg ${role}`;
+  row.textContent = text;
+  logEl.append(row);
+  logEl.scrollTop = logEl.scrollHeight;
+  return row;
+}
+
+async function sendCxChat() {
+  const input = $("#cxChatInput");
+  const text = input?.value.trim() || "";
+  if (!text) return;
+  appendCxMessage("user", text);
+  if (input) input.value = "";
+  const send = $("#cxChatSend");
+  if (send) send.disabled = true;
+  const status = appendCxMessage("status", "Génération…");
+  try {
+    const result = await proposeVibe(text, { logPrefix: "CX Chat" });
+    status?.remove();
+    appendCxMessage("assistant", cxChatReply({
+      ops: result?.ops || [],
+      note: result?.note || "",
+      unavailable: result?.unavailableHosts || []
+    }));
+    if (result?.ops?.length) {
+      const row = document.createElement("div");
+      row.className = "cx-msg assistant";
+      row.innerHTML = `<div class="cx-confirm"><button type="button" data-cx-confirm>Appliquer au patch</button><button type="button" data-cx-cancel>Annuler</button></div>`;
+      row.querySelector("[data-cx-confirm]").onclick = () => confirmPendingVibe();
+      row.querySelector("[data-cx-cancel]").onclick = () => {
+        pendingVibe = null;
+        $("#vibePreview")?.classList.add("hidden");
+        appendCxMessage("assistant", "Aperçu annulé. Aucune modification.");
+        row.remove();
+      };
+      $("#cxChatLog")?.append(row);
+    }
+  } catch (e) {
+    status?.remove();
+    appendCxMessage("assistant", `Échec · ${e.message || e}`);
+  } finally {
+    if (send) send.disabled = false;
+  }
+}
+$("#cxChatForm")?.addEventListener("submit", e => {
+  e.preventDefault();
+  sendCxChat();
+});
+$("#cxChatInput")?.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendCxChat();
   }
 });
 

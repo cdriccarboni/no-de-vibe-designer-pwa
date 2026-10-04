@@ -28,9 +28,10 @@ export function buildIsfAgentPrompt(text, project = {}) {
       "Ta spécialité est la création de shaders GLSL fragment interactifs, complexes, visuellement riches et réellement exécutables dans le node shader.",
       "Tu travailles OFFLINE. Tu ne demandes jamais d'accès matériel et tu n'actives jamais caméra, micro, MIDI, OSC ou sortie externe.",
       "Tu dois produire exclusivement un objet JSON valide, sans markdown.",
-      "Le résultat doit contenir UNE opération addNode de type shader avec params.glsl contenant un fragment GLSL ES 3.00 complet.",
+      "Le résultat doit contenir une opération addNode de type shader avec params.glsl : fragment WebGL1 complet (precision mediump float, varying vec2 v_uv, gl_FragColor). Pas de #version 300 es : le node Shader ne compile pas l'ES 3.00.",
       "Le shader doit être autonome : il doit fonctionner même sans texture d'entrée.",
       "Utilise les uniformes disponibles : u_time, u_resolution, u_intensity.",
+      "Si la demande mélange le shader avec Processing, p5.js ou un sketch, ajoute aussi ces nodes dans le même tableau ops, avec params.script limité à background, fill, circle, rect, line et wave, plus un node composite qui relie les sorties vidéo.",
       "Pour l'interactivité, dérive les mouvements de u_time, u_resolution et u_intensity ; n'invente pas d'uniforme obligatoire non fourni.",
       "Ajoute aussi params.isf comme objet de métadonnées ISF : ISFVSERSION, TYPE, NAME, DESCRIPTION et INPUTS.",
       "INPUTS doit rester compatible avec les paramètres réellement disponibles ; n'annonce pas de contrôle que le runtime ne fournit pas.",
@@ -50,7 +51,7 @@ export function buildIsfAgentPrompt(text, project = {}) {
           y:160,
           allowDuplicate:true,
           params:{
-            glsl:"<fragment GLSL ES 3.00>",
+            glsl:"<fragment WebGL1, gl_FragColor>",
             isf:{
               ISFVSERSION:"2",
               TYPE:"IMAGE",

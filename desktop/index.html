@@ -151,10 +151,24 @@
       </section>
     </main>
 
-    <aside class="panel inspector resizable-x">
-      <div class="panel-head">Inspecteur <span id="inspectorType" class="sub">Aucun</span><div class="tools"><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
+    <aside class="panel inspector resizable-x" id="rightPane">
+      <div class="panel-head">
+        <div class="pane-tabs" role="tablist">
+          <button type="button" class="pane-tab active" data-right-pane="inspector" role="tab" aria-selected="true">Inspecteur</button>
+          <button type="button" class="pane-tab" data-right-pane="cx" role="tab" aria-selected="false">CX Chat</button>
+        </div>
+        <span id="inspectorType" class="sub">Aucun</span>
+        <div class="tools"><button type="button" class="iconbtn collapse" title="Réduire">−</button></div>
+      </div>
       <div id="inspectorBody" class="panel-body inspector-body">
         <p>Sélectionne un node.</p>
+      </div>
+      <div id="cxChatPane" class="panel-body cx-chat pane-hidden" role="tabpanel" hidden>
+        <div id="cxChatLog" class="cx-chat-log" role="log" aria-live="polite"></div>
+        <form id="cxChatForm" class="cx-chat-form">
+          <textarea id="cxChatInput" rows="3" placeholder="Décris le résultat. Ex. : un shader GLSL mélangé avec Processing"></textarea>
+          <button id="cxChatSend" class="generate" type="submit">Envoyer</button>
+        </form>
       </div>
     </aside>
   </section>

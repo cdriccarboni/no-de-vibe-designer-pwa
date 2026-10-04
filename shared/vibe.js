@@ -7,6 +7,7 @@ import { buildLocalAiPrompt, directOllamaChat, directOllamaProbe, normalizeLocal
 import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError } from "./local-ai-diagnostic.js";
 import { selectLocalAgents } from "./local-agent-registry.js";
 import { buildIsfAgentPrompt, isIsfRequest, normalizeIsfNodeParams } from "./isf-agent.js";
+import { mergeRunnableSources } from "./cx-source.js";
 
 /**
  * Vibe coding — génération structurée de patch.
@@ -306,6 +307,17 @@ export async function probeLocalAi(cfg = readAiConfig(), { fresh = false } = {})
   }
 }
 
+function augmentRunnableSources(text, result) {
+  const merged = mergeRunnableSources(text, result?.ops || []);
+  return {
+    ...result,
+    ops: merged.ops,
+    engines: merged.engines,
+    unavailableHosts: merged.unavailable,
+    note: [result?.note, merged.summary].filter(Boolean).join(" · ")
+  };
+}
+
 function finalizeVibeResult(result, project, source = result?.engine || "unknown") {
   const secured = secureVibePlan(project, result?.ops || [], { source });
   const securityNotes = [
@@ -327,17 +339,17 @@ export async function runVibe(text, project, { forceLocal = false } = {}) {
 
   if (!forceLocal && localGenerativeEnabled) {
     const localAi = await callLocalAi(text, project, cfg);
-    if (localAi.ok) return finalizeVibeResult(localAi, project, "local-ai");
+    if (localAi.ok) return finalizeVibeResult(augmentRunnableSources(text, localAi), project, "local-ai");
 
     if (cfg.enabled === true && cfg.endpoint) {
       const remote = await callRemoteAi(text, project, cfg);
       if (remote.ok) {
-        return finalizeVibeResult({ ...remote, localAiError: localAi.error }, project, "remote-ai");
+        return finalizeVibeResult(augmentRunnableSources(text, { ...remote, localAiError: localAi.error }), project, "remote-ai");
       }
     }
 
     const rules = localVibeParse(text, project);
-    return finalizeVibeResult({
+    return finalizeVibeResult(augmentRunnableSources(text, {
       ok: rules.ops.length > 0,
       engine: "local-planner-fallback",
       ops: rules.ops,
@@ -346,16 +358,16 @@ export async function runVibe(text, project, { forceLocal = false } = {}) {
       aiError: localAi.error,
       note: `IA locale indisponible — ${localAi.error} · repli Planner déterministe`,
       aiUnavailable: true
-    }, project, "local-planner-fallback");
+    }), project, "local-planner-fallback");
   }
 
   if (!forceLocal && cfg.enabled === true && cfg.endpoint) {
     const remote = await callRemoteAi(text, project, cfg);
-    if (remote.ok) return finalizeVibeResult(remote, project, "remote-ai");
+    if (remote.ok) return finalizeVibeResult(augmentRunnableSources(text, remote), project, "remote-ai");
   }
 
   const local = localVibeParse(text, project);
-  return finalizeVibeResult({
+  return finalizeVibeResult(augmentRunnableSources(text, {
     ok: local.ops.length > 0,
     engine: "local-planner",
     ops: local.ops,
@@ -363,7 +375,7 @@ export async function runVibe(text, project, { forceLocal = false } = {}) {
     planner: local.diagnostics,
     note: "Planner local déterministe.",
     aiUnavailable: true
-  }, project, "local-planner");
+  }), project, "local-planner");
 }
 
 const AI_PROTECTED_EXTERNAL_TYPES = new Set(["arduino","esp","servo","dmx","osc","twozero","chataigne","millumin","touchdesigner","isadorabridge","max","pd","supercollider"]);
