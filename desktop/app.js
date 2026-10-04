@@ -2583,6 +2583,31 @@ function appendCxDownloadActions(proposals = []) {
   return row;
 }
 
+let cxHostProbePromise = null;
+function probeCxInstalledHosts() {
+  if (agentRegistryDoc) return Promise.resolve(agentRegistryDoc);
+  if (typeof globalThis.nvdDesktop?.agentRegistry !== "function") return Promise.resolve(null);
+  if (!cxHostProbePromise) {
+    cxHostProbePromise = globalThis.nvdDesktop.agentRegistry()
+      .then(doc => { agentRegistryDoc = doc; return doc; })
+      .catch(() => null);
+  }
+  return cxHostProbePromise;
+}
+
+function filterInstalledCxProposals(proposals = [], registry = null) {
+  const rows = new Map((registry?.rows || []).map(row => [row.id, row]));
+  return proposals.filter(item => {
+    const row = rows.get(item?.id);
+    const installed = row?.status === "VALIDÉ"
+      && row?.executable !== false
+      && row?.value !== null
+      && row?.value !== undefined
+      && row?.value !== "";
+    return !installed;
+  });
+}
+
 async function sendCxChat() {
   const input = $("#cxChatInput");
   const text = input?.value.trim() || "";
@@ -2593,14 +2618,18 @@ async function sendCxChat() {
   if (send) send.disabled = true;
   const status = appendCxMessage("status", "Génération…");
   try {
-    const result = await proposeVibe(text, { logPrefix: "CX Chat" });
+    const [result, hostRegistry] = await Promise.all([
+      proposeVibe(text, { logPrefix: "CX Chat" }),
+      probeCxInstalledHosts()
+    ]);
+    const unavailableHosts = filterInstalledCxProposals(result?.unavailableHosts || [], hostRegistry);
     status?.remove();
     appendCxMessage("assistant", cxChatReply({
       ops: result?.ops || [],
       note: result?.note || "",
-      unavailable: result?.unavailableHosts || []
+      unavailable: unavailableHosts
     }));
-    appendCxDownloadActions(result?.unavailableHosts || []);
+    appendCxDownloadActions(unavailableHosts);
     if (result?.ops?.length) {
       const row = document.createElement("div");
       row.className = "cx-msg assistant";

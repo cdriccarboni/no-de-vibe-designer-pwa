@@ -74,12 +74,6 @@ const INSTALLS = [
     steps: ["https://www.adobe.com/products/aftereffects.html"],
     note: "Installeur Creative Cloud et licence Adobe. After Effects n'est pas lancé tant qu'un test n'a pas renvoyé une valeur."
   }],
-  ["max", /\bmax\/msp\b|\bmax msp\b/, {
-    title: "Max/MSP",
-    cope: "L'export .maxpat reste un fichier générable, pas une session Max.",
-    steps: ["https://cycling74.com/downloads"],
-    note: "Installeur Cycling '74. Max n'est pas ouvert tant qu'un test n'a pas renvoyé une valeur."
-  }],
   ["puredata", /\bpure data\b|\bpuredata\b/, {
     title: "Pure Data",
     cope: "L'export .pd reste un fichier générable, pas une session Pd.",
