@@ -1,59 +1,70 @@
+
+/**
+ * CanvasPan - Navigation Main & Recadrage Canevas No[co]de
+ */
 export class CanvasPan {
-  constructor(canvasElement, viewportState = { panX: 0, panY: 0, zoom: 1 }) {
-    this.canvas = canvasElement;
-    this.viewport = viewportState;
+  constructor(container, viewport) {
+    this.container = container;
+    this.viewport = viewport;
     this.isPanning = false;
-    this.isSpacePressed = false;
-    this.startMouse = { x: 0, y: 0 };
-    this.startPan = { x: 0, y: 0 };
-    this.init();
+    this.startX = 0;
+    this.startY = 0;
+    this.panX = 0;
+    this.panY = 0;
+    this.spacePressed = false;
+    this.initEvents();
   }
 
-  init() {
-    window.addEventListener('keydown', (e) => {
-      const isInput = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
-      if (e.code === 'Space' && !this.isSpacePressed && !isInput) {
-        this.isSpacePressed = true;
-        this.canvas.style.cursor = 'grab';
+  initEvents() {
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+        this.spacePressed = true;
+        document.body.style.cursor = "grab";
       }
     });
 
-    window.addEventListener('keyup', (e) => {
-      if (e.code === 'Space') {
-        this.isSpacePressed = false;
-        if (!this.isPanning) {
-          this.canvas.style.cursor = 'default';
-        }
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "Space") {
+        this.spacePressed = false;
+        if (!this.isPanning) document.body.style.cursor = "default";
       }
     });
 
-    this.canvas.addEventListener('mousedown', (e) => {
-      const isBgClick = e.target === this.canvas || e.target.classList.contains('canvas-bg');
-      if (e.button === 1 || (e.button === 0 && (this.isSpacePressed || isBgClick))) {
+    this.container.addEventListener("pointerdown", (e) => {
+      // Actif si Clic Molette (button === 1) ou Espace + Clic Gauche (button === 0)
+      if (e.button === 1 || (e.button === 0 && this.spacePressed)) {
         this.isPanning = true;
-        this.startMouse = { x: e.clientX, y: e.clientY };
-        this.startPan = { x: this.viewport.panX, y: this.viewport.panY };
-        this.canvas.style.cursor = 'grabbing';
+        this.startX = e.clientX - this.panX;
+        this.startY = e.clientY - this.panY;
+        document.body.style.cursor = "grabbing";
         e.preventDefault();
       }
     });
 
-    window.addEventListener('mousemove', (e) => {
+    window.addEventListener("pointermove", (e) => {
       if (!this.isPanning) return;
-      const dx = e.clientX - this.startMouse.x;
-      const dy = e.clientY - this.startMouse.y;
-      this.viewport.panX = this.startPan.x + dx;
-      this.viewport.panY = this.startPan.y + dy;
-      if (window.cvd && typeof window.cvd.render === 'function') {
-        window.cvd.render();
-      }
+      this.panX = e.clientX - this.startX;
+      this.panY = e.clientY - this.startY;
+      this.applyTransform();
     });
 
-    window.addEventListener('mouseup', () => {
+    window.addEventListener("pointerup", () => {
       if (this.isPanning) {
         this.isPanning = false;
-        this.canvas.style.cursor = this.isSpacePressed ? 'grab' : 'default';
+        document.body.style.cursor = this.spacePressed ? "grab" : "default";
       }
     });
+  }
+
+  applyTransform() {
+    if (this.viewport) {
+      this.viewport.style.transform = `translate(${this.panX}px, ${this.panY}px)`;
+    }
+  }
+
+  centerPatch() {
+    this.panX = 0;
+    this.panY = 0;
+    this.applyTransform();
   }
 }
