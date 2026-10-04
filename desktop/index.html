@@ -43,7 +43,7 @@
 </dialog>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><div class="brandmark" title="No[co]de Vibe Designer"><img class="nocode-mark" src="../mobile/icons/icon-512.png" alt="" width="80" height="80"></div><div><b>No<span class="co">[co]</span>de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
+    <div class="brand"><div><b>No<span class="co">[co]</span>de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
     <span class="badge">v3.3.0</span>
     <span id="showLockBadge" class="show-lock-badge" role="status" aria-live="polite" hidden>Spectacle verrouillé</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
@@ -59,7 +59,7 @@
 
   <section class="workspace">
     <aside class="panel library resizable-x">
-      <div class="panel-head">Library <span class="sub">＋ production · ○ expérimental</span></div>
+      <div class="panel-head">Library <span class="sub">＋ production · ○ expérimental</span><button type="button" id="loadExampleBtn" class="btn">Exemple</button></div>
       <div class="search"><input id="search" placeholder="Rechercher…"></div>
       <label class="library-mode"><input id="showExperimental" type="checkbox"> Afficher les expérimentaux</label>
       <div id="libraryList" class="panel-body libscroll"></div>

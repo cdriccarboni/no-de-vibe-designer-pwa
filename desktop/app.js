@@ -518,10 +518,12 @@ let showExperimental = localStorage.getItem("nvd.showExperimental") === "1";
 const LIBRARY_EXPANDED_KEY = "nvd.library.expandedGroups";
 let expandedLibraryGroups = new Set();
 try {
-  const stored = JSON.parse(localStorage.getItem(LIBRARY_EXPANDED_KEY) || "[]");
-  if (Array.isArray(stored)) expandedLibraryGroups = new Set(stored.map(Number).filter(Number.isInteger));
+  const raw = localStorage.getItem(LIBRARY_EXPANDED_KEY);
+  const stored = raw == null ? null : JSON.parse(raw);
+  if (Array.isArray(stored) && stored.length) expandedLibraryGroups = new Set(stored.map(Number).filter(Number.isInteger));
+  else expandedLibraryGroups = new Set(LIB.map((_, i) => i));
 } catch {
-  expandedLibraryGroups = new Set();
+  expandedLibraryGroups = new Set(LIB.map((_, i) => i));
 }
 
 function saveExpandedLibraryGroups() {
@@ -3205,6 +3207,7 @@ if (project.nodes.length === 0 && generalPrefs.loadDemo !== false && localStorag
   setDemoBanner(false);
 }
 $("#demoExitBtn")?.addEventListener("click", exitShowcaseDemo);
+$("#loadExampleBtn")?.addEventListener("click", () => enterShowcaseDemo());
 renderPnpStatus();
 if (generalPrefs.plugAndPlay !== false) {
   queueMicrotask(() => runPlugAndPlayProbe({ silent:true }));
