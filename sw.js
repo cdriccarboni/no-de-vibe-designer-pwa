@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.0-multi-28b46be5c2";
+const CACHE = "nvd-3.3.0-multi-f9791db229";
 const ASSETS = [
   "./companion/companion.css",
   "./companion/companion.js",
@@ -69,7 +69,9 @@ const ASSETS = [
   "./shared/discovery/host-card.js",
   "./shared/discovery/lan-beacon.js",
   "./shared/discovery/registry.js",
+  "./shared/engine-downloads.js",
   "./shared/exporters.js",
+  "./shared/foundation-status.js",
   "./shared/graph-engine.js",
   "./shared/graphics/blackhole.js",
   "./shared/graphics/blob.js",
@@ -91,6 +93,7 @@ const ASSETS = [
   "./shared/image-vibe.js",
   "./shared/ir.js",
   "./shared/isf-agent.js",
+  "./shared/libpd-runtime.js",
   "./shared/local-agent-registry.js",
   "./shared/local-ai-core.js",
   "./shared/local-ai-diagnostic.js",
@@ -132,6 +135,9 @@ const ASSETS = [
   "./shared/subpatch.js",
   "./shared/supernodes-v3.js",
   "./shared/surface-switcher.js",
+  "./shared/vendor/libpd/LICENSE.txt",
+  "./shared/vendor/libpd/libpd.js",
+  "./shared/vendor/libpd/libpd.wasm",
   "./shared/version.js",
   "./shared/vibe-out.js",
   "./shared/vibe-planner.js",

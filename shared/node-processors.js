@@ -12,6 +12,7 @@ import { renderBlob } from "./graphics/blob.js";
 import { ndiStatusMessage } from "./remote-camera/ndi.js";
 import { anaglyphFrame, bendFrame, creativeFxFrame, stormFrame, transmuteFrame } from "./graphics/stage-fx.js";
 import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT, renderDream, renderSketch } from "./graphics/sketch-engine.js";
+import { LIBPD_AUDIO_PATCH, libpdResult, requestLibpd } from "./libpd-runtime.js";
 import {
   renderThreadCurtain, renderFlowField, renderRibbonTrails, fluidWarpFrame, refractionFrame,
   renderMetaballs, renderPointCloudDepth, renderInteractiveSand, renderSwarm, renderRippleField,
@@ -1193,6 +1194,22 @@ export function createNodeProcessors() {
   });
 
 
+
+  fns.set("libpd", (node, inputs) => {
+    const patch = readText(inputs.get(0), node.params?.patch || LIBPD_AUDIO_PATCH);
+    if (!libpdResult(patch)) requestLibpd(patch);
+    const found = libpdResult(patch);
+    const out = new Map();
+    if (found?.audio === true && Number.isFinite(found.peak) && found.peak > 0) {
+      out.set(1, numOut(found.peak));
+      out.set(2, textOut(`libpd audio · ${found.peak.toFixed(3)}`));
+      return out;
+    }
+    if (found?.ran === true) out.set(2, textOut("libpd · buffer silencieux"));
+    else if (found) out.set(2, textOut("libpd absent"));
+    else out.set(2, textOut("libpd · chargement"));
+    return out;
+  });
 
   fns.set("p5", (node, inputs, ctx) => {
     const seed = inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.seed ?? 1);

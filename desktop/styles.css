@@ -156,6 +156,7 @@ html.electron-macos .topbar{padding-left:84px}
 .library-mode{display:flex;align-items:center;gap:7px;padding:6px 10px;color:var(--muted,#8b949e);font-size:11px;border-bottom:1px solid rgba(255,255,255,.06)}
 .library-mode input{accent-color:var(--accent,#d7b86a)}
 .lib-item.unavailable{opacity:.58}
+.engine-offers{display:grid;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line,#30363d)}.engine-offers[hidden]{display:none}.engine-offers p{margin:0;color:var(--muted,#8b949e);font-size:11px;line-height:1.35}
 
 /* 1.4 · Companion Device Editor + Shader Lab, modales contextuelles uniquement */
 .companion-editor-dialog,.shader-dialog{width:min(1180px,calc(100vw - 28px));height:min(86vh,860px);padding:0;border:1px solid var(--line,#30363d);border-radius:16px;background:#0c0f12;color:var(--text,#eef1f2);box-shadow:0 28px 100px #000b}

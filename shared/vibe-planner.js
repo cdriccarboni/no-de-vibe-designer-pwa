@@ -97,6 +97,7 @@ const INTENTS = [
   ["isadorabridge", ["isadora bridge"]],
   ["isadora", ["mini isadora","isadora tool"]],
   ["max", ["max/msp","max msp"]],
+  ["libpd", ["libpd"]],
   ["pd", ["pure data","puredata"]],
   ["supercollider", ["supercollider"]]
 ];
@@ -359,10 +360,19 @@ export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
     notes.push("Millumin reste désarmé : aucun envoi sans Trigger ou armement manuel.");
   }
 
+  const explicit = t.match(/\bnode\s+([a-z0-9][a-z0-9-]{1,})\b/);
+  if (explicit && !isExecutable(explicit[1])) {
+    notes.push(`Node ${explicit[1]} absent du catalogue. Aucun node inventé.`);
+  }
+  if (/\bpurr data\b|\bplugdata\b/.test(t)) {
+    notes.push("Purr Data et PlugData ne sont pas ajoutés. L'audio embarqué reste libpd.");
+  }
+
   const merged = mergeRunnableSources(text, ops);
+  const opsOut = merged.ops.filter(op => !(op.op === "addNode" && existing.has(op.type)));
   return {
     engine:"local-planner",
-    ops:merged.ops,
+    ops:opsOut,
     note:[
       merged.ops.length ? "Planner local déterministe · intentions + câblage typé." : "Planner local : aucune intention reconnue.",
       merged.summary

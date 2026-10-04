@@ -512,6 +512,11 @@ export const EXECUTABLE_PORTS = {
     { name: "trigger", dir: "in", data: "trigger" },
     { name: "status", dir: "out", data: "text" }
   ],
+  libpd: [
+    { name: "patch", dir: "in", data: "text" },
+    { name: "level", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" }
+  ],
   pd: [
     { name: "value", dir: "in", data: "number" },
     { name: "trigger", dir: "in", data: "trigger" },

@@ -27,6 +27,19 @@ export function validateEdge(project, from, to) {
   return { ok: errors.length === 0, errors, fromType, toType };
 }
 
+export function validateBeforeRun(project) {
+  const errors = [];
+  for (const node of project?.nodes || []) {
+    if (!isExecutable(node.type)) errors.push(`Node non exécutable : ${node.type || node.id}`);
+  }
+  for (const edge of project?.edges || []) {
+    const check = validateEdge(project, edge.from, edge.to);
+    if (!check.ok) errors.push(...check.errors);
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+
 /** Détecte les edges participant à un cycle. */
 export function findCycleEdgeIds(project) {
   const edges = project.edges || [];

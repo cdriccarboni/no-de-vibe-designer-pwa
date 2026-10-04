@@ -48,6 +48,8 @@ import { loadCompanionLayout, ensureCompanionLayout, saveCompanionLayout } from 
 import { validateCompanionDocument } from "../shared/companion-studio/schema.js";
 import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref } from "../shared/companion-studio/detect.js";
 import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT } from "../shared/graphics/sketch-engine.js";
+import { missingEngineOffers } from "../shared/engine-downloads.js";
+import { LIBPD_AUDIO_PATCH, LIBPD_PROBE_PATCH, runLibpdPatch } from "../shared/libpd-runtime.js";
 import { applyShowManifest, showManifestSummary } from "../shared/show-importer.js";
 import { DEFAULT_FRAGMENT } from "../shared/adapters/shader-surface.js";
 import { RUDIMENTS, rudimentMeta, createRudimentNode } from "../shared/rudiments.js";
@@ -591,6 +593,7 @@ const NODE_RUNTIME_REQUIREMENTS = new Map([
   ["isadorabridge", "Isadora + OSC requis à l’usage"],
   ["max", "Max/MSP + OSC requis à l’usage"],
   ["pd", "Pure Data + OSC requis à l’usage"],
+  ["libpd", "float seulement si libpd le renvoie"],
   ["supercollider", "SuperCollider + OSC requis à l’usage"],
   ["remote-camera", "caméra distante et réseau requis à l’usage"],
   ["videoreturn", "source vidéo distante requise à l’usage"],
@@ -646,6 +649,62 @@ function buildLibrary() {
   const expCount = LIB.flatMap(([, items]) => items).filter(([, t]) => !isLibraryExecutable(t)).length;
   const mode = document.querySelector(".library-mode");
   if (mode) mode.style.display = expCount ? "flex" : "none";
+}
+
+function startEngineDownload(url) {
+  if (typeof window.nvdDesktop?.openExternal === "function") {
+    window.nvdDesktop.openExternal(url).catch(error => log(`Téléchargement · ${error?.message || error}`));
+    return;
+  }
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function refreshEngineOffers() {
+  const host = $("#engineOffers");
+  if (!host) return;
+  let processingInstalled = true;
+  const platform = window.nvdDesktop?.platform || "darwin";
+  const arch = window.nvdDesktop?.arch || "arm64";
+  if (typeof window.nvdDesktop?.enginePresence === "function") {
+    try {
+      const presence = await window.nvdDesktop.enginePresence();
+      processingInstalled = presence?.processing?.installed === true;
+    } catch {
+      processingInstalled = true;
+    }
+  }
+  let libpdReady = false;
+  try {
+    const probe = await runLibpdPatch(LIBPD_PROBE_PATCH);
+    libpdReady = probe?.ok === true && probe.value === 42;
+  } catch {
+    libpdReady = false;
+  }
+  const offers = missingEngineOffers({ processingInstalled, libpdReady, platform, arch });
+  host.replaceChildren();
+  if (!offers.length) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  for (const offer of offers) {
+    const row = document.createElement("div");
+    const copy = document.createElement("p");
+    copy.textContent = `${offer.title} manque. ${offer.note}`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "smallbtn";
+    button.textContent = `Télécharger ${offer.title}`;
+    button.onclick = () => startEngineDownload(offer.downloadUrl);
+    row.append(copy, button);
+    host.append(row);
+  }
 }
 
 function activeGraph() {
@@ -926,6 +985,7 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
     x, y,
     params: { enabled: true, duration: 5, opacity: 1, intensity: 1, host: "bridge", address: "/nvd/value", value: 0, fallback: 0, freq: 220, gain: 0.15, mode: "tone" }
   };
+  if (type === "libpd") n.params.patch = LIBPD_AUDIO_PATCH;
   if (type === "subpatch") ensureSubGraph(n);
   g.nodes.push(n);
   if (isRootGraph()) project.nodes = g.nodes;
@@ -1148,6 +1208,11 @@ function selectNode(id, { additive = false } = {}) {
   }
   if (n.type === "surface") extra += `<p class="hint">Passage de valeur vers le Control Surface. Expose ensuite les paramètres utiles depuis l'inspecteur des nodes concernés.</p>`;
   if (n.type === "connectors") extra += `<p class="hint">Lien local typé pour organiser le patch sans conversion de valeur.</p>`;
+  if (n.type === "libpd") {
+    const patch = n.params.patch || LIBPD_AUDIO_PATCH;
+    extra += `<div class="field"><label>Patch .pd</label><textarea id="nLibpdPatch" rows="8" spellcheck="false">${patch.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</textarea></div>`;
+    extra += `<p class="hint">libpd est seulement le moteur audio embarqué. Un niveau sort si le buffer audio contient un échantillon réel.</p>`;
+  }
   if (n.type === "p5" || n.type === "sketch") {
     const isP5 = n.type === "p5";
     const script = n.params.script || (isP5 ? DEFAULT_P5_SCRIPT : DEFAULT_SKETCH_SCRIPT);
@@ -1368,6 +1433,7 @@ function selectNode(id, { additive = false } = {}) {
   if ($("#nGenSeed")) $("#nGenSeed").onchange = e => { n.params.seed = +e.target.value || 1; runtime.render(); autosave(); commitHistory(); };
   if ($("#nGenEnergy")) $("#nGenEnergy").oninput = e => { n.params.energy = +e.target.value; runtime.render(); autosave(); };
   if ($("#nDreamIntensity")) $("#nDreamIntensity").oninput = e => { n.params.intensity = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nLibpdPatch")) $("#nLibpdPatch").oninput = e => { n.params.patch = e.target.value; runtime.render(); autosave(); };
   if ($("#nSketchScript")) $("#nSketchScript").oninput = e => { n.params.script = e.target.value; runtime.render(); autosave(); };
   if ($("#resetSketchScript")) $("#resetSketchScript").onclick = () => {
     n.params.script = n.type === "p5" ? DEFAULT_P5_SCRIPT : DEFAULT_SKETCH_SCRIPT;
@@ -3319,6 +3385,7 @@ ensureRouting(project);
 ensureEdges();
 updateRouteButtons();
 buildLibrary();
+void refreshEngineOffers();
 
 let generalPrefs = { restoreAutosave: true, loadDemo: true, plugAndPlay: true };
 try { generalPrefs = { ...generalPrefs, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") }; } catch { /* */ }

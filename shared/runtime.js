@@ -1,5 +1,5 @@
 import { ShaderSurface, DEFAULT_FRAGMENT } from "./adapters/shader-surface.js";
-import { evaluateGraph, findVideoOutput } from "./graph-engine.js";
+import { evaluateGraph, findVideoOutput, validateBeforeRun } from "./graph-engine.js";
 import { createNodeProcessors } from "./node-processors.js";
 import { evaluateSubGraph } from "./subpatch.js";
 import { sharedAudio } from "./audio-engine.js";
@@ -199,10 +199,17 @@ export class Runtime {
   }
 
   play() {
-    if (this.playing) return;
+    if (this.playing) return true;
+    const check = validateBeforeRun(this.project || { nodes: [], edges: [] });
+    this.lastValidation = check;
+    if (!check.ok) {
+      this.onGraphEvent?.({ type: "validate", errors: check.errors, warnings: [] });
+      return false;
+    }
     this.playing = true;
     this.last = performance.now();
     this.loop(this.last);
+    return true;
   }
   pause() {
     if (!this.playing) return;
