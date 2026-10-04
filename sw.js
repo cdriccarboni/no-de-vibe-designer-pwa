@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.0-multi-bf1b942d6a";
+const CACHE = "nvd-3.3.0-multi-9fa39920c4";
 const ASSETS = [
   "./companion/companion.css",
   "./companion/companion.js",

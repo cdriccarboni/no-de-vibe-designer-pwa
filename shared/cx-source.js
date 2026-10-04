@@ -11,15 +11,6 @@ function norm(text) {
 }
 
 const INSTALLS = [
-  ["processing", /\bprocessing\b|\bp5(?:\.js)?\b/, {
-    title: "Processing",
-    cope: "Le node p5 exécute déjà le dessin dans le patch (background, fill, circle, rect, line, wave).",
-    steps: [
-      "brew install --cask processing",
-      "https://processing.org/download"
-    ],
-    note: "La copie dans /Applications peut demander le mot de passe. L'application Processing ne compte comme moteur externe qu'après un test qui renvoie une valeur."
-  }],
   ["unity", /\bunity\b/, {
     title: "Unity",
     cope: "",
