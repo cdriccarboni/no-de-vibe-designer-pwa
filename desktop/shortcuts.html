@@ -2,187 +2,34 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>No[co]de Vibe Designer — Raccourcis Clavier Régie v3.3.2</title>
+  <title>Raccourcis Régie v3.3.2</title>
   <style>
-    @page { size: A4 portrait; margin: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #090d16;
-      color: #f8fafc;
-      margin: 0;
-      padding: 32px;
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 2px solid #00e5ff;
-      padding-bottom: 12px;
-      margin-bottom: 24px;
-    }
-    .title {
-      font-size: 24px;
-      font-weight: 800;
-      color: #00e5ff;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .badge {
-      background: #0f172a;
-      color: #38bdf8;
-      border: 1px solid #1e293b;
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-weight: bold;
-      font-size: 12px;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-    .card {
-      background: #0f172a;
-      border: 1px solid #1e293b;
-      border-radius: 8px;
-      padding: 16px;
-    }
-    .card-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: #38bdf8;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-      border-bottom: 1px solid #1e293b;
-      padding-bottom: 6px;
-    }
-    .shortcut-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      font-size: 12px;
-    }
-    .kbd {
-      background: #1e293b;
-      color: #00e5ff;
-      border: 1px solid #334155;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-family: monospace;
-      font-weight: bold;
-      font-size: 11px;
-      box-shadow: 0 2px 0 #0f172a;
-    }
-    .footer {
-      margin-top: 30px;
-      text-align: center;
-      font-size: 10px;
-      color: #64748b;
-      border-top: 1px solid #1e293b;
-      padding-top: 12px;
-    }
+    body { font-family: -apple-system, sans-serif; background: #090d16; color: #f8fafc; padding: 32px; }
+    .header { border-bottom: 2px solid #00e5ff; padding-bottom: 12px; margin-bottom: 24px; display: flex; justify-content: space-between; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card { background: #0f172a; border: 1px solid #1e293b; padding: 16px; border-radius: 8px; }
+    .row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px; }
+    .kbd { background: #1e293b; color: #00e5ff; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-weight: bold; }
   </style>
 </head>
 <body>
   <div class="header">
-    <div>
-      <div class="title">No[co]de Vibe Designer</div>
-      <div style="font-size: 12px; color: #94a3b8; margin-top: 4px;">Pense-Bête Raccourcis Clavier Plateau &amp; Régie</div>
-    </div>
-    <div class="badge">v3.3.2 — M4 Native</div>
+    <h1 style="color:#00e5ff;margin:0;">No[co]de Vibe Designer — Raccourcis Régie</h1>
+    <span style="color:#38bdf8;">v3.3.2 ARM64</span>
   </div>
-
   <div class="grid">
     <div class="card">
-      <div class="card-title">Urgence &amp; Conduite Régie</div>
-      <div class="shortcut-row">
-        <span>Blackout d'Urgence (Vidéo &amp; DMX à 0)</span>
-        <span class="kbd">Cmd + B</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Show Lock (Verrouiller le canevas)</span>
-        <span class="kbd">Cmd + L</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Envoyer Cue suivante (GO)</span>
-        <span class="kbd">Flèche Droite / Espace</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Cue précédente</span>
-        <span class="kbd">Flèche Gauche</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Reset / Stop temporisé</span>
-        <span class="kbd">Échap</span>
-      </div>
+      <h3 style="color:#38bdf8;margin-top:0;">Urgence & Conduite</h3>
+      <div class="row"><span>Blackout Urgence</span><span class="kbd">Cmd + B</span></div>
+      <div class="row"><span>Show Lock</span><span class="kbd">Cmd + L</span></div>
+      <div class="row"><span>Cue Suivante (GO)</span><span class="kbd">Flèche Droite / Espace</span></div>
+      <div class="row"><span>Cue Précédente</span><span class="kbd">Flèche Gauche</span></div>
     </div>
-
     <div class="card">
-      <div class="card-title">Navigation &amp; Édition</div>
-      <div class="shortcut-row">
-        <span>Pan Canevas (Curseur Main)</span>
-        <span class="kbd">Molette Clic / Espace + Clic</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Menu Ajout Rapide (Quick Add)</span>
-        <span class="kbd">Tab</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Supprimer le nœud sélectionné</span>
-        <span class="kbd">Suppr / Backspace</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Annuler / Rétablir (Undo / Redo)</span>
-        <span class="kbd">Cmd + Z / Cmd + Shift + Z</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Zoom + / Zoom -</span>
-        <span class="kbd">Cmd + / Cmd -</span>
-      </div>
+      <div class="row"><span>Pipette Couleur</span><span class="kbd">P</span></div>
+      <div class="row"><span>Dessin Masque</span><span class="kbd">M</span></div>
+      <div class="row"><span>Chat Vibe</span><span class="kbd">Cmd + K</span></div>
     </div>
-
-    <div class="card">
-      <div class="card-title">Vibe Assistant &amp; IA</div>
-      <div class="shortcut-row">
-        <span>Focus Chat Vibe IA</span>
-        <span class="kbd">Cmd + K</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Valider la prévisualisation Ghost</span>
-        <span class="kbd">Cmd + Entrée</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Rejeter la modification IA</span>
-        <span class="kbd">Échap</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Outils &amp; Masques</div>
-      <div class="shortcut-row">
-        <span>Pipette Couleurs (Eyedropper)</span>
-        <span class="kbd">P</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Mode Mask / Dessin Surface</span>
-        <span class="kbd">M</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Ouvrir les Préférences (Thème)</span>
-        <span class="kbd">Cmd + P</span>
-      </div>
-      <div class="shortcut-row">
-        <span>Ouvrir le Manuel Exhaustif</span>
-        <span class="kbd">F1 / Manuel</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="footer">
-    © 2026 Cédric Carboni — Acousmatic Théâtre · Fiche imprimable officielle No[co]de Vibe Designer v3.3.2
   </div>
 </body>
 </html>
