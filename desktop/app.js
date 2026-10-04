@@ -2554,6 +2554,35 @@ function appendCxMessage(role, text) {
   return row;
 }
 
+function appendCxDownloadActions(proposals = []) {
+  const logEl = $("#cxChatLog");
+  if (!logEl) return null;
+  const links = proposals
+    .filter(item => item?.downloadUrl && /^https?:\/\//i.test(item.downloadUrl))
+    .map(item => ({ title: String(item.title || "moteur"), url: String(item.downloadUrl) }));
+  if (!links.length) return null;
+  const row = document.createElement("div");
+  row.className = "cx-msg assistant";
+  for (const { title, url } of links) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "smallbtn";
+    button.textContent = `Télécharger ${title}`;
+    button.title = `Ouvrir le téléchargement officiel de ${title}`;
+    button.onclick = () => {
+      if (typeof window.nvdDesktop?.openExternal === "function") {
+        window.nvdDesktop.openExternal(url).catch(error => appendCxMessage("assistant", `Téléchargement · ${error?.message || error}`));
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    };
+    row.append(button);
+  }
+  logEl.append(row);
+  logEl.scrollTop = logEl.scrollHeight;
+  return row;
+}
+
 async function sendCxChat() {
   const input = $("#cxChatInput");
   const text = input?.value.trim() || "";
@@ -2571,6 +2600,7 @@ async function sendCxChat() {
       note: result?.note || "",
       unavailable: result?.unavailableHosts || []
     }));
+    appendCxDownloadActions(result?.unavailableHosts || []);
     if (result?.ops?.length) {
       const row = document.createElement("div");
       row.className = "cx-msg assistant";

@@ -95,6 +95,7 @@ export function installProposals(text = "") {
     title: spec.title,
     cope: spec.cope,
     steps: spec.steps,
+    downloadUrl: spec.steps.find(step => /^https?:\/\//i.test(step)) || "",
     note: spec.note,
     reason: ["Installation proposée · " + spec.title, spec.cope, ...spec.steps, spec.note].filter(Boolean).join(" ")
   }));
