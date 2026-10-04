@@ -98,5 +98,30 @@ export function createDemoProject() {
   ];
   p.meta.demo = "wow-interactive";
   p.meta.note = "Déplace la souris dans le Preview. EXIT restaure le projet précédent.";
+  const standIn = (id, type, x, y, params = {}) => ({
+    id, type, title: "Test à supprimer", x, y,
+    params: { enabled: true, duration: 5, opacity: 1, simulated: true, ...params }
+  });
+  p.nodes.push(
+    standIn("test-ndi-in", "ndi-in", 40, 430),
+    standIn("test-ndi-out", "ndi-out", 280, 430),
+    standIn("test-arduino", "arduino", 40, 580),
+    standIn("test-esp32", "esp", 280, 580),
+    standIn("test-gpio-in", "gpio-in", 520, 580),
+    standIn("test-gpio-out", "gpio-out", 760, 580),
+    { id: "envelope-adsr", type: "envelope", title: "Enveloppe ADSR", x: 520, y: 430, params: { enabled: true, duration: 5, opacity: 1, attack: 0.01, decay: 0.15, sustain: 0.7, release: 0.2 } },
+    { id: "sim-frame", type: "transform", title: "Image reçue", x: 760, y: 430, params: { enabled: true, duration: 5, opacity: 1, scale: 1, rotation: 0 } },
+    { id: "sim-level", type: "multiply", title: "Niveau reçu", x: 1000, y: 500, params: { enabled: true, duration: 5, opacity: 1 } },
+    { id: "sim-esp", type: "smooth", title: "Lissage ESP", x: 520, y: 720, params: { enabled: true, duration: 5, opacity: 1, amount: 1 } }
+  );
+  p.edges.push(
+    { id: "e-test-ndi", from: { node: "test-ndi-in", port: 0 }, to: { node: "test-ndi-out", port: 0 } },
+    { id: "e-test-frame", from: { node: "test-ndi-out", port: 2 }, to: { node: "sim-frame", port: 0 } },
+    { id: "e-test-gate", from: { node: "test-gpio-in", port: 0 }, to: { node: "envelope-adsr", port: 0 } },
+    { id: "e-test-gpio", from: { node: "envelope-adsr", port: 4 }, to: { node: "test-gpio-out", port: 0 } },
+    { id: "e-test-ard", from: { node: "test-arduino", port: 3 }, to: { node: "sim-level", port: 0 } },
+    { id: "e-test-env", from: { node: "envelope-adsr", port: 4 }, to: { node: "sim-level", port: 1 } },
+    { id: "e-test-esp", from: { node: "test-esp32", port: 3 }, to: { node: "sim-esp", port: 0 } }
+  );
   return p;
 }

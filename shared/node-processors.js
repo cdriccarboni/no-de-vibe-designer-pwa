@@ -169,7 +169,15 @@ function serialCommandNode(node, inputs, ctx, fallbackCommand) {
     catch (e) { ctx.warnings?.push(`Serial : ${e?.message || e}`); }
   }
   memory.set(key, { command, trigger: triggerNow });
-  out.set(2, textOut(state === "online" ? "SERIAL ONLINE" : "SERIAL OFFLINE"));
+  if (state !== "online") {
+    const wave = node.type === "esp"
+      ? 0.25 + 0.05 * Math.cos((Number(ctx.time) || 0) * 1.7)
+      : 0.42 + 0.08 * Math.sin((Number(ctx.time) || 0) * 2);
+    out.set(2, textOut("simulé · aucun appareil"));
+    out.set(3, numOut(wave));
+    return out;
+  }
+  out.set(2, textOut("SERIAL ONLINE"));
   return out;
 }
 
@@ -208,13 +216,100 @@ export function createNodeProcessors() {
     return out;
   });
 
+  fns.set("ndi-in", (node, _inputs, ctx) => {
+    const live = ctx.ndi?.frame;
+    if (live && (live.pixels || live.el)) {
+      return new Map([
+        [0, live],
+        [1, textOut("NDI · flux reçu")]
+      ]);
+    }
+    const width = 8;
+    const height = 8;
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    const tone = 80 + Math.round((40 * Math.sin((Number(ctx.time) || 0) * 3) + 40));
+    for (let i = 0; i < pixels.length; i += 4) {
+      pixels[i] = tone;
+      pixels[i + 1] = 48;
+      pixels[i + 2] = 160;
+      pixels[i + 3] = 255;
+    }
+    return new Map([
+      [0, { kind: "video", pixels, width, height, simulated: true, source: "simulé" }],
+      [1, textOut("simulé · aucun flux NDI")]
+    ]);
+  });
+
   fns.set("ndi-out", (node, inputs, ctx) => {
-    const hasVideo = !!inputs.get(0)?.value;
+    const video = inputs.get(0)?.value;
     const msg = ndiStatusMessage();
     ctx.warnings?.push?.(msg);
     ctx.honestFlags?.add?.("ndi-native-relay");
-    if (!hasVideo) throw new Error(`${msg} · aucune vidéo en entrée`);
-    return new Map([[1, { kind: "text", value: msg }]]);
+    if (!video) throw new Error(`${msg} · aucune vidéo en entrée`);
+    const native = typeof ctx.ndiSend === "function";
+    if (native) {
+      try { ctx.ndiSend(video); } catch (error) { ctx.warnings?.push?.(`NDI · ${error?.message || error}`); }
+      return new Map([[1, { kind: "text", value: msg }]]);
+    }
+    const packet = video?.pixels ? { ...video, simulated: true, source: "simulé" } : { ...video, simulated: true, source: "simulé" };
+    return new Map([
+      [1, { kind: "text", value: `simulé · aucun flux NDI · ${msg}` }],
+      [2, packet]
+    ]);
+  });
+
+  fns.set("gpio-in", (_node, _inputs, ctx) => {
+    if (typeof ctx.gpio?.read === "function") {
+      const value = Number(ctx.gpio.read(Number(_node.params?.pin ?? 0)));
+      return new Map([[0, numOut(value)], [1, textOut("GPIO · broche lue")]]);
+    }
+    const toggle = Math.floor((Number(ctx.time) || 0) * 2) % 2;
+    return new Map([[0, numOut(toggle)], [1, textOut("simulé · aucune broche GPIO")]]);
+  });
+
+  fns.set("gpio-out", (node, inputs, ctx) => {
+    const level = inputs.has(0) ? readNum(inputs.get(0)) : Number(node.params?.value ?? 0);
+    if (typeof ctx.gpio?.write === "function") {
+      ctx.gpio.write(Number(node.params?.pin ?? 0), level);
+      return new Map([[1, textOut("GPIO · broche écrite")], [2, numOut(level)]]);
+    }
+    return new Map([[1, textOut("simulé · aucune broche GPIO")], [2, numOut(level)]]);
+  });
+
+  fns.set("envelope", (node, inputs, ctx) => {
+    const gate = inputs.has(0) ? readNum(inputs.get(0)) > 0 : Number(node.params?.gate ?? 0) > 0;
+    const attack = Math.max(0.001, inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.attack ?? 0.01));
+    const decay = Math.max(0.001, inputs.has(2) ? readNum(inputs.get(2)) : Number(node.params?.decay ?? 0.15));
+    const sustain = Math.max(0, Math.min(1, inputs.has(3) ? readNum(inputs.get(3)) : Number(node.params?.sustain ?? 0.7)));
+    const release = Math.max(0.001, Number(node.params?.release ?? 0.2));
+    const memory = nodeMemory(ctx);
+    const key = `envelope:${node.id}`;
+    const state = memory.get(key) || { level: 0, phase: "idle", lastTime: null };
+    const now = Number(ctx.time) || 0;
+    const dt = state.lastTime == null ? 1 / 60 : Math.max(0, now - state.lastTime);
+    let { level, phase } = state;
+    if (gate) {
+      if (phase === "idle" || phase === "release") phase = "attack";
+      if (phase === "attack") {
+        level = Math.min(1, level + dt / attack);
+        if (level >= 1) phase = "decay";
+      } else if (phase === "decay") {
+        level = Math.max(sustain, level - dt / decay);
+        if (level <= sustain) phase = "sustain";
+      } else {
+        phase = "sustain";
+        level = sustain;
+      }
+    } else if (level > 0) {
+      phase = "release";
+      level = Math.max(0, level - dt / release);
+      if (level === 0) phase = "idle";
+    } else {
+      phase = "idle";
+      level = 0;
+    }
+    memory.set(key, { level, phase, lastTime: now });
+    return new Map([[4, numOut(level)], [5, textOut(`ADSR · ${phase}`)]]);
   });
 
   fns.set("phone-camera-front", (node, inputs, ctx) => fns.get("camera")(node, inputs, ctx));

@@ -61,9 +61,14 @@ export const EXECUTABLE_PORTS = {
     { name: "status", dir: "out", data: "text" },
     { name: "out", dir: "out", data: "video" }
   ],
+  "ndi-in": [
+    { name: "video", dir: "out", data: "video" },
+    { name: "status", dir: "out", data: "text" }
+  ],
   "ndi-out": [
     { name: "video", dir: "in", data: "video" },
-    { name: "status", dir: "out", data: "text" }
+    { name: "status", dir: "out", data: "text" },
+    { name: "packet", dir: "out", data: "video" }
   ],
   "phone-camera-front": [
     { name: "video", dir: "out", data: "video" },
@@ -458,11 +463,30 @@ export const EXECUTABLE_PORTS = {
   arduino: [
     { name: "command", dir: "in", data: "text" },
     { name: "trigger", dir: "in", data: "trigger" },
-    { name: "status", dir: "out", data: "text" }
+    { name: "status", dir: "out", data: "text" },
+    { name: "value", dir: "out", data: "number" }
   ],
   esp: [
     { name: "command", dir: "in", data: "text" },
     { name: "trigger", dir: "in", data: "trigger" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "value", dir: "out", data: "number" }
+  ],
+  "gpio-in": [
+    { name: "value", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  "gpio-out": [
+    { name: "value", dir: "in", data: "number" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "level", dir: "out", data: "number" }
+  ],
+  envelope: [
+    { name: "gate", dir: "in", data: "number" },
+    { name: "attack", dir: "in", data: "number" },
+    { name: "decay", dir: "in", data: "number" },
+    { name: "sustain", dir: "in", data: "number" },
+    { name: "level", dir: "out", data: "number" },
     { name: "status", dir: "out", data: "text" }
   ],
   servo: [
