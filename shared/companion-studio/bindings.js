@@ -4,6 +4,7 @@
  */
 
 import { makeStudioFeedback } from "./protocol.js";
+import { dispatchPanicEffects, formatPanicResult } from "../stage/cues.js";
 
 export const BINDING_KINDS = Object.freeze({
   action: "action",
@@ -93,13 +94,36 @@ export function applyCompanionBinding({
             for (const key of Object.keys(project)) delete project[key];
             Object.assign(project, applied.project);
           }
+          runtime?.setProject?.(project);
           runtime?.stop?.();
-          onLog("Companion · Stage PANIC");
+          const canSend = applied.effects?.some(effect =>
+            (effect.type === "artnet-blackout" && typeof sendArtNet === "function")
+            || (effect.type === "osc-stop" && typeof sendOsc === "function")
+          );
+          const preview = (applied.effects || []).flatMap(effect => {
+            if (effect.type === "artnet-blackout" && typeof sendArtNet !== "function") {
+              return [{ kind: "artnet", sent: false, universe: effect.universe, reason: "bridge absent" }];
+            }
+            if (effect.type === "osc-stop" && typeof sendOsc !== "function") {
+              return [{ kind: "osc", sent: false, address: effect.address, reason: "bridge absent" }];
+            }
+            return [];
+          });
+          if (canSend) {
+            dispatchPanicEffects(applied.effects, { sendOsc, sendArtNet })
+              .then(results => {
+                for (const line of formatPanicResult(applied.effects, results)) onLog(`Companion · ${line}`);
+              })
+              .catch(error => onLog(`Companion · PANIC · envoi non abouti · ${error?.message || error}`));
+          } else {
+            for (const line of formatPanicResult(applied.effects, preview)) onLog(`Companion · ${line}`);
+          }
+          const detail = formatPanicResult(applied.effects, preview).join(" · ");
           return makeStudioFeedback({
             widgetId: widget.id,
             value: "panic",
             ok: true,
-            detail: "PANIC",
+            detail,
             rttMs: Date.now() - t0
           });
         }

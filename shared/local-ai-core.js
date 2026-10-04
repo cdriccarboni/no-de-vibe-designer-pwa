@@ -1,5 +1,8 @@
 import { NODE_GROUPS } from "./node-specs.js";
 import { isExecutable } from "./ports.js";
+import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError, LOCAL_AI_PROBE_TIMEOUT_MS } from "./local-ai-diagnostic.js";
+
+export { LOCAL_AI_PROBE_TIMEOUT_MS, assessLocalModels, classifyLocalAiFailure };
 
 export const LOCAL_AI_DEFAULTS = Object.freeze({
   enabled: true,
@@ -157,12 +160,32 @@ export function sanitizeLocalAiResponse(raw, { maxOps = LOCAL_AI_DEFAULTS.maxOps
     if (!op || typeof op !== "object" || !allowedOps.has(op.op)) continue;
     if (op.op === "addNode") {
       if (!catalog.has(op.type)) continue;
+      const params = {};
+      if (op.params && typeof op.params === "object") {
+        for (const [key, value] of Object.entries(op.params).slice(0, 32)) {
+          if (!/^(key|token|secret|password|apiKey)$/i.test(key)) {
+            if (typeof value === "string") params[key] = value.slice(0, 60000);
+            else if (typeof value === "number" && Number.isFinite(value)) params[key] = value;
+            else if (typeof value === "boolean") params[key] = value;
+            else if (key === "isf" && value && typeof value === "object") {
+              params.isf = {
+                ISFVSERSION:String(value.ISFVSERSION || value.ISFVERSION || "2").slice(0, 12),
+                TYPE:String(value.TYPE || "IMAGE").slice(0, 32),
+                NAME:String(value.NAME || "No[co]de ISF").slice(0, 160),
+                DESCRIPTION:String(value.DESCRIPTION || "").slice(0, 500),
+                INPUTS:Array.isArray(value.INPUTS) ? value.INPUTS.slice(0, 32) : []
+              };
+            }
+          }
+        }
+      }
       ops.push({
         op: "addNode",
         type: op.type,
         x: Math.max(0, Math.min(6000, Number(op.x) || 60)),
         y: Math.max(0, Math.min(4000, Number(op.y) || 60)),
-        allowDuplicate: op.allowDuplicate === true
+        allowDuplicate: op.allowDuplicate === true,
+        ...(Object.keys(params).length ? { params } : {})
       });
     } else if (op.op === "connect") {
       const fromType = String(op.fromType || "");
@@ -204,15 +227,91 @@ export function sanitizeLocalAiResponse(raw, { maxOps = LOCAL_AI_DEFAULTS.maxOps
   };
 }
 
-export async function directOllamaProbe(baseUrl = LOCAL_AI_DEFAULTS.baseUrl) {
-  if (!isTrustedLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige localhost ou une IP privée du réseau local");
-  const res = await fetch(String(baseUrl).replace(/\/+$/, "") + "/api/tags", { method: "GET" });
-  if (!res.ok) throw new Error("Ollama HTTP " + res.status);
-  const data = await res.json();
-  return { ok: true, models: modelNamesFromTags(data) };
+function loopbackHost(hostname = "") {
+  return ["127.0.0.1", "localhost", "::1"].includes(String(hostname || "").toLowerCase().replace(/^\[|\]$/g, ""));
 }
 
-export async function directOllamaChat({ baseUrl, model, system, user, temperature = .15 } = {}) {
+function throwLocalAiFailure(failure, cause) {
+  const error = new Error(failure?.message || "Ollama inaccessible");
+  error.failure = failure || { code: "unreachable", message: error.message, responded: false };
+  error.responded = false;
+  if (cause) error.cause = cause;
+  return error;
+}
+
+async function opaqueOllamaReachable(url, timeoutMs) {
+  if (typeof document === "undefined") return false;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(100, timeoutMs));
+  try {
+    await fetch(url, { method: "GET", mode: "no-cors", cache: "no-store", signal: controller.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function directOllamaProbe(baseUrl = LOCAL_AI_DEFAULTS.baseUrl, options = {}) {
+  if (!isTrustedLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige localhost ou une IP privée du réseau local");
+  const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : LOCAL_AI_PROBE_TIMEOUT_MS;
+  const target = new URL(String(baseUrl).replace(/\/+$/, ""));
+  const pageProtocol = options.pageProtocol || globalThis?.location?.protocol || "";
+  const loopback = loopbackHost(target.hostname);
+  const mixed = classifyLocalAiFailure({ pageProtocol, targetProtocol: target.protocol, model: options.model });
+  if (mixed?.code === "mixed_content") throw throwLocalAiFailure(mixed);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
+  try {
+    const res = await fetch(target.origin + "/api/tags", { method: "GET", cache: "no-store", signal: controller.signal });
+    if (!res.ok) {
+      const failure = classifyLocalAiFailure({
+        status: res.status,
+        message: "Ollama HTTP " + res.status,
+        endpoint: "tags",
+        model: options.model,
+        probeTimeout: true
+      });
+      throw throwLocalAiFailure(failure);
+    }
+    const data = await res.json();
+    const models = modelNamesFromTags(data);
+    const assessed = assessLocalModels(models, options.model || "");
+    return {
+      ok: assessed.ok,
+      models,
+      installed: assessed.installed,
+      notice: assessed.notice,
+      error: assessed.error,
+      failure: assessed.failure,
+      responded: false
+    };
+  } catch (error) {
+    if (error?.failure) throw error;
+    let corsBlocked = false;
+    const remaining = timeoutMs - (Date.now() - started);
+    if (remaining > 200 && typeof document !== "undefined" && error?.name !== "AbortError") {
+      corsBlocked = await opaqueOllamaReachable(target.origin + "/api/tags", remaining);
+    }
+    const failure = classifyLocalAiFailure(factsFromLocalAiError(error, {
+      pageProtocol,
+      targetProtocol: target.protocol,
+      corsBlocked,
+      loopback,
+      probeTimeout: true,
+      binaryPresent: options.binaryPresent,
+      model: options.model
+    })) || { code: "unreachable", message: "Ollama inaccessible", responded: false };
+    throw throwLocalAiFailure(failure, error);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function directOllamaChat({ baseUrl, model, system, user, temperature = .15, numPredict = 1800 } = {}) {
   if (!isTrustedLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige localhost ou une IP privée du réseau local");
   const res = await fetch(String(baseUrl).replace(/\/+$/, "") + "/api/chat", {
     method: "POST",
@@ -221,13 +320,19 @@ export async function directOllamaChat({ baseUrl, model, system, user, temperatu
       model,
       stream: false,
       format: "json",
-      options: { temperature, num_predict: 1800 },
+      options: { temperature, num_predict: Math.max(512, Math.min(12000, Number(numPredict) || 1800)) },
       messages: [{ role: "system", content: system }, { role: "user", content: user }]
     })
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error("Ollama HTTP " + res.status + " · " + body.slice(0, 180));
+    const failure = classifyLocalAiFailure({
+      status: res.status,
+      message: ("Ollama HTTP " + res.status + " · " + body.slice(0, 180)).trim(),
+      endpoint: "chat",
+      model
+    });
+    throw throwLocalAiFailure(failure);
   }
   return res.json();
 }

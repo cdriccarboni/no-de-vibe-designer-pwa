@@ -5,7 +5,10 @@ button,textarea,input{font:inherit;color:inherit}
 button{cursor:pointer}
 .mobile-app{position:relative;height:100dvh;display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto;padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
 header{display:flex;align-items:center;gap:8px;padding:8px 10px;padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right));border-bottom:1px solid var(--line);background:var(--panel);min-height:52px}
-header .brand{min-width:0}
+header .brand{min-width:0;display:flex;align-items:center;gap:8px}
+header .brand .brandmark{width:32px;height:32px;flex:none;border-radius:7px;overflow:hidden}
+header .brand .brandmark svg{width:100%;height:100%;display:block}
+header .brand .brand-copy{min-width:0}
 header .brand b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}header .brand .co{font-size:.62em;vertical-align:.18em;letter-spacing:0;font-weight:650}
 header small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
 .spacer{flex:1}

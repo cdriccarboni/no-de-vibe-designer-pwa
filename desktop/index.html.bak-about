@@ -8,9 +8,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="../mobile/icons/icon-192.png">
-  <link rel="icon" href="../mobile/icons/icon-192.png" type="image/png">
-  <meta property="og:title" content="No[co]de Vibe Designer">
-  <meta property="og:image" content="https://cdriccarboni.github.io/no-de-vibe-designer-pwa/icons/icon-512.png">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body data-theme="stage" data-workspace="bureau">
@@ -43,9 +40,8 @@
 </dialog>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><div class="brandmark" title="No[co]de Vibe Designer"><img class="nocode-mark" src="../mobile/icons/icon-512.png" alt="" width="80" height="80"></div><div><b>No<span class="co">[co]</span>de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v3.3.0</span>
-    <span id="showLockBadge" class="show-lock-badge" role="status" aria-live="polite" hidden>Spectacle verrouillé</span>
+    <div class="brand"><div class="brandmark" title="No[co]de Vibe Designer">◒</div><div><b>No<span class="co">[co]</span>de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
+    <span class="badge">v3.2.0</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
     <div class="themes workspace-modes"><a class="active" href="./index.html">Designer</a><a href="../show/index.html">Show</a></div>
@@ -77,7 +73,6 @@
               <button type="button" class="iconbtn collapse" title="Réduire">−</button>
             </div>
           </div>
-          <div id="showLockBanner" class="show-lock-banner" role="status" hidden>Spectacle verrouillé</div>
           <div id="graphPath" class="graph-path"></div>
           <div id="patchSpace" class="panel-body patch-space"></div>
         </section>
@@ -129,21 +124,35 @@
             <button id="stop" class="smallbtn">■</button>
             <span id="timecode">00:00.0</span>
             <div class="spacer"></div>
-            <div class="layer-add-wrap"><button id="addLayer" class="smallbtn layer-add-btn" type="button">+ Layer</button><div id="layerAddMenu" class="layer-add-menu hidden" role="menu" aria-label="Ajouter un layer"><button type="button" data-add-layer="video">Vidéo</button><button type="button" data-add-layer="effect">Effet</button><button type="button" data-add-layer="shader">Shader</button><button type="button" data-add-layer="shadow">Ombre</button><button type="button" data-add-layer="cue">Cue</button><button type="button" data-add-layer="bridge">Liaison</button></div></div>
+            <button id="addCue" class="smallbtn">+ Cue</button>
+            <button id="addEffect" class="smallbtn">+ Effet</button>
             <button id="cueGo" class="smallbtn">GO</button>
             <button id="cuePrev" class="smallbtn">◀ Cue</button>
             <button id="cueNext" class="smallbtn">Cue ▶</button>
             <button id="cuePanic" class="smallbtn danger">PANIC</button>
           </div>
-          <div id="timelineBody" class="timeline-body">
-            <div class="timeline-inner">
-              <div id="playhead" class="playhead"></div>
-              <div class="timeline-grid-head">
-                <div class="layers-head">Layers</div>
-                <div class="timeline-head">Timeline</div>
-                <div class="route-head">Sortie</div>
+          <div class="timeline-routing-wrap">
+            <div id="timelineBody" class="timeline-body">
+              <div class="timeline-inner">
+                <div id="playhead" class="playhead"></div>
+                <div class="track-labels">
+                  <div class="track-label">Vidéo</div><div class="track-label">Effets</div><div class="track-label">Shader</div>
+                  <div class="track-label">Ombre</div><div class="track-label">Cues</div><div class="track-label">Liaisons</div>
+                </div>
+                <div id="tracks" class="tracks">
+                  <div class="track" data-track="0"></div><div class="track" data-track="1"></div><div class="track" data-track="2"></div>
+                  <div class="track" data-track="3"></div><div class="track" data-track="4"></div><div class="track" data-track="5"></div>
+                </div>
               </div>
-              <div id="timelineRows" class="timeline-rows" role="grid" aria-label="Layers Timeline Routage"></div>
+            </div>
+            <div class="route-strip">
+              <div class="route-title">SORTIE</div>
+              <button class="route-btn" data-track-route="0">Principal</button>
+              <button class="route-btn" data-track-route="1">Principal</button>
+              <button class="route-btn" data-track-route="2">Principal</button>
+              <button class="route-btn" data-track-route="3">Principal</button>
+              <button class="route-btn" data-track-route="4">Principal</button>
+              <button class="route-btn" data-track-route="5">Principal</button>
             </div>
           </div>
         </div>
@@ -177,7 +186,7 @@
       <button type="button" data-pref-tab="io">Moteurs / I/O</button>
       <button type="button" data-pref-tab="backup">Sauvegardes</button>
       <button type="button" data-pref-tab="manual">Manuel</button>
-      <button type="button" data-pref-tab="about">À propos</button>
+      <button type="button" data-pref-tab="about">Version</button>
     </div>
     <div class="preferences-body">
       <div data-pref-panel="general">
@@ -201,7 +210,6 @@
       </div>
       <div data-pref-panel="ai" class="hidden">
         <p class="hint"><b>IA locale prioritaire</b> : No-de utilise d’abord Ollama sur cette machine pour générer des opérations de patch JSON. Si elle est indisponible, repli automatique sur le moteur local déterministe.</p>
-        <div class="local-agents" style="margin-top:8px"><b>Agent ISF / Shader</b><p class="hint" style="margin-top:4px">Routage automatique pour les demandes ISF, GLSL interactif ou shader réaliste : le modèle spécialisé produit un node Shader avec fragment GLSL et métadonnées ISF, sans armer de périphérique.</p></div>
         <label>Activer l’IA générative locale <input id="aiLocalEnabled" type="checkbox" checked></label>
         <label class="stack">Serveur local / LAN<input id="aiLocalBase" type="url" value="http://127.0.0.1:11434" placeholder="http://192.168.1.20:11434"></label>
         <div class="local-agents">
@@ -257,15 +265,7 @@
         <p class="hint"><b>Vibe Out</b> — transforme le patch courant en fichier de travail ouvrable dans un logiciel externe grâce à l’IA locale ou à ton endpoint externe.</p>
         <label class="stack">Cible
           <select id="vibeOutTarget">
-            <option value="javascript">JavaScript · script</option><option value="node">Node.js · script</option>
-              <option value="python">Python · script</option>
-              <option value="typescript">TypeScript · script</option>
-              <option value="c">C · programme</option>
-              <option value="cpp">C++ · programme</option>
-              <option value="rust">Rust · programme</option>
-              <option value="swift">Swift · programme</option>
-              <option value="glsl">GLSL · shader</option>
-              <option value="wgsl">WGSL · WebGPU</option><option value="max">Max/MSP · JS à copier-coller</option>
+            <option value="max">Max/MSP · JS à copier-coller</option>
             <option value="touchdesigner">TouchDesigner · Python à copier-coller</option>
             <option value="p5">p5.js · sketch</option>
             <option value="processing">Processing · .pde</option>
@@ -298,18 +298,10 @@
         <button type="button" id="clearAutosave" class="smallbtn danger">Effacer l’autosave locale</button>
       </div>
       <div data-pref-panel="manual" class="hidden">
-        <iframe id="manualFrame" class="manual-frame" src="../manuel/index.html" title="Manuel No[co]de Vibe Designer"></iframe>
+        <iframe id="manualFrame" class="manual-frame" src="../docs/manual/index.html" title="Manuel No[co]de Vibe Designer"></iframe>
       </div>
       <div data-pref-panel="about" class="hidden">
         <p id="versionInfo">No[co]de Vibe Designer</p>
-        <p class="about-credit">No[co]de Vibe Designer
-est une création de <a class="credit-link" href="http://carboni.cedric.free.fr/" target="_blank" rel="noopener noreferrer">Cédric Carboni</a>
-
-Conçue et développée pour les besoins d’<a class="credit-link" href="https://www.acousmatic-theatre.fr/" target="_blank" rel="noopener noreferrer" title="Visiter le site d’Acousmatic Théâtre">Acousmatic Théâtre</a>,
-notamment dans le cadre de la création du spectacle
-<i>Pirate(s), Paillettes !</i>
-
-© 2026 — Tous droits réservés.</p>
         <p class="hint"><b>PWA</b> — application web utilisable directement dans votre navigateur, sans installation obligatoire.</p>
         <p class="hint"><b>Mac</b> — application native Apple Silicon distribuée directement depuis le site lorsqu’un build est publié.</p>
         <p class="hint"><b>Companion</b> — sur téléphone, No-de peut devenir télécommande, caméra et capteur. Les fonctions Remote Camera restent marquées expérimentales tant que la recette terrain n’est pas validée.</p>
@@ -363,21 +355,7 @@ notamment dans le cadre de la création du spectacle
   <div class="route-hint">Les adaptateurs natifs (NDI, Syphon, Spout) sont préparés dans le modèle mais ne sont affichés comme actifs que lorsqu'un backend compatible est réellement disponible.</div>
 </div>
 
-  <script>
-    // PeerJS est chargé uniquement lorsqu'un flux distant est réellement utilisé.
-    // Le mode desktop/local reste autonome et hors-ligne par défaut.
-    window.__nvdLoadPeer = () => {
-      if (window.Peer) return Promise.resolve(window.Peer);
-      return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = "https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js";
-        script.async = true;
-        script.onload = () => window.Peer ? resolve(window.Peer) : reject(new Error("PeerJS chargé mais indisponible"));
-        script.onerror = () => reject(new Error("PeerJS indisponible hors-ligne"));
-        document.head.appendChild(script);
-      });
-    };
-  </script>
+  <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

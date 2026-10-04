@@ -4,6 +4,7 @@ import { createNodeProcessors } from "./node-processors.js";
 import { evaluateSubGraph } from "./subpatch.js";
 import { sharedAudio } from "./audio-engine.js";
 import { createMlRuntime } from "./ml-runtime.js";
+import { renderTextPlate } from "./composition.js";
 
 export class Runtime {
   constructor(canvas, { destination = "main-output", onGraphEvent = null } = {}) {
@@ -339,6 +340,15 @@ export class Runtime {
     });
 
     // Error banner (non-blocking)
+    for (const node of this.project.nodes || []) {
+      if (node.type !== "text" || !node.params?.text) continue;
+      const plate = renderTextPlate({ ...node.params, width: w, height: h });
+      if (!plate.drawn) continue;
+      const image = c.createImageData(plate.width, plate.height);
+      image.data.set(plate.pixels);
+      c.putImageData(image, 0, 0);
+    }
+
     if (result.errors.length) {
       c.fillStyle = "rgba(120,30,30,.75)";
       c.fillRect(0, 0, w, 36);
@@ -380,23 +390,31 @@ export class Runtime {
   }
 
   drawPlaceholder(c, w, h) {
-    const g = c.createRadialGradient(w * .5, h * .35, 20, w * .5, h * .4, w * .65);
-    g.addColorStop(0, "#2a3037");
+    // Sortie neutre : aucun visuel de test ne doit être confondu avec une image générée.
+    const g = c.createRadialGradient(w * .5, h * .4, 12, w * .5, h * .5, Math.max(w, h) * .7);
+    g.addColorStop(0, "#1d2228");
     g.addColorStop(1, "#090b0d");
     c.fillStyle = g;
     c.fillRect(0, 0, w, h);
-    c.fillStyle = "#30363d";
-    c.strokeStyle = "#6f7882";
-    c.lineWidth = Math.max(2, w / 500);
-    c.beginPath();
-    c.moveTo(w * .26, h * .58);
-    c.bezierCurveTo(w * .35, h * .36, w * .58, h * .37, w * .72, h * .48);
-    c.bezierCurveTo(w * .78, h * .53, w * .82, h * .5, w * .88, h * .44);
-    c.bezierCurveTo(w * .83, h * .6, w * .72, h * .69, w * .57, h * .68);
-    c.bezierCurveTo(w * .44, h * .69, w * .35, h * .65, w * .26, h * .58);
-    c.closePath();
-    c.fill();
-    c.stroke();
+    c.save();
+    c.strokeStyle = "#252b31";
+    c.lineWidth = 1;
+    const step = Math.max(48, Math.round(Math.min(w, h) / 12));
+    for (let x = step; x < w; x += step) {
+      c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke();
+    }
+    for (let y = step; y < h; y += step) {
+      c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke();
+    }
+    c.fillStyle = "#7b848e";
+    c.font = "600 13px Inter, system-ui, sans-serif";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillText("Aucun rendu actif", w * .5, h * .5 - 9);
+    c.fillStyle = "#59616a";
+    c.font = "10px Inter, system-ui, sans-serif";
+    c.fillText("Ajoute un node ou lance Vibe", w * .5, h * .5 + 11);
+    c.restore();
   }
 
   setShaderSource(fragment) {

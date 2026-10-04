@@ -4,7 +4,9 @@ import { validateEdge } from "./graph-engine.js";
 import { deterministicVibePlan } from "./vibe-planner.js";
 import { secureVibePlan } from "./vibe-safety.js";
 import { buildLocalAiPrompt, directOllamaChat, directOllamaProbe, normalizeLocalAiConfig, sanitizeLocalAiResponse, selectLocalModels } from "./local-ai-core.js";
+import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError } from "./local-ai-diagnostic.js";
 import { selectLocalAgents } from "./local-agent-registry.js";
+import { buildIsfAgentPrompt, isIsfRequest, normalizeIsfNodeParams } from "./isf-agent.js";
 
 /**
  * Vibe coding — génération structurée de patch.
@@ -97,7 +99,11 @@ function parseAiOps(content, label = "IA") {
 
 function localAgentTaskForText(text = "") {
   const value = String(text || "").toLowerCase();
-  if (/\[image\s*→\s*vibe|image\s*->\s*vibe|photo|dessin|texture|vision|silhouette|image/.test(value)) return "vision";
+  if (isIsfRequest(value)) return "shader";
+  if (/\b(processing|\.pde|processing java)\b/.test(value)) return "code";
+  if (/\b(node\.js|nodejs|javascript|js|typescript|\.ts|\.js)\b/.test(value)) return "code";
+  if (/\bp5(?:\.js)?\b|p5\.js/.test(value)) return "code";
+  if (/(image\s*→\s*vibe|image\s*->\s*vibe|photo|dessin|texture|vision|silhouette|image)/.test(value)) return "vision";
   if (/vite|rapide|léger|leger|draft|brouillon/.test(value)) return "fast";
   return "patch";
 }
@@ -107,7 +113,7 @@ async function callLocalAi(text, project, cfg) {
   if (!local.enabled) return { ok:false, unavailable:true, error:"Local AI Core désactivé" };
 
   const probe = await probeLocalAi(cfg);
-  if (!probe.ok) return { ok:false, unavailable:true, error:probe.error || "Ollama local indisponible" };
+  if (!probe.ok) return { ok:false, unavailable:true, responded:false, error:probe.error || "Ollama local indisponible" };
 
   const agentTask = localAgentTaskForText(text);
   const routedAgents = selectLocalAgents(local.agents, {
@@ -118,7 +124,8 @@ async function callLocalAi(text, project, cfg) {
   const targets = routedAgents.length
     ? routedAgents.map(agent => ({ model:agent.model, baseUrl:agent.baseUrl || local.baseUrl, role:agent.role }))
     : fallbackModels.map(model => ({ model, baseUrl:local.baseUrl, role:"legacy" }));
-  const prompt = buildLocalAiPrompt(text, project);
+  const isfMode = isIsfRequest(text);
+  const prompt = isfMode ? buildIsfAgentPrompt(text, project) : buildLocalAiPrompt(text, project);
 
   const ask = async target => {
     const model = target.model;
@@ -129,14 +136,16 @@ async function callLocalAi(text, project, cfg) {
           model,
           temperature:local.temperature,
           system:prompt.system,
-          user:prompt.user
+          user:prompt.user,
+          numPredict:isfMode ? 8000 : 1800
         })
       : await directOllamaChat({
           baseUrl,
           model,
           temperature:local.temperature,
           system:prompt.system,
-          user:prompt.user
+          user:prompt.user,
+          numPredict:isfMode ? 8000 : 1800
         });
     const parsed = sanitizeLocalAiResponse(raw, { maxOps:local.maxOps });
     if (!parsed.ok) throw new Error(parsed.error || "Réponse locale inexploitable");
@@ -177,7 +186,8 @@ async function callLocalAi(text, project, cfg) {
       localModels:[parsed.model]
     };
   } catch (e) {
-    return { ok:false, unavailable:true, error:"Local AI Core injoignable : " + (e?.message || e) };
+    const message = e?.failure?.message || e?.message || String(e);
+    return { ok:false, unavailable:true, responded:false, error: e?.failure ? message : "Local AI Core injoignable : " + message };
   }
 }
 async function callRemoteAi(text, project, cfg) {
@@ -223,27 +233,76 @@ async function callRemoteAi(text, project, cfg) {
 
 export async function probeLocalAi(cfg = readAiConfig(), { fresh = false } = {}) {
   const local = normalizeLocalAiConfig(cfg);
-  if (!local.enabled) return { ok:false, available:false, disabled:true, error:"Local AI Core désactivé", models:[] };
+  if (!local.enabled) return { ok:false, available:false, disabled:true, error:"Local AI Core désactivé", models:[], responded:false };
   try {
     const bridgeProbe = globalThis?.nvdDesktop?.localAiProbe || globalThis?.nvdDesktop?.probeLocalAi;
     const result = typeof bridgeProbe === "function"
       ? await bridgeProbe({ baseUrl:local.baseUrl, model:local.model })
-      : await directOllamaProbe(local.baseUrl);
+      : await directOllamaProbe(local.baseUrl, { model:local.model });
+    if (result && result.ok === false) {
+      return {
+        ok:false,
+        available: result.available === true,
+        installed:false,
+        baseUrl:local.baseUrl,
+        models:Array.isArray(result.models) ? result.models : [],
+        model:local.model,
+        error:result.error || result.failure?.message || "Ollama inaccessible",
+        failure:result.failure || null,
+        responded:false,
+        fresh
+      };
+    }
     const models = Array.isArray(result?.models) ? result.models : [];
-    const selected = selectLocalModels(models, local.model, local.secondaryModel);
-    const installed = result?.installed === true || models.includes(selected.primary) || models.some(name => String(name).split(":")[0] === String(selected.primary).split(":")[0]);
+    const assessed = assessLocalModels(models, local.model);
+    if (!assessed.ok) {
+      return {
+        ok:false,
+        available:true,
+        reachable:true,
+        installed:false,
+        baseUrl:local.baseUrl,
+        models:assessed.models,
+        model:local.model,
+        error:assessed.error,
+        failure:assessed.failure,
+        responded:false,
+        fresh
+      };
+    }
+    const selected = selectLocalModels(assessed.models, local.model, local.secondaryModel);
+    const primaryInstalled = assessed.models.includes(selected.primary)
+      || assessed.models.some(name => String(name).split(":")[0] === String(selected.primary).split(":")[0]);
     return {
       ok:true,
       available:true,
-      installed,
+      installed:assessed.installed || primaryInstalled,
       baseUrl:local.baseUrl,
-      models,
+      models:assessed.models,
       model:selected.primary,
       localModels:[selected.primary, selected.secondary].filter(Boolean),
+      notice:assessed.notice || result?.notice || "",
+      failure:assessed.failure || null,
+      responded:false,
       fresh
     };
   } catch (e) {
-    return { ok:false, available:false, baseUrl:local.baseUrl, models:[], error:e?.message || String(e) };
+    const failure = e?.failure || classifyLocalAiFailure(factsFromLocalAiError(e, {
+      model:local.model,
+      probeTimeout:true,
+      loopback:/^(https?:\/\/)?(127\.0\.0\.1|localhost|\[::1\])/.test(local.baseUrl)
+    }));
+    return {
+      ok:false,
+      available:false,
+      installed:false,
+      baseUrl:local.baseUrl,
+      models:[],
+      error:failure?.message || e?.message || String(e),
+      failure:failure || null,
+      responded:false,
+      fresh
+    };
   }
 }
 

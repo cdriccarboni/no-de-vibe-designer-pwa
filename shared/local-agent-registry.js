@@ -9,6 +9,7 @@ export const LOCAL_AGENT_ROLES = Object.freeze([
   { id:"vision", label:"Vision / image" },
   { id:"fast", label:"Rapide" },
   { id:"chat", label:"Chat / général" },
+  { id:"shader", label:"Shader / ISF" },
   { id:"embedding", label:"Embedding" },
   { id:"utility", label:"Utilitaire" }
 ]);
@@ -62,6 +63,9 @@ export function classifyLocalAgent(model = "", show = {}) {
   }
   if (caps.includes("vision") || /(vision|llava|bakllava|moondream|minicpm-v|qwen[^ ]*-vl)/.test(text)) {
     return { role:"vision", generative:true, reason:"vision" };
+  }
+  if (/(isf|shader|glsl|spirv)/.test(text)) {
+    return { role:"shader", generative:true, reason:"shader / ISF" };
   }
   if (/(coder|codeqwen|deepseek-coder|starcoder|codestral)/.test(text)) {
     return { role:"code", generative:true, reason:"code" };
@@ -130,23 +134,29 @@ export function mergeLocalAgentRegistry(discovered = [], saved = []) {
     } catch { /* ignore invalid stale entries */ }
   }
   return merged.sort((a,b) => {
-    const order = { code:0, vision:1, fast:2, chat:3, embedding:4, utility:5 };
+    const order = { code:0, shader:1, vision:2, fast:3, chat:4, embedding:5, utility:6 };
     return (order[a.role] ?? 9) - (order[b.role] ?? 9) || a.model.localeCompare(b.model);
   });
 }
 
 async function browserTags(baseUrl) {
-  const res = await fetch(baseUrl + "/api/tags");
-  if (!res.ok) throw new Error("Ollama HTTP " + res.status);
-  const data = await res.json();
-  return Array.isArray(data?.models) ? data.models.map(m => m?.name || m?.model).filter(Boolean) : [];
+  const { directOllamaProbe } = await import("./local-ai-core.js");
+  const probe = await directOllamaProbe(baseUrl);
+  if (!probe?.ok) {
+    const error = new Error(probe?.error || probe?.failure?.message || "Modèle Ollama absent");
+    error.failure = probe?.failure || null;
+    error.responded = false;
+    throw error;
+  }
+  return Array.isArray(probe.models) ? probe.models : [];
 }
 
 async function browserShow(baseUrl, model) {
   const res = await fetch(baseUrl + "/api/show", {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({ model })
+    body:JSON.stringify({ model }),
+    signal: AbortSignal.timeout(2500)
   });
   if (!res.ok) throw new Error("Ollama show HTTP " + res.status);
   return res.json();
@@ -192,7 +202,9 @@ export async function scanLocalAgents({ baseUrl = "http://127.0.0.1:11434", save
 }
 
 function taskRoleOrder(task = "patch") {
+  if (task === "shader" || task === "isf") return ["shader","code","chat","fast","vision"];
   if (task === "vision" || task === "image") return ["vision","code","chat","fast"];
+  if (task === "code") return ["code","shader","chat","fast","vision"];
   if (task === "fast") return ["fast","chat","code","vision"];
   if (task === "chat") return ["chat","fast","code","vision"];
   return ["code","chat","fast","vision"];
@@ -206,6 +218,7 @@ export function selectLocalAgents(agents = [], { task = "patch", limit = 2 } = {
     .map((a,index) => {
       let score = roleScore.get(a.role) ?? 5;
       const n = String(a.model || "").toLowerCase();
+      if ((task === "shader" || task === "isf") && /(shader|glsl|isf)/.test(n)) score += 35;
       if (task === "patch" && /coder/.test(n)) score += 25;
       if ((task === "vision" || task === "image") && (a.capabilities || []).includes("vision")) score += 30;
       if (a.source === "electron") score += 1;

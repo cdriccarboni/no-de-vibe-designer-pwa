@@ -36,7 +36,7 @@ function line(f,x0,y0,x1,y1,c){
 function resolve(token,vars){
   const s=String(token??"").trim();
   if(s in vars)return Number(vars[s])||0;
-  const m=s.match(/^([a-zA-Z]+)s*([*/+-])s*(-?\d+(?:\.\d+)?)$/);
+  const m=s.match(/^([a-zA-Z]+)\s*([*/+-])\s*(-?\d+(?:\.\d+)?)$/);
   if(m&&m[1] in vars){const a=Number(vars[m[1]])||0,b=Number(m[3])||0;return m[2]==="*"?a*b:m[2]==="/"?a/(b||1):m[2]==="+"?a+b:a-b;}
   const n=Number(s);return Number.isFinite(n)?n:0;
 }

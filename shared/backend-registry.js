@@ -1,74 +1,63 @@
 /**
- * Lit le relevé prouvé sur cette machine. Le fichier de données se recharge
- * sans changer la logique. Rien n'est installé ici.
+ * Vue du registre d'agents. Le fichier backend-status n'active rien.
+ * Le chat ne choisit que des agents rendus VALIDÉ par une sonde.
  */
-import { BACKEND_STATUS as snapshot } from "./backend-status.js";
+import {
+  AGENT_STATUSES,
+  consultAgents,
+  defaultRegistry,
+  disponibleRows,
+  renderAgentTable,
+  selectAgentsForRequest
+} from "./agent-registry.js";
 
-export const BACKEND_STATUSES = Object.freeze([
-  "NON DISPONIBLE",
-  "DISPONIBLE",
-  "DISPONIBLE AVEC LIMITATIONS",
-  "INCOMPATIBLE",
-  "ERREUR"
-]);
+export const BACKEND_STATUSES = AGENT_STATUSES;
 
-let current = snapshot;
+let current = defaultRegistry();
 
 export function backendStatus() {
   return current;
 }
 
+export function rememberRegistry(doc) {
+  if (doc?.rows) current = doc;
+  return current;
+}
+
 export async function refreshBackendStatus() {
-  const url = new URL("./backend-status.json", import.meta.url);
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Registre illisible");
-  current = await response.json();
   return current;
 }
 
 export function artistBackends(doc = current) {
-  return (doc?.rows || []).filter(row => (row.state || row.status) === "DISPONIBLE");
+  return disponibleRows(doc);
 }
 
 export function technicalRows(doc = current) {
   return doc?.rows || [];
 }
 
-function esc(value) {
-  return String(value ?? "").replace(/[&<>"]/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;" }[ch]));
-}
-
 export function renderBackendReport(mode = "artist", doc = current) {
   if (mode !== "technical") {
-    const names = artistBackends(doc).map(row => row.label);
-    return `<p>Moteurs prêts : ${esc(names.join(", "))}.</p>`;
+    const names = artistBackends(doc).map(row => row.agent);
+    if (!doc?.probed) return "<p>Aucun agent actif. Le statut vient d'une sonde, pas d'un fichier de configuration.</p>";
+    return `<p>Agents VALIDÉ : ${names.length ? names.join(", ") : "aucun"}.</p>`;
   }
-  const lines = (doc?.rows || []).map(row => {
-    const state = row.state || row.status;
-    const link = state === "NON DISPONIBLE" && row.installUrl
-      ? ` <a href="${esc(row.installUrl)}" target="_blank" rel="noopener noreferrer">Installer maintenant</a>`
-      : "";
-    return `<li><b>${esc(row.name || row.label)}</b> · ${esc(state)}${row.version ? " · " + esc(row.version) : ""}${link}</li>`;
-  });
-  return `<p>Relevé ${esc(doc?.probedAt || "")} · ${esc(doc?.os || "")} · <a href="../shared/backend-status.json" data-refresh-backends>Relire le relevé</a></p><ul>${lines.join("")}</ul>`;
+  return renderAgentTable(doc);
 }
-
-const PREVIEW = new Set(["javascript", "webgl", "glsl"]);
 
 export function proposeArchitectures(prompt, doc = current) {
-  const text = String(prompt || "").toLowerCase();
-  const complex = /shader|glsl|vidéo|video|audio|osc|gpu/.test(text);
-  const ready = artistBackends(doc);
-  const ranked = [];
-  const push = id => {
-    const row = ready.find(item => item.id === id);
-    if (row && !ranked.some(item => item.id === id)) {
-      ranked.push({ id: row.id, label: row.label, preview: PREVIEW.has(row.id), proof: row.proof });
-    }
+  const options = selectAgentsForRequest(prompt, doc).map(row => ({
+    id: row.id,
+    label: row.agent,
+    preview: row.id === "javascript" || row.id === "webgl" || row.id === "glsl",
+    proof: row.lastTest
+  }));
+  return {
+    prompt: String(prompt || ""),
+    complex: options.length > 1,
+    options,
+    fusionRan: false
   };
-  push("javascript");
-  if (/shader|glsl|gpu|vidéo|video/.test(text)) push("webgl");
-  if (/shader|glsl/.test(text)) push("glsl");
-  const options = (complex ? ranked : ranked.slice(0, 1)).slice(0, 3);
-  return { prompt: String(prompt || ""), complex, options, fusionRan: false };
 }
+
+export { consultAgents, selectAgentsForRequest };

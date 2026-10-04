@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.2.0-multi-6f18c6bf58";
+const CACHE = "nvd-3.3.0-multi-14be299963";
 const ASSETS = [
   "./companion/companion.css",
   "./companion/companion.js",
@@ -11,9 +11,13 @@ const ASSETS = [
   "./desktop/app.js",
   "./desktop/float-panels.js",
   "./desktop/index.html",
+  "./desktop/index.html.bak-about",
   "./desktop/manifest.webmanifest",
   "./desktop/output.html",
+  "./desktop/shortcuts.html",
+  "./desktop/splash.html",
   "./desktop/styles.css",
+  "./desktop/vibe-designer-mark.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-192.png",
@@ -38,6 +42,7 @@ const ASSETS = [
   "./shared/adapters/serial.js",
   "./shared/adapters/shader-surface.js",
   "./shared/adapters/websocket-bridge.js",
+  "./shared/agent-registry.js",
   "./shared/audio-engine.js",
   "./shared/backend-registry.js",
   "./shared/backend-status.js",
@@ -54,6 +59,7 @@ const ASSETS = [
   "./shared/companion-studio/transport-ws.js",
   "./shared/companion-studio/transport.js",
   "./shared/companion-studio/widgets.js",
+  "./shared/composition.js",
   "./shared/connection-states.js",
   "./shared/demos.js",
   "./shared/device-manager.js",
@@ -82,8 +88,10 @@ const ASSETS = [
   "./shared/history.js",
   "./shared/image-vibe.js",
   "./shared/ir.js",
+  "./shared/isf-agent.js",
   "./shared/local-agent-registry.js",
   "./shared/local-ai-core.js",
+  "./shared/local-ai-diagnostic.js",
   "./shared/media-status.js",
   "./shared/ml-runtime.js",
   "./shared/mobile-sensors.js",

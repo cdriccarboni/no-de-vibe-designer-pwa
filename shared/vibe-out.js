@@ -25,6 +25,30 @@ function compactProject(project = {}) {
 }
 
 export const VIBE_OUT_TARGETS = Object.freeze({
+  javascript: {
+    label:"JavaScript · script",
+    extension:"js",
+    mime:"text/javascript",
+    system:[
+      "Tu génères un script JavaScript complet et autonome.",
+      "Retourne UNIQUEMENT du JavaScript, sans markdown.",
+      "Le script doit avoir un point d'entrée clair et produire un résultat observable (console, DOM/canvas ou sortie explicitement décrite).",
+      "Utilise uniquement des APIs JavaScript standard ou celles explicitement demandées.",
+      "Ne retourne jamais une réponse vide ni un pseudo-code."
+    ].join("\n")
+  },
+  node: {
+    label:"Node.js · script",
+    extension:"mjs",
+    mime:"text/javascript",
+    system:[
+      "Tu génères un script Node.js complet et exécutable.",
+      "Retourne UNIQUEMENT du JavaScript Node.js, sans markdown.",
+      "Le script doit avoir un point d'entrée clair et produire un résultat observable.",
+      "Privilégie les APIs Node.js standard et évite les dépendances implicites.",
+      "Ne retourne jamais une réponse vide ni un pseudo-code."
+    ].join("\n")
+  },
   max: {
     label:"Max/MSP · JS builder",
     extension:"js",
@@ -86,6 +110,94 @@ export const VIBE_OUT_TARGETS = Object.freeze({
       "Utilise l'API Processing standard et commente TODO_ADAPT si une fonction externe reste à brancher."
     ].join("\n")
   },
+  python: {
+    label:"Python · script",
+    extension:"py",
+    mime:"text/x-python",
+    system:[
+      "Tu génères un script Python 3 complet et exécutable.",
+      "Retourne UNIQUEMENT du Python, sans markdown.",
+      "Le script doit avoir un point d'entrée clair et produire un résultat observable.",
+      "Privilégie la bibliothèque standard sauf demande explicite."
+    ].join("\n")
+  },
+  typescript: {
+    label:"TypeScript · script",
+    extension:"ts",
+    mime:"text/typescript",
+    system:[
+      "Tu génères un programme TypeScript complet et compilable.",
+      "Retourne UNIQUEMENT du TypeScript, sans markdown.",
+      "Le programme doit avoir un point d'entrée clair et produire un résultat observable.",
+      "Évite les dépendances implicites."
+    ].join("\n")
+  },
+  c: {
+    label:"C · programme",
+    extension:"c",
+    mime:"text/x-c",
+    system:[
+      "Tu génères un programme C complet et compilable.",
+      "Retourne UNIQUEMENT le code C, sans markdown.",
+      "Le programme doit contenir main() et produire un résultat observable.",
+      "Utilise uniquement la bibliothèque standard sauf demande explicite."
+    ].join("\n")
+  },
+  cpp: {
+    label:"C++ · programme",
+    extension:"cpp",
+    mime:"text/x-c++src",
+    system:[
+      "Tu génères un programme C++ complet et compilable.",
+      "Retourne UNIQUEMENT le code C++, sans markdown.",
+      "Le programme doit contenir main() et produire un résultat observable.",
+      "Utilise la bibliothèque standard sauf demande explicite."
+    ].join("\n")
+  },
+  rust: {
+    label:"Rust · programme",
+    extension:"rs",
+    mime:"text/rust",
+    system:[
+      "Tu génères un programme Rust complet et compilable.",
+      "Retourne UNIQUEMENT le code Rust, sans markdown.",
+      "Le programme doit contenir fn main() et produire un résultat observable.",
+      "N'utilise que la bibliothèque standard sauf demande explicite."
+    ].join("\n")
+  },
+  swift: {
+    label:"Swift · programme",
+    extension:"swift",
+    mime:"text/swift",
+    system:[
+      "Tu génères un programme Swift complet et compilable.",
+      "Retourne UNIQUEMENT le code Swift, sans markdown.",
+      "Le programme doit être autonome et produire un résultat observable.",
+      "Utilise les frameworks système uniquement si nécessaires."
+    ].join("\n")
+  },
+  glsl: {
+    label:"GLSL · shader",
+    extension:"frag",
+    mime:"text/plain",
+    system:[
+      "Tu génères un fragment shader GLSL ES 3.00 complet.",
+      "Retourne UNIQUEMENT le shader, sans markdown.",
+      "Le shader doit compiler sous WebGL2.",
+      "Utilise u_time, u_resolution et u_intensity quand utiles.",
+      "Ne déclenche aucun périphérique ou accès système."
+    ].join("\n")
+  },
+  wgsl: {
+    label:"WGSL · shader WebGPU",
+    extension:"wgsl",
+    mime:"text/plain",
+    system:[
+      "Tu génères un shader WGSL complet et valide pour WebGPU.",
+      "Retourne UNIQUEMENT le WGSL, sans markdown.",
+      "Le shader doit être compilable par le validateur WebGPU."
+    ].join("\n")
+  },
   puredata: {
     label:"Pure Data",
     extension:"pd",
@@ -124,6 +236,40 @@ export function buildVibeOutPrompt(target, project, instruction = "") {
 export function validateVibeOut(target, content) {
   const text = stripFences(content);
   if (!text) return { ok:false, error:"Vibe Out : réponse vide", content:"" };
+  if (target === "javascript") {
+    if (!/(console\.|document\.|canvas|getElementById|function\s+main\s*\(|=>)/.test(text)) {
+      return { ok:false, error:"Vibe Out JavaScript : script exécutable non reconnu", content:text };
+    }
+  }
+  if (target === "node") {
+    if (!/(process\.|console\.|import\s+|require\s*\(|async\s+function|function\s+main\s*\(|=>)/.test(text)) {
+      return { ok:false, error:"Vibe Out Node.js : script exécutable non reconnu", content:text };
+    }
+  }
+  if (target === "python" && !/(print\s*\(|def\s+main\s*\(|if __name__\\s*===?)/.test(text)) {
+    return { ok:false, error:"Vibe Out Python : script exécutable non reconnu", content:text };
+  }
+  if (target === "typescript" && !/(console\.|function\s+main\s*\(|const\\s+|let\\s+|interface\\s+)/.test(text)) {
+    return { ok:false, error:"Vibe Out TypeScript : script non reconnu", content:text };
+  }
+  if (target === "c" && !(/\bint\s+main\s*\(/.test(text))) {
+    return { ok:false, error:"Vibe Out C : main() absent", content:text };
+  }
+  if (target === "cpp" && !(/\bint\s+main\s*\(/.test(text))) {
+    return { ok:false, error:"Vibe Out C++ : main() absent", content:text };
+  }
+  if (target === "rust" && !(/\bfn\s+main\s*\(/.test(text))) {
+    return { ok:false, error:"Vibe Out Rust : fn main() absent", content:text };
+  }
+  if (target === "swift" && !(/\bprint\s*\(|@main\b|func\s+main\s*\(/.test(text))) {
+    return { ok:false, error:"Vibe Out Swift : point d'entrée non reconnu", content:text };
+  }
+  if (target === "glsl" && !(/#version\s+300\s+es/.test(text) && /void\s+main\s*\(/.test(text))) {
+    return { ok:false, error:"Vibe Out GLSL : shader ES 3.00 non reconnu", content:text };
+  }
+  if (target === "wgsl" && !(/@(?:fragment|compute|vertex)\b/.test(text) && /fn\s+\w+\s*\(/.test(text))) {
+    return { ok:false, error:"Vibe Out WGSL : entry point non reconnu", content:text };
+  }
   if (target === "max") {
     if (!/(this\.patcher|newdefault\s*\(|function\s+bang\s*\()/.test(text)) {
       return { ok:false, error:"Vibe Out Max : script builder non reconnu", content:text };
