@@ -1519,3 +1519,18 @@ safety.triggerNextCue();
 assert(mockRuntime.cueFired === true, "StageSafety triggers NEXT CUE (GO)");
 
 console.log(" OK   StageSafety rehearsal guardrails unit tests passed");
+
+// ============================================================================
+// TESTS NAVIGATION UNIFIÉE DES 7 SURFACES (surface-switcher.js)
+// ============================================================================
+import { getSurfaceList } from "../shared/surface-switcher.js";
+
+const surfaces = getSurfaceList();
+assert(surfaces.length === 7, "Surface switcher exposes exactly 7 surfaces");
+
+const expectedIds = ["designer", "show", "mobile", "regie", "plateau", "camera", "auto"];
+expectedIds.forEach(id => {
+  assert(surfaces.some(s => s.id === id), "Surface list contains mode: " + id);
+});
+
+console.log(" OK   Unified 7 Surfaces Navigation tests passed");
