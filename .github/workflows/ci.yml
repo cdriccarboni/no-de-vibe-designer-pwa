@@ -22,26 +22,47 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Install
-        run: npm ci
-      - name: Production audit
-        run: npm run audit:production
-      - name: Core tests
-        run: npm test
-      - name: Syntax checks
-        run: npm run check
-      - name: Build PWA
-        run: npm run build:pwa
-      - name: Verify PWA
+      - name: Verify install, tests, syntax and PWA
+        id: verify_all
+        shell: bash
         run: |
-          test -f dist/pwa/index.html
-          test -f dist/pwa/desktop/index.html
-          test -f dist/pwa/mobile/index.html
-          test -f dist/pwa/manuel/index.html
-          test -f dist/pwa/shared/image-vibe.js
-          test -f dist/pwa/shared/graphics/mapping-v3.js
-          test -f dist/pwa/src/core/StageSafety.js
-          node -e "const fs=require('fs');const pkg=require('./package.json');const info=JSON.parse(fs.readFileSync('dist/pwa/build-info.json','utf8'));if(info.version!==pkg.version)throw new Error('PWA version mismatch: '+info.version+' != '+pkg.version)"
+          set +e
+          : > ci-diagnostics.log
+          failed=0
+          run_step() {
+            label="$1"; shift
+            echo "===== $label =====" | tee -a ci-diagnostics.log
+            "$@" 2>&1 | tee -a ci-diagnostics.log
+            status=${PIPESTATUS[0]}
+            echo "===== $label exit=$status =====" | tee -a ci-diagnostics.log
+            if [ "$status" -ne 0 ]; then failed=1; fi
+          }
+          run_step "npm ci" npm ci
+          run_step "production audit" npm run audit:production
+          run_step "core tests" npm test
+          run_step "syntax checks" npm run check
+          run_step "build PWA" npm run build:pwa
+          echo "===== PWA invariants =====" | tee -a ci-diagnostics.log
+          pwa_failed=0
+          for req in             dist/pwa/index.html             dist/pwa/desktop/index.html             dist/pwa/mobile/index.html             dist/pwa/manuel/index.html             dist/pwa/shared/image-vibe.js             dist/pwa/shared/graphics/mapping-v3.js             dist/pwa/src/core/StageSafety.js
+          do
+            if [ ! -f "$req" ]; then
+              echo "MISSING $req" | tee -a ci-diagnostics.log
+              pwa_failed=1
+            fi
+          done
+          node -e "const fs=require('fs');const pkg=require('./package.json');const info=JSON.parse(fs.readFileSync('dist/pwa/build-info.json','utf8'));if(info.version!==pkg.version)throw new Error('PWA version mismatch: '+info.version+' != '+pkg.version)" 2>&1 | tee -a ci-diagnostics.log
+          version_status=${PIPESTATUS[0]}
+          if [ "$pwa_failed" -ne 0 ] || [ "$version_status" -ne 0 ]; then failed=1; fi
+          echo "CI_FINAL_STATUS=$failed" | tee -a ci-diagnostics.log
+          exit "$failed"
+      - name: Upload CI diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: no-de-ci-diagnostics
+          path: ci-diagnostics.log
+          if-no-files-found: warn
 
   macos:
     runs-on: macos-14
