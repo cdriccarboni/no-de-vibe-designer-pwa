@@ -71,12 +71,39 @@ function plateau() {
   return validateCompanionDocument(doc);
 }
 
+function lecteurs12() {
+  const doc=createUniversalRegieLayout({name:"12 Players",profileIds:[],includeCore:false});
+  doc.pages=[];
+  for(let group=0;group<3;group++){
+    const start=group*4+1;
+    const p={id:`page-audio-players-${group+1}`,name:`Players ${start}–${start+3}`,role:"audio-players",icon:"♪",cols:4,rows:4,widgets:[]};
+    for(let offset=0;offset<4;offset++){
+      const slot=start+offset;
+      const y=offset;
+      const make=(label,action,x,w,color)=>normalizeWidget({
+        type:"button",
+        presentation:{label,secondary:`Player ${slot}`,x,y,w,h:1,color},
+        binding:{kind:"audioplayer",action,playerSlot:slot}
+      });
+      p.widgets.push(
+        make(`P${slot} ▶`,"play",0,2,"#8fa79d"),
+        make("Ⅱ","pause",2,1,"#d7b86a"),
+        make("■","stop",3,1,"#c97868")
+      );
+    }
+    doc.pages.push(p);
+  }
+  doc.meta.presetId="lecteurs12";
+  return validateCompanionDocument(doc);
+}
+
 export const REGIE_PRESETS=Object.freeze([
   {id:"conduite",name:"Conduite",badge:"base",description:"Cues et commandes de spectacle.",factory:conduite},
   {id:"son",name:"Son",badge:"son",description:"Page son compacte, à relier au profil de console utilisé.",factory:son},
   {id:"lumiere",name:"Lumière",badge:"lumière",description:"Page lumière compacte avec faders réseau prêts à configurer.",factory:lumiere},
   {id:"video",name:"Vidéo",badge:"vidéo",description:"Transport No-de et page vidéo prête à compléter.",factory:video},
-  {id:"plateau",name:"Plateau",badge:"plateau",description:"Commandes plateau, caméra et état réseau.",factory:plateau}
+  {id:"plateau",name:"Plateau",badge:"plateau",description:"Commandes plateau, caméra et état réseau.",factory:plateau},
+  {id:"lecteurs12",name:"12 Players",badge:"audio",description:"Douze lecteurs stéréo répartis sur trois pages compactes.",factory:lecteurs12}
 ]);
 
 export function createRegiePreset(id){
