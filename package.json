@@ -2,8 +2,8 @@
   "name": "no-de-vibe-designer",
   "productName": "No-de Vibe Designer",
   "version": "3.3.1",
-  "description": "No-de Vibe Designer \u2014 environnement de patch nodal pour le spectacle vivant",
-  "author": "C\u00e9dric Carboni",
+  "description": "No-de Vibe Designer — environnement de patch nodal pour le spectacle vivant",
+  "author": "Cédric Carboni",
   "homepage": "https://github.com/cdriccarboni",
   "license": "UNLICENSED",
   "private": true,
@@ -20,7 +20,7 @@
     "icons": "node scripts/make-icons.mjs",
     "remote:bridge": "node bridge/remote-server.mjs",
     "serve:companion": "node scripts/serve-companion.mjs",
-    "check": "node tests/run.mjs && node tests/soakTest.mjs",
+    "check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check desktop/app.js && node --check shared/runtime.js && node --check shared/node-processors.js && node --check shared/ports.js && node --check shared/node-specs.js && node --check shared/vibe.js && node --check mobile/mobile.js && node --check scripts/build-pwa.mjs",
     "pack:mac": "electron-builder --mac dir --arm64",
     "dist:mac": "electron-builder --mac zip --arm64",
     "pack:linux": "electron-builder --linux zip --x64",
@@ -33,7 +33,7 @@
   "build": {
     "appId": "fr.acousmatic.nodevibedesigner",
     "productName": "No-de Vibe Designer",
-    "copyright": "Copyright \u00a9 2026 C\u00e9dric Carboni",
+    "copyright": "Copyright © 2026 Cédric Carboni",
     "directories": {
       "output": "dist/electron",
       "buildResources": "packaging/mac"
@@ -79,8 +79,8 @@
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "extendInfo": {
-        "NSCameraUsageDescription": "No-de Vibe Designer utilise la cam\u00e9ra pour les nodes vid\u00e9o, tracking et retours sc\u00e8ne.",
-        "NSMicrophoneUsageDescription": "No-de Vibe Designer utilise le micro pour les nodes audio et communications temps r\u00e9el."
+        "NSCameraUsageDescription": "No-de Vibe Designer utilise la caméra pour les nodes vidéo, tracking et retours scène.",
+        "NSMicrophoneUsageDescription": "No-de Vibe Designer utilise le micro pour les nodes audio et communications temps réel."
       }
     },
     "linux": {
