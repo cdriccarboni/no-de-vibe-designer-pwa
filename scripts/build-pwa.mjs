@@ -55,6 +55,7 @@ fs.mkdirSync(dist, { recursive: true });
 spawnSync(process.execPath, [path.join(root, "scripts", "make-icons.mjs")], { stdio: "inherit" });
 
 copyDir(path.join(root, "shared"), path.join(dist, "shared"));
+copyDir(path.join(root, "src"), path.join(dist, "src"));
 copyDir(path.join(root, "docs", "manual"), path.join(dist, "manuel"));
 copyDir(path.join(root, "mobile", "icons"), path.join(dist, "icons"));
 

@@ -40,6 +40,7 @@ jobs:
           test -f dist/pwa/manuel/index.html
           test -f dist/pwa/shared/image-vibe.js
           test -f dist/pwa/shared/graphics/mapping-v3.js
+          test -f dist/pwa/src/core/StageSafety.js
           node -e "const fs=require('fs');const pkg=require('./package.json');const info=JSON.parse(fs.readFileSync('dist/pwa/build-info.json','utf8'));if(info.version!==pkg.version)throw new Error('PWA version mismatch: '+info.version+' != '+pkg.version)"
 
   macos:
