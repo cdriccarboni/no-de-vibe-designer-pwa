@@ -61,3 +61,28 @@ export function pushRecentProject(entry, storage = globalThis.localStorage) {
   storage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, MAX_RECENT)));
   return list.slice(0, MAX_RECENT);
 }
+
+export function storageFailureMessage(error, { kind = "autosave" } = {}) {
+  const detail = error?.message || String(error || "échec inconnu");
+  const quota = error?.name === "QuotaExceededError" || /quota/i.test(`${error?.name || ""} ${detail}`);
+  if (kind === "mirror") {
+    return quota
+      ? `Sauvegarde partielle · localStorage plein · copie IndexedDB conservée · dernier miroir local conservé · ${detail}`
+      : `Sauvegarde partielle · localStorage refusé · copie IndexedDB conservée · ${detail}`;
+  }
+  if (quota) return `AUTOSAVE ÉCHEC · stockage plein · dernier état conservé · ${detail}`;
+  return `AUTOSAVE ÉCHEC · ${detail}`;
+}
+
+/** Écrit cvd.autosave. En cas d'échec, ne remplace pas la valeur précédente et renvoie un message UI. */
+export function commitAutosave(storage, projectJson, afterWrite) {
+  try {
+    if (!storage?.setItem) throw new Error("Stockage indisponible");
+    if (typeof projectJson !== "string" || !projectJson) throw new Error("Snapshot autosave vide");
+    storage.setItem("cvd.autosave", projectJson);
+    if (afterWrite) afterWrite();
+    return { ok: true, message: null };
+  } catch (e) {
+    return { ok: false, message: storageFailureMessage(e) };
+  }
+}

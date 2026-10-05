@@ -145,17 +145,249 @@ export function buildCueState(project, {
  * Applique une cue sur une copie du projet + effets I/O déclarés.
  * Les I/O externes sont retournées sous forme d'effets ; l'appelant effectue l'envoi.
  */
-export function applyCue(project, cue, { panic = false } = {}) {
+const PANIC_AUDIO_TYPES = new Set([
+  "audio", "organicaudio", "soundmemo", "audiofilter", "audiodelay", "audiofft", "phone-mic"
+]);
+
+/** Ports par défaut déjà utilisés par les nodes OSC, pas une nouvelle destination. */
+const OSC_NODE_DEFAULTS = {
+  osc: { port: 9000 },
+  twozero: { port: 9000 },
+  td: { port: 9000 },
+  isadora: { port: 9000 },
+  chataigne: { port: 9000 },
+  millumin: { port: 5000 },
+  touchdesigner: { port: 9000 },
+  isadorabridge: { port: 9000 },
+  max: { port: 9000 },
+  pd: { port: 9000 },
+  supercollider: { port: 57120 }
+};
+
+function isStopAddress(address) {
+  return typeof address === "string" && /(?:^|\/)(stop|panic|blackout)(?:\/|$)/i.test(address);
+}
+
+function explicitUdpPort(value, fallback) {
+  const port = Number(value);
+  return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : fallback;
+}
+
+function explicitUdpHost(value) {
+  if (typeof value !== "string") return null;
+  const host = value.trim();
+  if (!host || host === "bridge") return null;
+  return host;
+}
+
+function remember(map, key, value) {
+  if (!map.has(key)) map.set(key, value);
+}
+
+/** Univers déjà écrits sur un node DMX ou une action Art-Net. Aucun univers par défaut. */
+export function configuredArtNetBlackouts(project) {
+  const found = new Map();
+  const add = (universe, host, port) => {
+    const uni = Number(universe);
+    if (!Number.isInteger(uni) || uni < 0 || uni > 32767) return;
+    if (typeof host === "string" && host.trim() === "bridge") return;
+    const destHost = explicitUdpHost(host) || "127.0.0.1";
+    const destPort = explicitUdpPort(port, 6454);
+    remember(found, `${uni}|${destHost}|${destPort}`, {
+      type: "artnet-blackout",
+      universe: uni,
+      host: destHost,
+      port: destPort,
+      channels: 512
+    });
+  };
+  for (const node of project?.nodes || []) {
+    if (node?.type !== "dmx") continue;
+    if (node.params?.transport === "bridge") continue;
+    const universe = node.params?.universe;
+    if (universe == null || universe === "") continue;
+    add(universe, node.params?.host, node.params?.port);
+  }
+  for (const cue of [...(project?.timeline || []), ...(project?.cues || [])]) {
+    for (const action of cue?.actions || []) {
+      if (action?.type !== "dmx" && action?.type !== "artnet") continue;
+      if (action.universe == null || action.universe === "") continue;
+      add(action.universe, action.host, action.port);
+    }
+  }
+  return [...found.values()];
+}
+
+/**
+ * Message OSC d'arrêt seulement s'il est déjà déclaré (node, cue ou layout).
+ * Un node OSC sans hôte UDP reste sur la passerelle WebSocket : pas d'invention.
+ */
+export function configuredOscStops(project, layout = null) {
+  const found = new Map();
+  const add = (address, host, port, args) => {
+    if (!isStopAddress(address)) return;
+    const destHost = explicitUdpHost(host);
+    if (!destHost) return;
+    const destPort = explicitUdpPort(port, 9000);
+    const packetArgs = Array.isArray(args) ? args : [];
+    remember(found, `${destHost}|${destPort}|${address}|${JSON.stringify(packetArgs)}`, {
+      type: "osc-stop",
+      host: destHost,
+      port: destPort,
+      address,
+      args: packetArgs
+    });
+  };
+  for (const node of project?.nodes || []) {
+    const defaults = OSC_NODE_DEFAULTS[node?.type];
+    if (!defaults) continue;
+    const rawHost = node.params?.host;
+    if (typeof rawHost === "string" && rawHost.trim() === "bridge") continue;
+    const host = node.type === "osc" ? rawHost : (explicitUdpHost(rawHost) || "127.0.0.1");
+    const value = node.params?.value;
+    add(node.params?.address, host, node.params?.port ?? defaults.port, value == null ? [] : [value]);
+  }
+  for (const cue of [...(project?.timeline || []), ...(project?.cues || [])]) {
+    for (const action of cue?.actions || []) {
+      if (action?.type !== "osc") continue;
+      if (typeof action.host === "string" && action.host.trim() === "bridge") continue;
+      const args = Array.isArray(action.args) ? action.args : (action.value == null ? [] : [action.value]);
+      add(action.address, explicitUdpHost(action.host) || "127.0.0.1", action.port, args);
+    }
+  }
+  for (const page of layout?.pages || []) {
+    for (const widget of page?.widgets || []) {
+      const binding = widget?.binding || {};
+      if (binding.kind !== "osc") continue;
+      if (typeof binding.oscHost === "string" && binding.oscHost.trim() === "bridge") continue;
+      add(
+        binding.oscAddress,
+        explicitUdpHost(binding.oscHost) || "127.0.0.1",
+        binding.oscPort,
+        binding.value == null ? [] : [binding.value]
+      );
+    }
+  }
+  return [...found.values()];
+}
+
+export async function dispatchPanicEffects(effects, { sendOsc, sendArtNet } = {}) {
+  const results = [];
+  for (const effect of effects || []) {
+    if (effect?.type === "artnet-blackout") {
+      if (typeof sendArtNet !== "function") {
+        results.push({
+          kind: "artnet",
+          sent: false,
+          universe: effect.universe,
+          host: effect.host,
+          port: effect.port,
+          reason: "bridge absent"
+        });
+        continue;
+      }
+      const data = new Uint8Array(512);
+      try {
+        const result = await sendArtNet({
+          host: effect.host,
+          port: effect.port,
+          universe: effect.universe,
+          data
+        });
+        results.push({
+          kind: "artnet",
+          sent: true,
+          universe: effect.universe,
+          host: result?.host || effect.host,
+          port: result?.port || effect.port,
+          bytes: result?.bytes ?? null
+        });
+      } catch (error) {
+        results.push({
+          kind: "artnet",
+          sent: false,
+          universe: effect.universe,
+          host: effect.host,
+          port: effect.port,
+          reason: error?.message || String(error)
+        });
+      }
+    } else if (effect?.type === "osc-stop") {
+      if (typeof sendOsc !== "function") {
+        results.push({
+          kind: "osc",
+          sent: false,
+          address: effect.address,
+          host: effect.host,
+          port: effect.port,
+          reason: "bridge absent"
+        });
+        continue;
+      }
+      try {
+        const result = await sendOsc({
+          host: effect.host,
+          port: effect.port,
+          address: effect.address,
+          args: effect.args || []
+        });
+        results.push({
+          kind: "osc",
+          sent: true,
+          address: effect.address,
+          host: result?.host || effect.host,
+          port: result?.port || effect.port,
+          bytes: result?.bytes ?? null
+        });
+      } catch (error) {
+        results.push({
+          kind: "osc",
+          sent: false,
+          address: effect.address,
+          host: effect.host,
+          port: effect.port,
+          reason: error?.message || String(error)
+        });
+      }
+    }
+  }
+  return results;
+}
+
+export function formatPanicResult(effects, results) {
+  const lines = ["PANIC · audio du projet coupé · lecture arrêtée"];
+  const artnet = (effects || []).filter(effect => effect.type === "artnet-blackout");
+  const osc = (effects || []).filter(effect => effect.type === "osc-stop");
+  if (!artnet.length) lines.push("PANIC · aucun univers Art-Net configuré · blackout non envoyé");
+  if (!osc.length) lines.push("PANIC · aucun message OSC d'arrêt prévu par le protocole · OSC non envoyé");
+  for (const result of results || []) {
+    if (result.kind === "artnet" && result.sent) {
+      lines.push(`PANIC · Art-Net blackout univers ${result.universe} → ${result.host}:${result.port} · 512 canaux à 0`);
+    } else if (result.kind === "artnet") {
+      lines.push(`PANIC · Art-Net univers ${result.universe} non envoyé · ${result.reason}`);
+    } else if (result.kind === "osc" && result.sent) {
+      lines.push(`PANIC · OSC ${result.address} → ${result.host}:${result.port}`);
+    } else if (result.kind === "osc") {
+      lines.push(`PANIC · OSC ${result.address || "arrêt"} non envoyé · ${result.reason}`);
+    }
+  }
+  lines.push("PANIC · non coupé : NDI, MIDI matériel, projecteur, sACN, caméra, série");
+  return lines;
+}
+
+export function applyCue(project, cue, { panic = false, layout = null } = {}) {
   const next = JSON.parse(JSON.stringify(project || { nodes: [], timeline: [], cues: [] }));
   const effects = [];
 
   if (panic) {
     for (const node of next.nodes || []) {
-      if (node.type === "audio" || node.type === "organicaudio" || node.type === "soundmemo") {
+      if (PANIC_AUDIO_TYPES.has(node.type)) {
         node.params = { ...(node.params || {}), enabled: false };
       }
     }
-    effects.push({ type: "panic", stopped: true });
+    effects.push({ type: "panic", stopped: true, repeatable: true });
+    effects.push(...configuredArtNetBlackouts(next));
+    effects.push(...configuredOscStops(next, layout));
     return { project: next, effects, cue: normalizeCue(cue || { label: "PANIC" }) };
   }
 

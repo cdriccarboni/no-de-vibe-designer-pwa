@@ -39,3 +39,11 @@ export function saveStatusMessage(plan, fileName = "projet.cvd.json") {
   if (plan?.honest === "local") return "Projet enregistré localement dans No-de Vibe Designer.";
   return `Projet exporté · ${fileName}`;
 }
+
+/** Ne pas annoncer un enregistrement réussi si la seule copie réelle (local) a échoué. */
+export function announceManualSave(plan, localFailed) {
+  if (!localFailed) return true;
+  if (plan?.honest === "local") return false;
+  if (plan?.mode === "native") return true;
+  return plan?.download === true;
+}
