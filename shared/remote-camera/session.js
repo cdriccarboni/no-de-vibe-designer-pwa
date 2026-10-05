@@ -8,9 +8,12 @@ import { RC_STATES, remoteCameraHostId, makeRoomCode } from "./states.js";
 import { createRcMetrics } from "./metrics.js";
 import { openCamera, stopStream } from "./camera.js";
 
-function loadPeerCtor() {
+async function loadPeerCtor() {
   if (typeof window !== "undefined" && window.Peer) return window.Peer;
-  throw new Error("PeerJS non chargé (window.Peer) — PLATFORM-LIMITED hors navigateur");
+  if (typeof window !== "undefined" && typeof window.__nvdLoadPeer === "function") {
+    return await window.__nvdLoadPeer();
+  }
+  throw new Error("PeerJS indisponible — connexion distante impossible hors-ligne");
 }
 
 function watchFirstFrame(stream, videoEl, onFirstFrame) {
@@ -194,7 +197,7 @@ export function createRemoteCameraSession({
     leaving = false;
     error = null;
     setState(RC_STATES.QR_OPEN);
-    const Peer = loadPeerCtor();
+    const Peer = await loadPeerCtor();
     const hostId = remoteCameraHostId(roomCode);
     peer = peerOptions ? new Peer(hostId, peerOptions) : new Peer(hostId);
     peer.on("open", (id) => {
@@ -230,7 +233,7 @@ export function createRemoteCameraSession({
     setState(RC_STATES.CAMERA_PERMISSION);
     localStream = await openCamera({ deviceId, facingMode });
     setState(RC_STATES.CAMERA_READY);
-    const Peer = loadPeerCtor();
+    const Peer = await loadPeerCtor();
     peer = peerOptions ? new Peer(peerOptions) : new Peer();
     setState(RC_STATES.CONNECTING);
     peer.on("open", () => {

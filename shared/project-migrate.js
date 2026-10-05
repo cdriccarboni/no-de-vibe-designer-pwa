@@ -28,6 +28,20 @@ function ensureShape(p) {
   p.nodes ||= [];
   p.edges ||= [];
   p.timeline ||= [];
+  p.layers ||= [
+    { id: "layer-video-1", type: "video", name: "Vidéo", height: 30 },
+    { id: "layer-effect-1", type: "effect", name: "Effets", height: 30 },
+    { id: "layer-shader-1", type: "shader", name: "Shader", height: 30 },
+    { id: "layer-shadow-1", type: "shadow", name: "Ombre", height: 30 },
+    { id: "layer-cue-1", type: "cue", name: "Cues", height: 30 },
+    { id: "layer-bridge-1", type: "bridge", name: "Liaisons", height: 30 }
+  ];
+  p.layers = p.layers.map((layer, i) => ({
+    id: layer.id || `layer-${i + 1}`,
+    type: layer.type || "effect",
+    name: layer.name || `Layer ${i + 1}`,
+    height: Math.max(24, Math.min(96, Number(layer.height) || 30))
+  }));
   p.controls ||= [];
   p.channels ||= [];
   p.resources ||= [];
