@@ -3,7 +3,7 @@
   "version": "3.3.1",
   "builtAt": "2026-10-05T00:10:49.162Z",
   "files": 146,
-  "cacheRevision": "838fe97212",
+  "cacheRevision": "136b80c130",
   "surfaces": [
     "designer",
     "show",
@@ -12,5 +12,5 @@
     "plateau",
     "camera"
   ],
-  "sourceCommit": "838fe9721262ff07e3d3c54331a9487b6c78b40d"
+  "sourceCommit": "00343f51fc371fdaf446b5d35a7840cba1bb3a8c"
 }
