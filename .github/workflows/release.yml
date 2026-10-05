@@ -98,7 +98,7 @@ jobs:
         shell: bash
         run: |
           cat > package.json <<JSON
-          {"name":"no-de-vibe-designer-mac-public","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","mobile/**/*","studio/**/*","companion/**/*","manuel/**/*","icons/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"mac":{"category":"public.app-category.graphics-design","identity":null,"target":[{"target":"zip","arch":["arm64"]}],"artifactName":"No-de-Vibe-Designer-${APP_VERSION}-arm64-mac.zip"}}}
+          {"name":"no-de-vibe-designer-mac-public","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","manuel/**/*","icons/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"mac":{"category":"public.app-category.graphics-design","identity":null,"target":[{"target":"zip","arch":["arm64"]}],"artifactName":"No-de-Vibe-Designer-${APP_VERSION}-arm64-mac.zip"}}}
           JSON
           mkdir -p electron
           cat > electron/main.cjs <<'JS'
