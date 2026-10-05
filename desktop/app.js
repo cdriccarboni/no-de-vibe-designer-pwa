@@ -523,8 +523,10 @@ let expandedLibraryGroups = new Set();
 try {
   const raw = localStorage.getItem(LIBRARY_EXPANDED_KEY);
   const stored = raw == null ? null : JSON.parse(raw);
-  if (Array.isArray(stored) && stored.length) expandedLibraryGroups = new Set(stored.map(Number).filter(Number.isInteger));
-  else expandedLibraryGroups = new Set(LIB.map((_, i) => i));
+  expandedLibraryGroups = new Set(LIB.map((_, i) => i));
+  if (Array.isArray(stored) && stored.length) {
+    for (const index of stored.map(Number).filter(Number.isInteger)) expandedLibraryGroups.add(index);
+  }
 } catch {
   expandedLibraryGroups = new Set(LIB.map((_, i) => i));
 }
@@ -3416,7 +3418,7 @@ try {
   if (session.lastProjectName) log(`Session · dernier projet « ${session.lastProjectName} »`);
   if (session.remoteCamera?.room) log(`Session · Remote Camera connu ${session.remoteCamera.room} · ${session.remoteCamera.lastStatus || LINK_STATES.KNOWN}`);
 } catch { /* */ }
-if (project.nodes.length === 0 && generalPrefs.loadDemo !== false && localStorage.getItem(DEMO_DISMISSED_KEY) !== "1") {
+if (project.nodes.length === 0 && generalPrefs.loadDemo !== false) {
   try { demoReturnProject = JSON.parse(JSON.stringify(project)); } catch { demoReturnProject = newProject(); }
   project = createDemoProject();
   setDemoBanner(true);
