@@ -6,6 +6,9 @@ import { DeviceManager } from "../shared/device-manager.js";
 import { portDirection, portLabels, portDataType, isExecutable } from "../shared/ports.js";
 import { validateEdge } from "../shared/graph-engine.js";
 import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed, probeLocalAi } from "../shared/vibe.js";
+import { cxChatReply } from "../shared/cx-source.js";
+import { directOllamaProbe } from "../shared/local-ai-core.js";
+import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError } from "../shared/local-ai-diagnostic.js";
 import { renderBackendReport } from "../shared/backend-registry.js";
 import { browserProbeRegistry } from "../shared/agent-registry.js";
 import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
@@ -13,11 +16,11 @@ import { NODE_GROUPS, spec as sharedSpec } from "../shared/node-specs.js";
 import { createHistory } from "../shared/history.js";
 import { addBoxPort, ensureSubGraph, wrapNodesInSubpatch } from "../shared/subpatch.js";
 import { sharedAudio } from "../shared/audio-engine.js";
-import { planManualSave, planManualOpen, saveStatusMessage, MANUAL_SAVE_KEY } from "../shared/save-fallback.js";
+import { planManualSave, planManualOpen, saveStatusMessage, announceManualSave, MANUAL_SAVE_KEY } from "../shared/save-fallback.js";
 import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { connectRemote } from "../shared/remote-client.js";
 import { REMOTE_PORT } from "../shared/remote-protocol.js";
-import { applyCue, listCues, nextCue, previousCue } from "../shared/stage/cues.js";
+import { applyCue, listCues, nextCue, previousCue, dispatchPanicEffects, formatPanicResult } from "../shared/stage/cues.js";
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
 import { generateVibeOut, VIBE_OUT_TARGETS } from "../shared/vibe-out.js";
 import { createHostCard, hostCardToQrPayload } from "../shared/discovery/host-card.js";
@@ -26,7 +29,7 @@ import { createRemoteCameraSession, makeRoomCode } from "../shared/remote-camera
 import { companionJoinUrl } from "../shared/remote-camera/url.js";
 import { rcStateLabel } from "../shared/remote-camera/states.js";
 import { ndiStatusMessage } from "../shared/remote-camera/ndi.js";
-import { markCrashRecovery, clearCrashRecovery, loadCrashRecovery, pushRecentProject } from "../shared/session-recovery.js";
+import { markCrashRecovery, clearCrashRecovery, loadCrashRecovery, pushRecentProject, commitAutosave, storageFailureMessage } from "../shared/session-recovery.js";
 import {
   loadSession,
   saveSession,
@@ -45,6 +48,8 @@ import { loadCompanionLayout, ensureCompanionLayout, saveCompanionLayout } from 
 import { validateCompanionDocument } from "../shared/companion-studio/schema.js";
 import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref } from "../shared/companion-studio/detect.js";
 import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT } from "../shared/graphics/sketch-engine.js";
+import { missingEngineOffers } from "../shared/engine-downloads.js";
+import { LIBPD_AUDIO_PATCH, LIBPD_PROBE_PATCH, runLibpdPatch } from "../shared/libpd-runtime.js";
 import { applyShowManifest, showManifestSummary } from "../shared/show-importer.js";
 import { DEFAULT_FRAGMENT } from "../shared/adapters/shader-surface.js";
 import { RUDIMENTS, rudimentMeta, createRudimentNode } from "../shared/rudiments.js";
@@ -52,6 +57,7 @@ import { DEFAULT_QUAD, normalizeQuad, mappingParams } from "../shared/graphics/m
 import { superNodePreset, applySuperNodePreset } from "../shared/supernodes-v3.js";
 import { analyzeImageFile, imageVibePrompt, imageVibeOps, imageVibeSummary } from "../shared/image-vibe.js";
 import { installFloatPanels } from "./float-panels.js";
+import { StageSafety } from "../src/core/StageSafety.js";
 import { scanLocalAgents, selectLocalAgents, LOCAL_AGENT_ROLES, localAgentRegistrySummary } from "../shared/local-agent-registry.js";
 
 installSurfaceSwitcher({ current:"designer" });
@@ -62,12 +68,13 @@ const htmlSafe = value => String(value ?? "").replace(/[&<>"']/g, ch => ({ "&":"
 
 if ("serviceWorker" in navigator && window.nvdDesktop?.runtime !== "electron") {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(err => console.warn("PWA_SW", err?.message || err));
+    navigator.serviceWorker.register("../sw.js", { scope: "../" }).catch(err => console.warn("PWA_SW", err?.message || err));
   });
 }
 
 let project = newProject();
 let nodeSeq = 0, clipSeq = 0, pointSeq = 0, selectedNode = null;
+let selectedTimelineLayerId = null;
 const selection = new Set();
 const deviceBus = { lastMidi: null, lastSerial: null, serialState: "offline" };
 let graphLogThrottle = 0;
@@ -91,6 +98,7 @@ function setDemoBanner(active) {
 }
 
 function enterShowcaseDemo({ preserve = true } = {}) {
+  if (refuseCanvasEdit("chargement d'exemple")) return;
   if (preserve && !demoReturnProject) {
     try { demoReturnProject = JSON.parse(JSON.stringify(project)); } catch { demoReturnProject = newProject(); }
   }
@@ -106,6 +114,7 @@ function enterShowcaseDemo({ preserve = true } = {}) {
 }
 
 function exitShowcaseDemo() {
+  if (refuseCanvasEdit("sortie de l'exemple")) return;
   project = demoReturnProject ? validateProject(demoReturnProject) : newProject();
   demoReturnProject = null;
   graphPath = [];
@@ -134,6 +143,26 @@ const runtime = new Runtime($("#previewCanvas"), {
   }
 });
 runtime.setDeviceBus(deviceBus);
+
+function paintShowLock(locked) {
+  document.body.classList.toggle("show-locked", Boolean(locked));
+  const badge = $("#showLockBadge");
+  const banner = $("#showLockBanner");
+  if (badge) badge.hidden = !locked;
+  if (banner) banner.hidden = !locked;
+  const space = $("#patchSpace");
+  if (space) space.setAttribute("aria-disabled", locked ? "true" : "false");
+}
+const stageSafety = new StageSafety(runtime, { onLockChange: paintShowLock });
+function canvasStructurallyLocked() {
+  return stageSafety?.isLocked === true;
+}
+function refuseCanvasEdit(action) {
+  if (!canvasStructurallyLocked()) return false;
+  log(`Show Lock · ${action} bloqué · spectacle verrouillé`);
+  return true;
+}
+
 
 let pnpState = null;
 const devices = new DeviceManager(e => {
@@ -328,21 +357,70 @@ async function requestAiForNode(options = {}) {
   if (protocol === "apple") throw new Error("Apple Intelligence ne tourne pas dans la PWA : uniquement l'application macOS peut appeler le modèle local.");
   if (protocol === "ollama") {
     const base = String(options.baseUrl || cfg.localBaseUrl || "http://127.0.0.1:11434").replace(/\/+$/, "");
-    const res = await fetch(base + "/api/chat", {
-      method: "POST",
-      headers: { "Content-Type":"application/json" },
-      body: JSON.stringify({
-        model: options.model || cfg.localModel || "qwen2.5-coder:7b",
-        stream: false,
-        messages: [
-          { role:"system", content: options.system || "Tu es une IA créative reliée à No-de Vibe Designer." },
-          { role:"user", content: prompt }
-        ]
-      })
-    });
-    if (!res.ok) throw new Error("Ollama HTTP " + res.status);
+    const modelName = options.model || cfg.localModel || "qwen2.5-coder:7b";
+    const probe = await directOllamaProbe(base, { model: modelName, pageProtocol: globalThis.location?.protocol || "" });
+    const assessed = assessLocalModels(probe?.models || [], modelName);
+    if (!probe?.ok || !assessed.ok || assessed.installed === false) {
+      const failure = probe?.failure || assessed.failure;
+      const error = new Error(probe?.error || assessed.error || assessed.notice || failure?.message || "Ollama inaccessible");
+      error.failure = failure || null;
+      error.responded = false;
+      throw error;
+    }
+    let res;
+    try {
+      res = await fetch(base + "/api/chat", {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({
+          model: modelName,
+          stream: false,
+          messages: [
+            { role:"system", content: options.system || "Tu es une IA créative reliée à No-de Vibe Designer." },
+            { role:"user", content: prompt }
+          ]
+        })
+      });
+    } catch (error) {
+      let targetProtocol = "http:";
+      let loopback = true;
+      try {
+        const url = new URL(base);
+        targetProtocol = url.protocol;
+        loopback = ["127.0.0.1", "localhost", "::1"].includes(url.hostname);
+      } catch { /* URL déjà refusée par le probe */ }
+      const failure = classifyLocalAiFailure(factsFromLocalAiError(error, {
+        pageProtocol: globalThis.location?.protocol || "",
+        targetProtocol,
+        loopback,
+        model: modelName
+      }));
+      const wrapped = new Error(failure?.message || error?.message || "Ollama inaccessible");
+      wrapped.failure = failure;
+      wrapped.responded = false;
+      throw wrapped;
+    }
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      const failure = classifyLocalAiFailure({
+        status: res.status,
+        message: ("Ollama HTTP " + res.status + " · " + body.slice(0, 180)).trim(),
+        model: modelName,
+        endpoint: "chat"
+      });
+      const error = new Error(failure?.message || ("Ollama HTTP " + res.status));
+      error.failure = failure;
+      error.responded = false;
+      throw error;
+    }
     const data = await res.json();
-    return { ok:true, content:String(data?.message?.content || ""), model:data?.model || options.model };
+    const content = String(data?.message?.content || "");
+    if (!content.trim()) {
+      const error = new Error("IA locale : réponse vide");
+      error.responded = false;
+      throw error;
+    }
+    return { ok:true, content, model:data?.model || modelName, responded:true };
   }
   const endpoint = String(options.endpoint || cfg.endpoint || "").trim();
   if (!endpoint) throw new Error("Endpoint IA manquant");
@@ -443,10 +521,14 @@ let showExperimental = localStorage.getItem("nvd.showExperimental") === "1";
 const LIBRARY_EXPANDED_KEY = "nvd.library.expandedGroups";
 let expandedLibraryGroups = new Set();
 try {
-  const stored = JSON.parse(localStorage.getItem(LIBRARY_EXPANDED_KEY) || "[]");
-  if (Array.isArray(stored)) expandedLibraryGroups = new Set(stored.map(Number).filter(Number.isInteger));
+  const raw = localStorage.getItem(LIBRARY_EXPANDED_KEY);
+  const stored = raw == null ? null : JSON.parse(raw);
+  expandedLibraryGroups = new Set(LIB.map((_, i) => i));
+  if (Array.isArray(stored) && stored.length) {
+    for (const index of stored.map(Number).filter(Number.isInteger)) expandedLibraryGroups.add(index);
+  }
 } catch {
-  expandedLibraryGroups = new Set();
+  expandedLibraryGroups = new Set(LIB.map((_, i) => i));
 }
 
 function saveExpandedLibraryGroups() {
@@ -513,6 +595,7 @@ const NODE_RUNTIME_REQUIREMENTS = new Map([
   ["isadorabridge", "Isadora + OSC requis à l’usage"],
   ["max", "Max/MSP + OSC requis à l’usage"],
   ["pd", "Pure Data + OSC requis à l’usage"],
+  ["libpd", "float seulement si libpd le renvoie"],
   ["supercollider", "SuperCollider + OSC requis à l’usage"],
   ["remote-camera", "caméra distante et réseau requis à l’usage"],
   ["videoreturn", "source vidéo distante requise à l’usage"],
@@ -568,6 +651,62 @@ function buildLibrary() {
   const expCount = LIB.flatMap(([, items]) => items).filter(([, t]) => !isLibraryExecutable(t)).length;
   const mode = document.querySelector(".library-mode");
   if (mode) mode.style.display = expCount ? "flex" : "none";
+}
+
+function startEngineDownload(url) {
+  if (typeof window.nvdDesktop?.openExternal === "function") {
+    window.nvdDesktop.openExternal(url).catch(error => log(`Téléchargement · ${error?.message || error}`));
+    return;
+  }
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function refreshEngineOffers() {
+  const host = $("#engineOffers");
+  if (!host) return;
+  let processingInstalled = true;
+  const platform = window.nvdDesktop?.platform || "darwin";
+  const arch = window.nvdDesktop?.arch || "arm64";
+  if (typeof window.nvdDesktop?.enginePresence === "function") {
+    try {
+      const presence = await window.nvdDesktop.enginePresence();
+      processingInstalled = presence?.processing?.installed === true;
+    } catch {
+      processingInstalled = true;
+    }
+  }
+  let libpdReady = false;
+  try {
+    const probe = await runLibpdPatch(LIBPD_PROBE_PATCH);
+    libpdReady = probe?.ok === true && probe.value === 42;
+  } catch {
+    libpdReady = false;
+  }
+  const offers = missingEngineOffers({ processingInstalled, libpdReady, platform, arch });
+  host.replaceChildren();
+  if (!offers.length) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  for (const offer of offers) {
+    const row = document.createElement("div");
+    const copy = document.createElement("p");
+    copy.textContent = `${offer.title} manque. ${offer.note}`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "smallbtn";
+    button.textContent = `Télécharger ${offer.title}`;
+    button.onclick = () => startEngineDownload(offer.downloadUrl);
+    row.append(copy, button);
+    host.append(row);
+  }
 }
 
 function activeGraph() {
@@ -677,6 +816,7 @@ function renderWires() {
     path.setAttribute("d", edgePath(portCenter(from), portCenter(to)));
     path.addEventListener("dblclick", e => {
       e.stopPropagation();
+      if (refuseCanvasEdit("suppression de câble")) return;
       g.edges = g.edges.filter(x => x.id !== edge.id);
       if (isRootGraph()) project.edges = g.edges;
       renderWires();
@@ -690,6 +830,7 @@ function renderWires() {
 
 function beginWire(e, dot) {
   if (e.button !== 0) return;
+  if (refuseCanvasEdit("câblage")) return;
   e.preventDefault();
   e.stopPropagation();
   const start = { node: dot.dataset.node, port: +dot.dataset.portIndex, dir: dot.dataset.dir, dot };
@@ -715,6 +856,13 @@ function moveWire(e) {
 
 function finishWire(e) {
   if (!wireDraft) return;
+  if (canvasStructurallyLocked()) {
+    wireDraft = null;
+    $("#wireDraftPath")?.classList.remove("active");
+    $("#wireDraftPath")?.setAttribute("d", "");
+    log("Show Lock · câblage bloqué · spectacle verrouillé");
+    return;
+  }
   const target = e.target?.closest?.(".port-dot");
   const start = wireDraft;
   wireDraft = null;
@@ -770,6 +918,7 @@ function openShaderLab(node) {
   if (dialog?.showModal) dialog.showModal();
 }
 function applyShaderLab() {
+  if (refuseCanvasEdit("modification de shader")) return;
   const node = nodeById(shaderDialogNodeId);
   if (!node) return;
   const source = $("#shaderSource").value.trim() || DEFAULT_FRAGMENT;
@@ -811,6 +960,7 @@ $("#companionEditorClose")?.addEventListener("click", () => $("#companionEditorD
 $("#companionEditorDialog")?.addEventListener("close", () => { const frame=$("#companionEditorFrame"); if(frame) frame.removeAttribute("src"); });
 
 function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq / 4) * 110) {
+  if (refuseCanvasEdit("ajout de node")) return null;
   const g = activeGraph();
   if (String(type).startsWith("rudiment:")) {
     const rid = String(type).slice("rudiment:".length);
@@ -837,6 +987,7 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
     x, y,
     params: { enabled: true, duration: 5, opacity: 1, intensity: 1, host: "bridge", address: "/nvd/value", value: 0, fallback: 0, freq: 220, gain: 0.15, mode: "tone" }
   };
+  if (type === "libpd") n.params.patch = LIBPD_AUDIO_PATCH;
   if (type === "subpatch") ensureSubGraph(n);
   g.nodes.push(n);
   if (isRootGraph()) project.nodes = g.nodes;
@@ -880,9 +1031,13 @@ function drawNode(n) {
 function makeDraggable(el, n) {
   const h = el.querySelector(".nh");
   let d = false, sx = 0, sy = 0, ox = 0, oy = 0;
-  h.onmousedown = e => { d = true; sx = e.clientX; sy = e.clientY; ox = n.x; oy = n.y; e.preventDefault(); };
+  h.onmousedown = e => {
+    if (refuseCanvasEdit("déplacement")) return;
+    d = true; sx = e.clientX; sy = e.clientY; ox = n.x; oy = n.y; e.preventDefault();
+  };
   window.addEventListener("mousemove", e => {
     if (!d) return;
+    if (canvasStructurallyLocked()) { d = false; return; }
     n.x = Math.max(0, ox + e.clientX - sx);
     n.y = Math.max(0, oy + e.clientY - sy);
     el.style.left = n.x + "px";
@@ -1055,6 +1210,11 @@ function selectNode(id, { additive = false } = {}) {
   }
   if (n.type === "surface") extra += `<p class="hint">Passage de valeur vers le Control Surface. Expose ensuite les paramètres utiles depuis l'inspecteur des nodes concernés.</p>`;
   if (n.type === "connectors") extra += `<p class="hint">Lien local typé pour organiser le patch sans conversion de valeur.</p>`;
+  if (n.type === "libpd") {
+    const patch = n.params.patch || LIBPD_AUDIO_PATCH;
+    extra += `<div class="field"><label>Patch .pd</label><textarea id="nLibpdPatch" rows="8" spellcheck="false">${patch.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</textarea></div>`;
+    extra += `<p class="hint">libpd est seulement le moteur audio embarqué. Un niveau sort si le buffer audio contient un échantillon réel.</p>`;
+  }
   if (n.type === "p5" || n.type === "sketch") {
     const isP5 = n.type === "p5";
     const script = n.params.script || (isP5 ? DEFAULT_P5_SCRIPT : DEFAULT_SKETCH_SCRIPT);
@@ -1275,6 +1435,7 @@ function selectNode(id, { additive = false } = {}) {
   if ($("#nGenSeed")) $("#nGenSeed").onchange = e => { n.params.seed = +e.target.value || 1; runtime.render(); autosave(); commitHistory(); };
   if ($("#nGenEnergy")) $("#nGenEnergy").oninput = e => { n.params.energy = +e.target.value; runtime.render(); autosave(); };
   if ($("#nDreamIntensity")) $("#nDreamIntensity").oninput = e => { n.params.intensity = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nLibpdPatch")) $("#nLibpdPatch").oninput = e => { n.params.patch = e.target.value; runtime.render(); autosave(); };
   if ($("#nSketchScript")) $("#nSketchScript").oninput = e => { n.params.script = e.target.value; runtime.render(); autosave(); };
   if ($("#resetSketchScript")) $("#resetSketchScript").onclick = () => {
     n.params.script = n.type === "p5" ? DEFAULT_P5_SCRIPT : DEFAULT_SKETCH_SCRIPT;
@@ -1434,7 +1595,8 @@ function selectNode(id, { additive = false } = {}) {
   if ($("#cameraStop")) $("#cameraStop").onclick = () => runtime.stopCamera();
   if ($("#rcHost")) $("#rcHost").onclick = async () => {
     try {
-      if (!window.Peer) throw new Error("PeerJS non chargé — recharge la page");
+      if (!window.Peer) await window.__nvdLoadPeer?.();
+      if (!window.Peer) throw new Error("PeerJS non chargé — connexion distante indisponible hors-ligne");
       rcSession?.stop();
       const known = (n.params?.room || loadRemoteCameraRoom() || "").toUpperCase();
       const room = known || makeRoomCode();
@@ -1539,6 +1701,7 @@ function selectNode(id, { additive = false } = {}) {
 }
 
 function addSubpatchPort(node, direction) {
+  if (refuseCanvasEdit("ajout de port")) return;
   const label = direction === "in" ? "Nom de l'entrée" : "Nom de la sortie";
   const name = prompt(label, direction === "in" ? "In" : "Out");
   if (!name) return;
@@ -1551,6 +1714,7 @@ function addSubpatchPort(node, direction) {
 }
 
 function wrapSelection() {
+  if (refuseCanvasEdit("regroupement")) return;
   const ids = [...selection];
   if (!ids.length && selectedNode) ids.push(selectedNode);
   if (!ids.length) { log("Sélection vide"); return; }
@@ -1567,6 +1731,7 @@ function wrapSelection() {
 }
 
 function duplicateNode(id) {
+  if (refuseCanvasEdit("duplication")) return;
   const src = nodeById(id);
   if (!src) return;
   const n = addNode(src.type, src.x + 36, src.y + 36);
@@ -1579,6 +1744,7 @@ function duplicateNode(id) {
 }
 
 function deleteNode(id) {
+  if (refuseCanvasEdit("suppression")) return;
   selection.delete(id);
   const g = activeGraph();
   sharedAudio.release(id);
@@ -1613,7 +1779,8 @@ function drawPoint(p, i) {
 }
 function addClip(track, start, duration, label, kind = "effect") {
   clipSeq++;
-  const c = { id: `c${clipSeq}`, track, start, duration, label, kind };
+  const layer = (project.layers || [])[track] || (project.layers || []).find(l => l.type === kind) || (project.layers || [])[0];
+  const c = { id: `c${clipSeq}`, track, layerId: layer?.id || null, start, duration, label, kind };
   project.timeline.push(c);
   drawClip(c);
   autosave();
@@ -1626,7 +1793,7 @@ function drawClip(c) {
   el.style.left = (c.start / 60 * 100) + "%";
   el.style.width = (c.duration / 60 * 100) + "%";
   el.innerHTML = `${c.label}<span class="resize"></span>`;
-  const track = document.querySelector(`.track[data-track="${c.track}"]`);
+  const track = document.querySelector(`.timeline-track[data-track="${c.track}"]`);
   if (track) track.appendChild(el);
   clipDrag(el, c);
 }
@@ -1640,7 +1807,7 @@ function clipDrag(el, c) {
   };
   window.addEventListener("mousemove", e => {
     if (!m) return;
-    const w = $(".tracks").getBoundingClientRect().width;
+    const w = el.closest(".timeline-track")?.getBoundingClientRect().width || $(".timeline-body")?.getBoundingClientRect().width || 1;
     const delta = (e.clientX - sx) / w * 60;
     if (m === "move") c.start = Math.max(0, Math.min(60 - c.duration, s + delta));
     else c.duration = Math.max(.25, Math.min(60 - c.start, d + delta));
@@ -1657,9 +1824,10 @@ function redraw() {
   updateRouteButtons();
   $("#patchSpace").innerHTML = "";
   ensurePatchWorld();
+  renderTimelineLayers();
   ensureWireLayer();
   $("#previewOverlay").innerHTML = "";
-  qall(".track").forEach(t => t.innerHTML = "");
+  qall(".timeline-track").forEach(t => t.innerHTML = "");
   nodeSeq = 0; clipSeq = 0; pointSeq = 0;
   const g = activeGraph();
   for (const n of g.nodes || []) {
@@ -1679,15 +1847,25 @@ function redraw() {
 }
 
 function autosave() {
+  let data = "";
   try {
-    const data = exportProject(project);
-    localStorage.setItem("cvd.autosave", data);
+    data = exportProject(project);
+  } catch (e) {
+    const message = storageFailureMessage(e);
+    console.error("AUTOSAVE_FAILED", message);
+    log(message);
+    try { publishHostState(); } catch { /* hôte distant optionnel */ }
+    return;
+  }
+  const saved = commitAutosave(localStorage, data, () => {
     markCrashRecovery(data);
     markProjectMeta(project.name, {
       workspace: localStorage.getItem("cvd.workspace") || "bureau"
     });
-  } catch (e) {
-    console.error("AUTOSAVE_FAILED", e?.message || e);
+  });
+  if (!saved.ok) {
+    console.error("AUTOSAVE_FAILED", saved.message);
+    log(saved.message);
   }
   try { publishHostState(); } catch { /* hôte distant optionnel */ }
 }
@@ -1708,8 +1886,92 @@ $("#clearPoints").onclick = () => {
   autosave();
   log("Points effacés");
 };
-$("#addCue").onclick = () => addClip(4, Math.random() * 45, 2, "Cue", "cue");
-$("#addEffect").onclick = () => addClip(1, Math.random() * 40, 6, "Effet", "effect");
+function layerTypeMeta(type) {
+  return ({
+    video: { label:"Vidéo", kind:"video", description:"Sources et séquences vidéo." },
+    effect: { label:"Effet", kind:"effect", description:"Effets de traitement et transformations vidéo." },
+    shader: { label:"Shader", kind:"shader", description:"Rendu GLSL programmable, pour créer ou transformer des pixels." },
+    shadow: { label:"Ombre", kind:"shadow", description:"Silhouette, ombre portée ou duplication visuelle d’une source." },
+    cue: { label:"Cue", kind:"cue", description:"Déclencheurs et repères de conduite." },
+    bridge: { label:"Liaison", kind:"bridge", description:"Liaisons vers des moteurs, périphériques ou contrôleurs." }
+  }[type] || { label:"Layer", kind:"effect", description:"Calque timeline." });
+}
+function renderTimelineLayers() {
+  const host = $("#timelineRows");
+  if (!host) return;
+  project.layers ||= [];
+  host.innerHTML = project.layers.map((layer, index) => {
+    const meta = layerTypeMeta(layer.type);
+    const height = Math.max(24, Math.min(96, Number(layer.height) || 30));
+    const selected = selectedTimelineLayerId === layer.id ? " selected" : "";
+    return `<div class="timeline-layer-row${selected}" data-layer-id="${htmlSafe(layer.id)}" data-track="${index}" style="--layer-height:${height}px" role="row">
+      <div class="timeline-track-label" role="gridcell"><span class="layer-type-dot layer-${htmlSafe(meta.kind)}"></span><span class="layer-name">${htmlSafe(layer.name || meta.label)}</span><span class="layer-index">${index + 1}</span></div>
+      <div class="timeline-track" data-track="${index}" role="gridcell"></div>
+      <div class="timeline-route" role="gridcell"><button class="route-btn" data-track-route="${index}">Principal</button></div>
+      <div class="layer-row-resize" title="Redimensionner le layer"></div>
+    </div>`;
+  }).join("");
+  for (const clip of project.timeline || []) drawClip(clip);
+  updateRouteButtons();
+  installTimelineLayerEvents();
+}
+function selectTimelineLayer(layerId) {
+  const layer = (project.layers || []).find(l => l.id === layerId);
+  if (!layer) return;
+  selectedTimelineLayerId = layer.id;
+  qall(".timeline-layer-row").forEach(row => row.classList.toggle("selected", row.dataset.layerId === layer.id));
+  const meta = layerTypeMeta(layer.type);
+  $("#inspectorType").textContent = `${layer.name} · ${meta.label}`;
+  $("#inspectorBody").innerHTML = `<div class="layer-inspector"><b>${htmlSafe(layer.name)}</b><p class="hint">${htmlSafe(meta.description)}</p><p class="hint">${(project.timeline || []).filter(c => c.track === (project.layers || []).indexOf(layer)).length} clip(s) sur ce layer.</p></div>`;
+}
+function addTimelineLayer(type) {
+  project.layers ||= [];
+  const meta = layerTypeMeta(type);
+  const count = project.layers.filter(l => l.type === type).length + 1;
+  const layer = { id:`layer-${type}-${Date.now().toString(36)}`, type, name: count > 1 ? `${meta.label} ${count}` : meta.label, height:30 };
+  project.layers.push(layer);
+  selectedTimelineLayerId = layer.id;
+  renderTimelineLayers();
+  autosave();
+  commitHistory();
+  log(`Timeline · layer ${layer.name} ajouté`);
+}
+function installTimelineLayerEvents() {
+  const host = $("#timelineRows");
+  if (!host || host.dataset.bound === "1") return;
+  host.dataset.bound = "1";
+  let resize = null;
+  host.addEventListener("click", event => {
+    const route = event.target.closest("[data-track-route]");
+    if (route) { openRouteSheet(Number(route.dataset.trackRoute)); return; }
+    const row = event.target.closest(".timeline-layer-row");
+    if (row) selectTimelineLayer(row.dataset.layerId);
+  });
+  host.addEventListener("mousedown", event => {
+    const handle = event.target.closest(".layer-row-resize");
+    if (!handle) return;
+    const row = handle.closest(".timeline-layer-row");
+    const index = Number(row?.dataset.track);
+    if (!Number.isInteger(index) || !project.layers?.[index]) return;
+    resize = { index, startY:event.clientY, start:Number(project.layers[index].height) || 30 };
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  window.addEventListener("mousemove", event => {
+    if (!resize) return;
+    const layer = project.layers[resize.index];
+    layer.height = Math.max(24, Math.min(96, resize.start + event.clientY - resize.startY));
+    const row = host.querySelector(`.timeline-layer-row[data-track="${resize.index}"]`);
+    if (row) row.style.setProperty("--layer-height", `${layer.height}px`);
+  });
+  window.addEventListener("mouseup", () => {
+    if (!resize) return;
+    resize = null; autosave(); commitHistory();
+  });
+}
+$("#addLayer")?.addEventListener("click", event => { event.stopPropagation(); $("#layerAddMenu")?.classList.toggle("hidden"); });
+qall("[data-add-layer]").forEach(button => button.addEventListener("click", () => { $("#layerAddMenu")?.classList.add("hidden"); addTimelineLayer(button.dataset.addLayer); }));
+document.addEventListener("click", event => { if (!event.target.closest(".layer-add-wrap")) $("#layerAddMenu")?.classList.add("hidden"); });
 
 function videoOutputPort(node) {
   if (!node) return null;
@@ -1721,6 +1983,7 @@ function videoOutputPort(node) {
 }
 
 function connectNodes(fromNode, fromPort, toNode, toPort = 0) {
+  if (refuseCanvasEdit("câblage")) return false;
   if (!fromNode || !toNode || fromPort == null) return false;
   const g = activeGraph();
   const from = { node: fromNode.id, port: fromPort };
@@ -1739,6 +2002,7 @@ function connectNodes(fromNode, fromPort, toNode, toPort = 0) {
 }
 
 function applyMagicFx(type) {
+  if (refuseCanvasEdit("Magic FX")) return;
   const source = selectedNode ? nodeById(selectedNode) : null;
   if (type === "blob") {
     const n = addNode("blob", source ? source.x + 220 : 340, source ? source.y + 40 : 160);
@@ -1828,6 +2092,7 @@ $("#magicFxModal")?.addEventListener("click", e => { if (e.target.id === "magicF
 qall("[data-magic-fx]").forEach(b => b.onclick = () => applyMagicFx(b.dataset.magicFx));
 
 function applySuperNodeV3(id) {
+  if (refuseCanvasEdit("SuperNode")) return;
   const preset = superNodePreset(id);
   if (!preset) return log(`SuperNode inconnu · ${id}`);
   const source = selectedNode ? nodeById(selectedNode) : null;
@@ -1911,14 +2176,28 @@ $("#cuePrev").onclick = () => {
   fireDesktopCue(cue);
 };
 $("#cuePanic").onclick = () => {
-  const applied = applyCue(project, null, { panic: true });
+  performPanic();
+};
+
+async function performPanic() {
+  const applied = applyCue(project, null, { panic: true, layout: companionLayout });
   project = applied.project;
+  if (isRootGraph()) runtime.setProject(project);
   runtime.stop();
   syncPlayButton();
   redraw();
   autosave();
-  log("PANIC");
-};
+  let results = [];
+  try {
+    results = await dispatchPanicEffects(applied.effects, {
+      sendOsc: runtime.oscUdpSend,
+      sendArtNet: runtime.artnetUdpSend
+    });
+  } catch (error) {
+    results = [{ kind: "osc", sent: false, reason: error?.message || String(error) }];
+  }
+  for (const line of formatPanicResult(applied.effects, results)) log(line);
+}
 
 function downloadText(content, fileName, mime = "text/plain") {
   const blob = new Blob([content], { type: mime });
@@ -1954,16 +2233,20 @@ $("#exportMilluminBtn")?.addEventListener("click", () => runExport("millumin"));
 
 let lastVibeOut = null;
 
-async function askVibeOutAi(prompt, provider = "auto") {
+async function askVibeOutAi(prompt, provider = "auto", target = "") {
   const cfg = readAiConfig();
+  const task = /glsl|isf/i.test(String(target || "")) ? "shader" : "code";
+  const routed = selectLocalAgents(cfg.localAgents || [], { task, limit:1 })[0];
+  const localModel = routed?.model || cfg.localModel || "qwen2.5-coder:7b";
+  const localBaseUrl = routed?.baseUrl || cfg.localBaseUrl || "http://127.0.0.1:11434";
   const local = () => requestAiForNode({
     protocol:"ollama",
-    baseUrl:cfg.localBaseUrl || "http://127.0.0.1:11434",
-    model:cfg.localModel || "qwen2.5-coder:7b",
+    baseUrl:localBaseUrl,
+    model:localModel,
     system:prompt.system,
     prompt:prompt.user,
     temperature:.12
-  }).then(r => ({ ...r, provider:"local" }));
+  }).then(r => ({ ...r, provider:"local", agent:routed?.id || "", model:r.model || localModel }));
   const external = () => {
     if (!cfg.enabled || !cfg.endpoint) throw new Error("Endpoint externe non configuré");
     return requestAiForNode({
@@ -1984,7 +2267,6 @@ async function askVibeOutAi(prompt, provider = "auto") {
     throw e;
   }
 }
-
 function vibeOutFallback(target) {
   if (target === "maxpat") return exportMax(project);
   if (target === "touchdesigner") return exportTouchDesigner(project);
@@ -2021,7 +2303,7 @@ $("#vibeOutGenerate")?.addEventListener("click", async () => {
       target,
       project,
       instruction,
-      askAi: prompt => askVibeOutAi(prompt, provider),
+      askAi: prompt => askVibeOutAi(prompt, provider, target),
       fallback
     });
     lastVibeOut = { ...result, target, fileName:vibeOutFileName(target, result.extension) };
@@ -2205,54 +2487,70 @@ $("#vibeImageClear")?.addEventListener("click", () => {
   if ($("#vibeImageFile")) $("#vibeImageFile").value = "";
 });
 
+function showVibePreview(result, logPrefix) {
+  if (!result?.ops?.length) {
+    log(`${logPrefix} · aucune opération générée (pas de réussite simulée)`);
+    pendingVibe = null;
+    $("#vibePreview")?.classList.add("hidden");
+    return result;
+  }
+  pendingVibe = result;
+  const box = $("#vibePreview");
+  if (box) {
+    box.classList.remove("hidden");
+    box.innerHTML = `<div class="vibe-preview-head"><b>Aperçu Vibe</b> · ${htmlSafe(result.engine || "")} · ${result.ops.length} op(s)</div>
+      <pre class="vibe-preview-ops">${result.ops.map(o => htmlSafe(JSON.stringify(o))).join("\n")}</pre>
+      <div class="vibe-preview-actions">
+        <button type="button" id="vibeConfirm" class="smallbtn">Appliquer</button>
+        <button type="button" id="vibeCancel" class="smallbtn">Annuler</button>
+      </div>`;
+    $("#vibeConfirm").onclick = () => confirmPendingVibe();
+    $("#vibeCancel").onclick = () => {
+      pendingVibe = null;
+      box.classList.add("hidden");
+      log(`${logPrefix} · aperçu annulé (aucune modification)`);
+    };
+  }
+  return result;
+}
+
+async function proposeVibe(rawText, { logPrefix = "Vibe", image = null } = {}) {
+  const text = String(rawText || "").trim();
+  if (!text && !image?.analysis) {
+    log(`${logPrefix} · texte ou image requis`);
+    return { ops: [], note: "texte requis", engine: "none", unavailableHosts: [] };
+  }
+  log(image?.analysis ? `${logPrefix} · analyse + génération…` : `${logPrefix} · analyse…`);
+  const target = image?.target || "auto";
+  const promptText = image?.analysis ? imageVibePrompt(text, image.analysis, target) : text;
+  let result = await runVibe(promptText, project);
+  if (image?.analysis) {
+    const seedOps = imageVibeOps(image.analysis, target, text);
+    result = {
+      ...result,
+      engine: `image-vibe+${result.engine || "local"}`,
+      ops: [...seedOps, ...(result.ops || [])],
+      note: `Image → Vibe · ${target} · ${result.note || "analyse locale"}`
+    };
+  }
+  if (result.aiError) log(`${logPrefix} · IA indisponible · ${result.aiError}`);
+  if (result.aiUnavailable) log(`${logPrefix} · ${result.note}`);
+  else log(`${logPrefix} · ${result.note || result.engine}`);
+  const preview = showVibePreview(result, logPrefix);
+  if (!preview?.ops?.length) return result;
+  if (!$("#vibePreview")) await confirmPendingVibe();
+  return result;
+}
+
 async function applyVibeFromUi() {
-  const text = $("#vibeText").value.trim();
-  if (!text && !imageVibeState.analysis) { log("Vibe · texte ou image requis"); return; }
-  log(imageVibeState.analysis ? "Image Vibe · analyse + génération…" : "Vibe · analyse…");
   $("#applyVibe").disabled = true;
   try {
+    const text = $("#vibeText").value.trim();
     const target = $("#vibeImageTarget")?.value || "auto";
-    const promptText = imageVibeState.analysis ? imageVibePrompt(text, imageVibeState.analysis, target) : text;
-    let result = await runVibe(promptText, project);
-    if (imageVibeState.analysis) {
-      const seedOps = imageVibeOps(imageVibeState.analysis, target, text);
-      result = {
-        ...result,
-        engine: `image-vibe+${result.engine || "local"}`,
-        ops: [...seedOps, ...(result.ops || [])],
-        note: `Image → Vibe · ${target} · ${result.note || "analyse locale"}`
-      };
-    }
-    if (result.aiError) log(`Vibe · IA indisponible · ${result.aiError}`);
-    if (result.aiUnavailable) log(`Vibe · ${result.note}`);
-    else log(`Vibe · ${result.note || result.engine}`);
-
-    if (!result.ops?.length) {
-      log("Vibe · aucune opération générée (pas de réussite simulée)");
-      pendingVibe = null;
-      $("#vibePreview")?.classList.add("hidden");
-      return;
-    }
-
-    pendingVibe = result;
-    const box = $("#vibePreview");
-    if (box) {
-      box.classList.remove("hidden");
-      box.innerHTML = `<div class="vibe-preview-head"><b>Aperçu Vibe</b> · ${result.engine} · ${result.ops.length} op(s)</div>
-        <pre class="vibe-preview-ops">${result.ops.map(o => JSON.stringify(o)).join("\n")}</pre>
-        <div class="vibe-preview-actions">
-          <button type="button" id="vibeConfirm" class="smallbtn">Appliquer</button>
-          <button type="button" id="vibeCancel" class="smallbtn">Annuler</button>
-        </div>`;
-      $("#vibeConfirm").onclick = () => confirmPendingVibe();
-      $("#vibeCancel").onclick = () => {
-        pendingVibe = null;
-        box.classList.add("hidden");
-        log("Vibe · aperçu annulé (aucune modification)");
-      };
-    } else {
-      await confirmPendingVibe();
-    }
+    await proposeVibe(text, {
+      logPrefix: "Vibe",
+      image: imageVibeState.analysis ? { analysis: imageVibeState.analysis, target } : null
+    });
   } catch (e) {
     log(`Vibe ÉCHEC · ${e.message || e}`);
   } finally {
@@ -2262,6 +2560,7 @@ async function applyVibeFromUi() {
 
 async function confirmPendingVibe() {
   if (!pendingVibe?.ops?.length) return;
+  if (refuseCanvasEdit("application Vibe")) return;
   commitHistory();
   const { applied, errors } = applyVibeOps(project, pendingVibe.ops, {
     addNode: (type, x, y) => {
@@ -2296,6 +2595,140 @@ $("#vibeText").addEventListener("keydown", e => {
   }
 });
 
+function showRightPane(id) {
+  const inspector = $("#inspectorBody");
+  const chat = $("#cxChatPane");
+  if (!inspector || !chat) return;
+  const cx = id === "cx";
+  inspector.classList.toggle("pane-hidden", cx);
+  chat.classList.toggle("pane-hidden", !cx);
+  chat.hidden = !cx;
+  qall("[data-right-pane]").forEach(btn => {
+    const on = btn.dataset.rightPane === id;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+}
+qall("[data-right-pane]").forEach(btn => btn.addEventListener("click", () => showRightPane(btn.dataset.rightPane)));
+
+function appendCxMessage(role, text) {
+  const logEl = $("#cxChatLog");
+  if (!logEl) return null;
+  const row = document.createElement("div");
+  row.className = `cx-msg ${role}`;
+  row.textContent = text;
+  logEl.append(row);
+  logEl.scrollTop = logEl.scrollHeight;
+  return row;
+}
+
+function appendCxDownloadActions(proposals = []) {
+  const logEl = $("#cxChatLog");
+  if (!logEl) return null;
+  const links = proposals
+    .filter(item => item?.downloadUrl && /^https?:\/\//i.test(item.downloadUrl))
+    .map(item => ({ title: String(item.title || "moteur"), url: String(item.downloadUrl) }));
+  if (!links.length) return null;
+  const row = document.createElement("div");
+  row.className = "cx-msg assistant";
+  for (const { title, url } of links) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "smallbtn";
+    button.textContent = `Télécharger ${title}`;
+    button.title = `Ouvrir le téléchargement officiel de ${title}`;
+    button.onclick = () => {
+      if (typeof window.nvdDesktop?.openExternal === "function") {
+        window.nvdDesktop.openExternal(url).catch(error => appendCxMessage("assistant", `Téléchargement · ${error?.message || error}`));
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    };
+    row.append(button);
+  }
+  logEl.append(row);
+  logEl.scrollTop = logEl.scrollHeight;
+  return row;
+}
+
+let cxHostProbePromise = null;
+function probeCxInstalledHosts() {
+  if (agentRegistryDoc) return Promise.resolve(agentRegistryDoc);
+  if (typeof globalThis.nvdDesktop?.agentRegistry !== "function") return Promise.resolve(null);
+  if (!cxHostProbePromise) {
+    cxHostProbePromise = globalThis.nvdDesktop.agentRegistry()
+      .then(doc => { agentRegistryDoc = doc; return doc; })
+      .catch(() => null);
+  }
+  return cxHostProbePromise;
+}
+
+function filterInstalledCxProposals(proposals = [], registry = null) {
+  const rows = new Map((registry?.rows || []).map(row => [row.id, row]));
+  return proposals.filter(item => {
+    const row = rows.get(item?.id);
+    const installed = row?.status === "VALIDÉ"
+      && row?.executable !== false
+      && row?.value !== null
+      && row?.value !== undefined
+      && row?.value !== "";
+    return !installed;
+  });
+}
+
+async function sendCxChat() {
+  const input = $("#cxChatInput");
+  const text = input?.value.trim() || "";
+  if (!text) return;
+  appendCxMessage("user", text);
+  if (input) input.value = "";
+  const send = $("#cxChatSend");
+  if (send) send.disabled = true;
+  const status = appendCxMessage("status", "Génération…");
+  try {
+    const [result, hostRegistry] = await Promise.all([
+      proposeVibe(text, { logPrefix: "CX Chat" }),
+      probeCxInstalledHosts()
+    ]);
+    const unavailableHosts = filterInstalledCxProposals(result?.unavailableHosts || [], hostRegistry);
+    status?.remove();
+    appendCxMessage("assistant", cxChatReply({
+      ops: result?.ops || [],
+      note: result?.note || "",
+      unavailable: unavailableHosts
+    }));
+    appendCxDownloadActions(unavailableHosts);
+    if (result?.ops?.length) {
+      const row = document.createElement("div");
+      row.className = "cx-msg assistant";
+      row.innerHTML = `<div class="cx-confirm"><button type="button" data-cx-confirm>Appliquer au patch</button><button type="button" data-cx-cancel>Annuler</button></div>`;
+      row.querySelector("[data-cx-confirm]").onclick = () => confirmPendingVibe();
+      row.querySelector("[data-cx-cancel]").onclick = () => {
+        pendingVibe = null;
+        $("#vibePreview")?.classList.add("hidden");
+        appendCxMessage("assistant", "Aperçu annulé. Aucune modification.");
+        row.remove();
+      };
+      $("#cxChatLog")?.append(row);
+    }
+  } catch (e) {
+    status?.remove();
+    appendCxMessage("assistant", `Échec · ${e.message || e}`);
+  } finally {
+    if (send) send.disabled = false;
+  }
+}
+$("#cxChatForm")?.addEventListener("submit", e => {
+  e.preventDefault();
+  sendCxChat();
+});
+$("#cxChatInput")?.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendCxChat();
+  }
+});
+
 function runtimeFacts() {
   return {
     electronRuntime: window.nvdDesktop?.runtime === "electron",
@@ -2306,6 +2739,7 @@ function runtimeFacts() {
 }
 
 async function loadProjectText(data, label) {
+  if (refuseCanvasEdit("ouverture de projet")) return;
   project = validateProject(JSON.parse(data));
   graphPath = [];
   redraw();
@@ -2323,9 +2757,13 @@ $("#saveProject").onclick = async () => {
     userAgent: facts.userAgent,
     electronRuntime: facts.electronRuntime
   });
+  let localFailed = false;
   if (plan.persistLocal) {
     try { localStorage.setItem(MANUAL_SAVE_KEY, data); }
-    catch (e) { log(`Sauvegarde locale impossible · ${e.message || e}`); }
+    catch (e) {
+      localFailed = true;
+      log(`Sauvegarde locale impossible · ${e.message || e}`);
+    }
   }
   if (plan.mode === "native") {
     const r = await window.nvdDesktop.saveProject({ suggestedName: fileName, data });
@@ -2344,7 +2782,7 @@ $("#saveProject").onclick = async () => {
     a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1200);
   }
-  log(saveStatusMessage(plan, fileName));
+  if (announceManualSave(plan, localFailed)) log(saveStatusMessage(plan, fileName));
   autosave();
 };
 $("#loadProject").onclick = async () => {
@@ -2366,6 +2804,7 @@ $("#loadProject").onclick = async () => {
 $("#projectFile").onchange = async e => {
   const f = e.target.files[0];
   if (!f) return;
+  if (refuseCanvasEdit("ouverture de projet")) { e.target.value = ""; return; }
   project = validateProject(JSON.parse(await f.text()));
   redraw();
   runtime.play();
@@ -2515,6 +2954,18 @@ function openPreferences(tab = "general") {
 $("#preferencesBtn").onclick = () => openPreferences("general");
 $("#preferencesClose").onclick = () => $("#preferencesModal").classList.add("hidden");
 qall("[data-pref-tab]").forEach(b => b.onclick = () => openPreferences(b.dataset.prefTab));
+qall("a.credit-link").forEach(anchor => {
+  anchor.addEventListener("click", async event => {
+    const open = window.nvdDesktop?.openExternal;
+    if (typeof open !== "function") return;
+    event.preventDefault();
+    try {
+      await open(anchor.href);
+    } catch {
+      window.open(anchor.href, "_blank", "noopener,noreferrer");
+    }
+  });
+});
 
 for (const id of ["accentColor", "secondaryColor", "gradientMode", "gradientIntensity"]) {
   const el = $("#" + id);
@@ -2627,15 +3078,18 @@ $("#aiLocalProbe")?.addEventListener("click", async () => {
     const second = selectedModels.find(m => m !== selected) || cfg.localSecondaryModel;
     if ($("#aiLocalSecondaryModel") && second) $("#aiLocalSecondaryModel").value = second;
     saveAiConfig({ ...cfg, localModel:selected, localSecondaryModel:second });
-    if (status) status.textContent = names.length
-      ? `Prêt · ${selectedModels.join(" + ") || selected} · ${names.length} modèle(s)`
-      : "Ollama joignable · aucun modèle installé";
-    log(names.length
-      ? `Local AI Core · prêt · ${selectedModels.join(" + ") || selected}`
-      : "Local AI Core · Ollama OK mais aucun modèle installé");
+    if (result.notice) {
+      const present = names.length ? ` · modèles présents : ${names.join(", ")}` : "";
+      if (status) status.textContent = result.notice + present;
+      log(`Local AI Core · ${result.notice}`);
+    } else if (status) {
+      status.textContent = `Prêt · ${selectedModels.join(" + ") || selected} · ${names.length} modèle(s)`;
+      log(`Local AI Core · prêt · ${selectedModels.join(" + ") || selected}`);
+    }
   } else {
-    if (status) status.textContent = `Indisponible · ${result.error || "Ollama non joignable"}`;
-    log(`Local AI Core · indisponible · ${result.error || "Ollama non joignable"}`);
+    const message = result.error || result.failure?.message || "Ollama inaccessible";
+    if (status) status.textContent = message;
+    log(`Local AI Core · ${message}`);
   }
 });
 
@@ -2729,6 +3183,7 @@ document.addEventListener("keydown", e => {
   if (!mod || typing) return;
   if (e.key === "z" && !e.shiftKey) {
     e.preventDefault();
+    if (refuseCanvasEdit("annulation")) return;
     const snap = history.undo();
     if (!snap) { log("Undo · rien à annuler"); return; }
     historySuspended = true;
@@ -2739,6 +3194,7 @@ document.addEventListener("keydown", e => {
     log("Undo");
   } else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
     e.preventDefault();
+    if (refuseCanvasEdit("rétablissement")) return;
     const snap = history.redo();
     if (!snap) { log("Redo · rien à rétablir"); return; }
     historySuspended = true;
@@ -2833,7 +3289,9 @@ async function runCmd() {
       exitShowcaseDemo();
     } else if (v === "ai probe") {
       const result = await probeLocalAi(readAiConfig(), { fresh:true });
-      log(result.ok ? `AI · ${(result.localModels || [result.model]).filter(Boolean).join(" + ") || "Ollama OK"}` : `AI · indisponible · ${result.error || "?"}`);
+      log(result.ok
+        ? `AI · ${(result.localModels || [result.model]).filter(Boolean).join(" + ") || "Ollama"}${result.notice ? " · " + result.notice : ""}`
+        : `AI · ${result.error || "Ollama inaccessible"}`);
     } else if (v === "ai install qwen") {
       await installLocalModel("qwen2.5-coder:7b");
     } else if (v === "ai install gemma") {
@@ -2929,6 +3387,7 @@ ensureRouting(project);
 ensureEdges();
 updateRouteButtons();
 buildLibrary();
+void refreshEngineOffers();
 
 let generalPrefs = { restoreAutosave: true, loadDemo: true, plugAndPlay: true };
 try { generalPrefs = { ...generalPrefs, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") }; } catch { /* */ }
@@ -2959,7 +3418,7 @@ try {
   if (session.lastProjectName) log(`Session · dernier projet « ${session.lastProjectName} »`);
   if (session.remoteCamera?.room) log(`Session · Remote Camera connu ${session.remoteCamera.room} · ${session.remoteCamera.lastStatus || LINK_STATES.KNOWN}`);
 } catch { /* */ }
-if (project.nodes.length === 0 && generalPrefs.loadDemo !== false && localStorage.getItem(DEMO_DISMISSED_KEY) !== "1") {
+if (project.nodes.length === 0 && generalPrefs.loadDemo !== false) {
   try { demoReturnProject = JSON.parse(JSON.stringify(project)); } catch { demoReturnProject = newProject(); }
   project = createDemoProject();
   setDemoBanner(true);
@@ -2968,6 +3427,7 @@ if (project.nodes.length === 0 && generalPrefs.loadDemo !== false && localStorag
   setDemoBanner(false);
 }
 $("#demoExitBtn")?.addEventListener("click", exitShowcaseDemo);
+$("#loadExampleBtn")?.addEventListener("click", () => enterShowcaseDemo());
 renderPnpStatus();
 if (generalPrefs.plugAndPlay !== false) {
   queueMicrotask(() => runPlugAndPlayProbe({ silent:true }));
@@ -3244,15 +3704,18 @@ function startDesktopRemoteHost() {
   const params = new URLSearchParams(location.search);
   const query = params.get("remoteHost");
   const electron = window.nvdDesktop?.runtime === "electron";
-  // Always allow ?companionHost=1 or electron; also enable with remoteHost
-  if (!query && !electron && params.get("companionHost") !== "1") return;
-  const url = query && query.startsWith("ws") ? query : `ws://127.0.0.1:${window.nvdDesktop?.remotePort || REMOTE_PORT}`;
+  const explicitCompanion = params.get("companionHost") === "1";
+  // Le desktop autonome ne tente jamais une connexion distante implicite.
+  // Une session WS n'est activée que par un paramètre explicite.
+  if (!query && !explicitCompanion) return;
+  const url = query && /^wss?:/i.test(query) ? query : `ws://127.0.0.1:${window.nvdDesktop?.remotePort || REMOTE_PORT}`;
   remoteSession = connectRemote({
     url,
     role: "host",
     clientId: "desktop",
     getState: () => ({ revision: remoteRevision, project }),
     setState: ({ revision, project: next }) => {
+      if (refuseCanvasEdit("synchro distante du patch")) return;
       applyingRemote = true;
       remoteRevision = revision ?? remoteRevision;
       try {
