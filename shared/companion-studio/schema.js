@@ -104,6 +104,7 @@ export function normalizeWidget(w = {}) {
       priority: Math.max(0, Math.min(200, Number(w.binding?.priority) || 100)),
       profileId: w.binding?.profileId || null,
       profileName: w.binding?.profileName || null,
+      playerSlot: Math.max(1, Math.min(12, Number(w.binding?.playerSlot) || 1)),
       midiOutputId: w.binding?.midiOutputId || null,
       midiData: Array.isArray(w.binding?.midiData) ? w.binding.midiData.slice(0, 3).map(Number) : null,
       serialText: w.binding?.serialText || null,
