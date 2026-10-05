@@ -78,7 +78,11 @@ export function normalizeRequest(text) {
 }
 
 function stamp(base, patch = {}) {
-  const status = AGENT_STATUSES.includes(patch.status) ? patch.status : base.defaultStatus;
+  const probedValue = patch.value ?? null;
+  const hasProof = probedValue !== null && probedValue !== undefined && probedValue !== "";
+  const status = hasProof && patch.status !== "ÉCHEC"
+    ? "VALIDÉ"
+    : (AGENT_STATUSES.includes(patch.status) ? patch.status : base.defaultStatus);
   const executable = base.priority === 3 ? patch.windowsTested === true : patch.executable !== false;
   return {
     id: base.id,
@@ -154,11 +158,25 @@ function rankRequest(text, registry) {
   const add = (...ids) => {
     for (const id of ids) if (!wanted.includes(id)) wanted.push(id);
   };
+  if (/processing|\.pde|processing java/.test(t)) add("processing");
+  if (/p5(?:\.js)?|p5\.js/.test(t)) add("p5");
+  if (/javascript|\bjs\b|\.js\b/.test(t)) add("javascript");
+  if (/node\.js|nodejs|\bnode\b/.test(t)) add("node");
   if (/ondul|shader|glsl/.test(t)) add("glsl", "webgl", "javascript");
   if (/webgpu|\bwgsl\b/.test(t)) add("webgpu", "wgsl");
+  if (/\\bjava\\b|\\.java\\b/.test(t)) add("java");
+  if (/\\bgdscript\\b|\\bgodot\\b/.test(t)) add("godot");
+  if (/\\b(unreal|unreal engine)\\b/.test(t)) add("unreal");
+  if (/openframeworks/.test(t)) add("openframeworks");
+  if (/\\bcinder\\b/.test(t)) add("cinder");
+  if (/\\bjuce\\b/.test(t)) add("juce");
+  if (/\\bfaust\\b/.test(t)) add("faust");
+  if (/supercollider|\\bsclang\\b/.test(t)) add("supercollider");
+  if (/pure\\s*data|\\bpd\\b/.test(t)) add("puredata");
+  if (/\\bunity\\b|\\bcsharp\\b|\\bc#\\b/.test(t)) add("unity");
+  if (/\\bvvvv\\b|\\bvl\\b/.test(t)) add("vvvv");
   if (/python/.test(t)) add("python");
   if (/typescript|\btsc\b/.test(t)) add("typescript");
-  if (/\bnode\b/.test(t)) add("node");
   if (/\brust\b/.test(t)) add("rust");
   if (/\bswift\b/.test(t)) add("swift");
   if (/metal/.test(t)) add("metal");

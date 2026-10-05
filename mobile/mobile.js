@@ -1418,7 +1418,7 @@ function bindServiceWorker() {
   const built = document.querySelector('meta[name="nvd-pwa"]')?.content === "build";
   if (!built || !("serviceWorker" in navigator)) return;
   let waiting = null;
-  navigator.serviceWorker.register("./sw.js", { scope: "./" }).then((reg) => {
+  navigator.serviceWorker.register("../sw.js", { scope: "../" }).then((reg) => {
     const watch = (worker) => {
       if (!worker) return;
       const decide = () => {
