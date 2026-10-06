@@ -58,7 +58,7 @@ jobs:
           pgrep -x "ART" >/dev/null
           pkill -x "ART" || true
       - name: Build Apple Silicon
-        run: npx tauri build --target aarch64-apple-darwin --bundles dmg
+        run: npx tauri build --target aarch64-apple-darwin --bundles app,dmg
       - name: Validate Apple Silicon
         run: |
           set -euo pipefail
@@ -68,7 +68,7 @@ jobs:
           grep -q "arm64" /tmp/art-arm64-file.txt
           codesign --verify --deep --strict --verbose=2 "$APP"
       - name: Build Intel
-        run: npx tauri build --target x86_64-apple-darwin --bundles dmg
+        run: npx tauri build --target x86_64-apple-darwin --bundles app,dmg
       - name: Validate Intel
         run: |
           set -euo pipefail
