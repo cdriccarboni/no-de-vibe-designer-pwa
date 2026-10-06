@@ -3,7 +3,10 @@
   "productName": "No-de Vibe Designer",
   "version": "3.3.1",
   "description": "No-de Vibe Designer — environnement de patch nodal pour le spectacle vivant",
-  "author": "Cédric Carboni",
+  "author": {
+    "name": "Cédric Carboni",
+    "email": "cdriccarboni@users.noreply.github.com"
+  },
   "homepage": "https://github.com/cdriccarboni",
   "license": "UNLICENSED",
   "private": true,
@@ -104,7 +107,8 @@
         }
       ],
       "category": "Graphics",
-      "artifactName": "No-de-Vibe-Designer-${version}-Linux-${arch}.${ext}"
+      "artifactName": "No-de-Vibe-Designer-${version}-Linux-${arch}.${ext}",
+      "maintainer": "Cédric Carboni <cdriccarboni@users.noreply.github.com>"
     },
     "asar": true,
     "backgroundColor": "#090d16",
