@@ -164,7 +164,11 @@ jobs:
               "Aucune commande Terminal n'est nécessaire." \
               > "$STAGE/À LIRE - PREMIER LANCEMENT.txt"
             ditto -c -k --sequesterRsrc --keepParent "$STAGE/No-de Vibe Designer.app" "release-assets/No-de-Vibe-Designer-${APP_VERSION}-macOS-$ARCH.zip"
-            DMG="release-assets/No-de-Vibe-Designer-${APP_VERSION}-macOS-$ARCH.dmg"\n            if ! hdiutil create -volname "No-de Vibe Designer $APP_VERSION $ARCH" -srcfolder "$STAGE" -ov -format UDZO "$DMG"; then\n              sleep 3\n              hdiutil create -volname "No-de Vibe Designer $APP_VERSION $ARCH" -srcfolder "$STAGE" -ov -format UDZO "$DMG"\n            fi
+            DMG="release-assets/No-de-Vibe-Designer-${APP_VERSION}-macOS-$ARCH.dmg"
+            if ! hdiutil create -volname "No-de Vibe Designer $APP_VERSION $ARCH" -srcfolder "$STAGE" -ov -format UDZO "$DMG"; then
+              sleep 3
+              hdiutil create -volname "No-de Vibe Designer $APP_VERSION $ARCH" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+            fi
           done
           (cd release-assets && shasum -a 256 * > SHA256SUMS-macOS.txt)
       - uses: actions/upload-artifact@v4
