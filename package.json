@@ -1,8 +1,8 @@
 {
   "name": "no-de-vibe-designer",
-  "productName": "No-de Vibe Designer",
-  "version": "3.3.1",
-  "description": "No-de Vibe Designer — environnement de patch nodal pour le spectacle vivant",
+  "productName": "No[co]de Vibe Designer",
+  "version": "3.3.8",
+  "description": "No[co]de Vibe Designer — environnement de patch nodal pour le spectacle vivant",
   "author": {
     "name": "Cédric Carboni",
     "email": "cdriccarboni@users.noreply.github.com"
@@ -24,25 +24,25 @@
     "remote:bridge": "node bridge/remote-server.mjs",
     "serve:companion": "node scripts/serve-companion.mjs",
     "check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check desktop/app.js && node --check shared/runtime.js && node --check shared/node-processors.js && node --check shared/ports.js && node --check shared/node-specs.js && node --check shared/vibe.js && node --check mobile/mobile.js && node --check scripts/build-pwa.mjs",
-    "pack:mac": "electron-builder --mac dir --arm64",
-    "dist:mac": "electron-builder --mac zip --arm64",
+    "pack:mac": "npm run icons && electron-builder --mac dir --arm64",
+    "dist:mac": "npm run icons && electron-builder --mac zip --arm64",
     "pack:linux": "electron-builder --linux zip --x64",
     "serve:web": "node scripts/serve-web.mjs",
     "release:check": "npm run audit:production && npm test && npm run check && npm run build:pwa",
     "android:aab": "node scripts/build-android.mjs --aab",
     "deploy:pwa": "node scripts/deploy-pwa.mjs",
     "audit:production": "node tests/run.mjs",
-    "dist:mac:universal": "electron-builder --mac dir --arm64 --x64",
-    "dist:win": "electron-builder --win nsis --x64",
-    "dist:linux": "electron-builder --linux AppImage deb tar.gz --x64"
+    "dist:mac:universal": "npm run icons && electron-builder --mac dir --arm64 --x64",
+    "dist:win": "npm run icons && electron-builder --win nsis --x64",
+    "dist:linux": "npm run icons && electron-builder --linux AppImage deb tar.gz --x64"
   },
   "build": {
     "appId": "fr.acousmatic.nodevibedesigner",
-    "productName": "No-de Vibe Designer",
+    "productName": "No[co]de Vibe Designer",
     "copyright": "Copyright © 2026 Cédric Carboni",
     "directories": {
       "output": "dist/electron",
-      "buildResources": "packaging/mac"
+      "buildResources": "build"
     },
     "files": [
       "electron/**/*",
@@ -59,15 +59,9 @@
       "index.html",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "packaging/mac/VibeDesigner.icns",
-        "to": "VibeDesigner.icns"
-      }
-    ],
     "mac": {
       "category": "public.app-category.graphics-design",
-      "icon": "packaging/mac/VibeDesigner.icns",
+      "icon": "build/icon.png",
       "target": [
         {
           "target": "dir",
@@ -108,7 +102,8 @@
       ],
       "category": "Graphics",
       "artifactName": "No-de-Vibe-Designer-${version}-Linux-${arch}.${ext}",
-      "maintainer": "Cédric Carboni <cdriccarboni@users.noreply.github.com>"
+      "maintainer": "Cédric Carboni <cdriccarboni@users.noreply.github.com>",
+      "icon": "build/icon.png"
     },
     "asar": true,
     "backgroundColor": "#090d16",
@@ -121,7 +116,8 @@
           ]
         }
       ],
-      "artifactName": "No-de-Vibe-Designer-${version}-Windows-${arch}-Setup.${ext}"
+      "artifactName": "No-de-Vibe-Designer-${version}-Windows-${arch}-Setup.${ext}",
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
