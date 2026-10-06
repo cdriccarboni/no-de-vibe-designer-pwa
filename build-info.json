@@ -1,9 +1,9 @@
 {
   "name": "No[co]de Vibe Designer",
-  "version": "3.3.7",
-  "builtAt": "2026-10-06T10:57:00.000Z",
+  "version": "3.3.8",
+  "builtAt": "2026-10-06T19:46:00.000Z",
   "files": 147,
-  "cacheRevision": "3.3.7-multi-brand-installer",
+  "cacheRevision": "3.3.8-unified-rings-brand",
   "surfaces": [
     "designer",
     "show",
