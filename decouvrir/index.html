@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#090b0d">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#090b0d">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ece9e2">
 <meta name="description" content="No[co]de Vibe Designer — environnement visuel pour connecter image, son, vidéo, lumière, capteurs, réseau et IA.">
 <title>No[co]de Vibe Designer — Découvrir</title>
 <link rel="icon" href="../icons/nocode-rings.svg" type="image/svg+xml">
@@ -15,17 +16,18 @@
   --text:#f1f3f5;--muted:#9ba4ae;--accent:#d7b86a;--accent2:#8fa79d;--ok:#7ca587;--grid:rgba(215,184,106,.09);
   --shadow:0 18px 60px rgba(0,0,0,.28)
 }
-html[data-theme="light"]{
-  color-scheme:light;
-  --bg:#ece9e2;--bg2:#e4dfd6;--panel:#f7f5f0;--panel2:#eeeae3;--line:#cbc5ba;--line2:#aea79c;
-  --text:#24272a;--muted:#6f746f;--accent:#9a7b37;--accent2:#6f8a7f;--ok:#5e7e67;--grid:rgba(154,123,55,.12);
-  --shadow:0 14px 42px rgba(0,0,0,.10)
+@media(prefers-color-scheme:light){
+  :root{
+    color-scheme:light;
+    --bg:#ece9e2;--bg2:#e4dfd6;--panel:#f7f5f0;--panel2:#eeeae3;--line:#cbc5ba;--line2:#aea79c;
+    --text:#24272a;--muted:#6f746f;--accent:#9a7b37;--accent2:#6f8a7f;--ok:#5e7e67;--grid:rgba(154,123,55,.12);
+    --shadow:0 14px 42px rgba(0,0,0,.10)
+  }
 }
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:13px Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-a{color:inherit}.topbar{position:sticky;top:0;z-index:60;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;padding:10px clamp(14px,3vw,34px);background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+a{color:inherit}.topbar{position:sticky;top:0;z-index:60;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:16px;padding:10px clamp(14px,3vw,34px);background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:9px;text-decoration:none;min-width:0}.brand img{width:42px;height:42px;border:1px solid var(--line2);border-radius:8px}.brand b{display:block;font-size:13px}.brand .co{font-size:.62em;vertical-align:.2em}.brand span:last-child{display:block;color:var(--muted);font-size:9px;letter-spacing:.15em;margin-top:2px}
 .surface-nav{display:flex;justify-content:center;gap:3px;overflow:auto;scrollbar-width:none}.surface-nav::-webkit-scrollbar{display:none}.surface-nav a{padding:7px 9px;border-radius:7px;text-decoration:none;color:var(--muted);font-size:10px;font-weight:750;white-space:nowrap}.surface-nav a:hover,.surface-nav a:focus-visible{background:var(--panel2);color:var(--text);outline:none}
-.theme-toggle{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.theme-toggle button{border:0;background:transparent;color:var(--muted);padding:7px 9px;font:inherit;font-size:10px;font-weight:800;cursor:pointer}.theme-toggle button.active{background:var(--panel2);color:var(--text)}
 .hero,.story,.final{position:relative;overflow:hidden;background-color:var(--bg);background-image:radial-gradient(circle at 1px 1px,var(--grid) 1.1px,transparent 0);background-size:24px 24px;border-bottom:1px solid var(--line)}
 .hero{min-height:76vh;display:flex;align-items:center;padding:clamp(80px,11vw,150px) clamp(20px,7vw,88px)}
 .hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 78% 24%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 34%),radial-gradient(circle at 18% 82%,color-mix(in srgb,var(--accent2) 10%,transparent),transparent 28%);pointer-events:none}
@@ -61,10 +63,6 @@ h1,h2{margin:10px 0 0;line-height:.92;letter-spacing:-.06em}h1{font-size:clamp(6
     <a href="#plateau">Plateau</a>
     <a href="#camera">Caméra</a>
   </nav>
-  <div class="theme-toggle" aria-label="Thème">
-    <button type="button" data-theme="dark">Sombre</button>
-    <button type="button" data-theme="light">Clair</button>
-  </div>
 </header>
 
 <main>
@@ -188,19 +186,6 @@ h1,h2{margin:10px 0 0;line-height:.92;letter-spacing:-.06em}h1{font-size:clamp(6
 </section>
 </main>
 
-<script>
-const root=document.documentElement;
-const buttons=[...document.querySelectorAll('[data-theme]')];
-function setTheme(theme){
-  root.dataset.theme=theme;
-  buttons.forEach(button=>button.classList.toggle('active',button.dataset.theme===theme));
-  try{localStorage.setItem('nocode.discover.theme',theme)}catch{}
-}
-let saved='';
-try{saved=localStorage.getItem('nocode.discover.theme')||''}catch{}
-if(saved!=='dark'&&saved!=='light')saved=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
-setTheme(saved);
-buttons.forEach(button=>button.addEventListener('click',()=>setTheme(button.dataset.theme)));
-</script>
+
 </body>
 </html>
