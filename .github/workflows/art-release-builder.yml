@@ -1,0 +1,237 @@
+name: ART 7.2.8 — Desktop validated release
+
+on:
+  push:
+    branches: [art-release-builder]
+    paths:
+      - ".art-builder/**"
+      - ".github/workflows/art-release-builder.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: "22"
+  RELEASE_TAG: "art-v7.2.8"
+  ART_VERSION: "7.2.8"
+
+jobs:
+  macos:
+    name: macOS · Universal + Apple Silicon + Intel
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: .art-builder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Install builder
+        run: npm install --no-audit --no-fund
+      - name: Prepare ART icon
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 https://art.acousmatic-theatre.fr/icons/icon-512.png -o art-icon.png
+          cp art-icon.png src-tauri/splash/art-icon.png
+          npx tauri icon art-icon.png -o src-tauri/icons
+      - name: Build Universal
+        run: npx tauri build --target universal-apple-darwin --bundles app,dmg
+      - name: Validate Universal
+        run: |
+          set -euo pipefail
+          APP="$(find src-tauri/target/universal-apple-darwin/release/bundle/macos -maxdepth 1 -name '*.app' -print -quit)"
+          BIN="$APP/Contents/MacOS/ART"
+          test -x "$BIN"
+          file "$BIN" | tee /tmp/art-universal-file.txt
+          grep -q "arm64" /tmp/art-universal-file.txt
+          grep -q "x86_64" /tmp/art-universal-file.txt
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv --verbose=4 "$APP" 2>&1 | tee /tmp/art-codesign.txt
+          open "$APP"
+          sleep 8
+          pgrep -f "$BIN" >/dev/null
+          pkill -f "$BIN" || true
+      - name: Build Apple Silicon
+        run: npx tauri build --target aarch64-apple-darwin --bundles dmg
+      - name: Validate Apple Silicon
+        run: |
+          set -euo pipefail
+          APP="$(find src-tauri/target/aarch64-apple-darwin/release/bundle/macos -maxdepth 1 -name '*.app' -print -quit)"
+          BIN="$APP/Contents/MacOS/ART"
+          file "$BIN" | tee /tmp/art-arm64-file.txt
+          grep -q "arm64" /tmp/art-arm64-file.txt
+          codesign --verify --deep --strict --verbose=2 "$APP"
+      - name: Build Intel
+        run: npx tauri build --target x86_64-apple-darwin --bundles dmg
+      - name: Validate Intel
+        run: |
+          set -euo pipefail
+          APP="$(find src-tauri/target/x86_64-apple-darwin/release/bundle/macos -maxdepth 1 -name '*.app' -print -quit)"
+          BIN="$APP/Contents/MacOS/ART"
+          file "$BIN" | tee /tmp/art-intel-file.txt
+          grep -q "x86_64" /tmp/art-intel-file.txt
+          codesign --verify --deep --strict --verbose=2 "$APP"
+      - name: Prepare Mac packages
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cp "$(find src-tauri/target/universal-apple-darwin/release/bundle/dmg -name '*.dmg' -print -quit)" "out/ART-${ART_VERSION}-macOS-Universal.dmg"
+          cp "$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg -name '*.dmg' -print -quit)" "out/ART-${ART_VERSION}-macOS-Apple-Silicon.dmg"
+          cp "$(find src-tauri/target/x86_64-apple-darwin/release/bundle/dmg -name '*.dmg' -print -quit)" "out/ART-${ART_VERSION}-macOS-Intel.dmg"
+          shasum -a 256 out/* > out/SHA256SUMS-macOS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ART-macOS
+          path: .art-builder/out/*
+          if-no-files-found: error
+
+  windows:
+    name: Windows · EXE + portable ZIP
+    runs-on: windows-latest
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: .art-builder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install builder
+        run: npm install --no-audit --no-fund
+      - name: Prepare ART icon
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://art.acousmatic-theatre.fr/icons/icon-512.png" -OutFile "art-icon.png"
+          Copy-Item art-icon.png src-tauri/splash/art-icon.png
+          npx tauri icon art-icon.png -o src-tauri/icons
+      - name: Build Windows
+        run: npx tauri build --bundles nsis
+      - name: Validate Windows launch
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/target/release/ART.exe"
+          if (-not (Test-Path $exe)) { throw "ART.exe missing" }
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) { throw "ART.exe exited during smoke test ($($p.ExitCode))" }
+          Stop-Process -Id $p.Id -Force
+      - name: Prepare Windows packages
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          $setup = Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
+          if (-not $setup) { throw "NSIS installer missing" }
+          Copy-Item $setup.FullName "out/ART-$env:ART_VERSION-Windows-x64-Setup.exe"
+          Compress-Archive -Path "src-tauri/target/release/ART.exe" -DestinationPath "out/ART-$env:ART_VERSION-Windows-x64-portable.zip" -Force
+          Get-FileHash out/* -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content out/SHA256SUMS-Windows.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ART-Windows
+          path: .art-builder/out/*
+          if-no-files-found: error
+
+  linux:
+    name: Linux · AppImage + DEB + tar.gz
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: .art-builder
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file libxdo-dev libssl-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install builder
+        run: npm install --no-audit --no-fund
+      - name: Prepare ART icon
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 https://art.acousmatic-theatre.fr/icons/icon-512.png -o art-icon.png
+          cp art-icon.png src-tauri/splash/art-icon.png
+          npx tauri icon art-icon.png -o src-tauri/icons
+      - name: Build Linux
+        run: npx tauri build --bundles appimage,deb
+      - name: Validate Linux launch
+        run: |
+          set -euo pipefail
+          EXE="src-tauri/target/release/ART"
+          test -x "$EXE"
+          LOG="/tmp/art-linux.log"
+          xvfb-run -a "$EXE" >"$LOG" 2>&1 &
+          PID=$!
+          sleep 8
+          if ! kill -0 "$PID" 2>/dev/null; then
+            cat "$LOG"
+            exit 1
+          fi
+          kill "$PID" || true
+          wait "$PID" 2>/dev/null || true
+      - name: Prepare Linux packages
+        run: |
+          set -euo pipefail
+          mkdir -p out portable
+          APPIMAGE="$(find src-tauri/target/release/bundle/appimage -maxdepth 1 -name '*.AppImage' -print -quit)"
+          DEB="$(find src-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)"
+          test -n "$APPIMAGE"
+          test -n "$DEB"
+          cp "$APPIMAGE" "out/ART-${ART_VERSION}-Linux-x64.AppImage"
+          cp "$DEB" "out/ART-${ART_VERSION}-Linux-x64.deb"
+          cp src-tauri/target/release/ART portable/ART
+          printf '%s\n' "ART — Acousmatic Régie Tools" "Lancer ./ART. WebKitGTK 4.1 et GStreamer sont requis sur le système." > portable/README.txt
+          tar -C portable -czf "out/ART-${ART_VERSION}-Linux-x64.tar.gz" .
+          sha256sum out/ART-* > out/SHA256SUMS-Linux.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ART-Linux
+          path: .art-builder/out/*
+          if-no-files-found: error
+
+  release:
+    name: Publish validated ART desktop release
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ART-*
+          path: release-assets
+          merge-multiple: true
+      - name: Validate release matrix
+        run: |
+          set -euo pipefail
+          test -f "release-assets/ART-${ART_VERSION}-macOS-Universal.dmg"
+          test -f "release-assets/ART-${ART_VERSION}-macOS-Apple-Silicon.dmg"
+          test -f "release-assets/ART-${ART_VERSION}-macOS-Intel.dmg"
+          test -f "release-assets/ART-${ART_VERSION}-Windows-x64-Setup.exe"
+          test -f "release-assets/ART-${ART_VERSION}-Windows-x64-portable.zip"
+          test -f "release-assets/ART-${ART_VERSION}-Linux-x64.AppImage"
+          test -f "release-assets/ART-${ART_VERSION}-Linux-x64.deb"
+          test -f "release-assets/ART-${ART_VERSION}-Linux-x64.tar.gz"
+          cat release-assets/SHA256SUMS-*.txt > release-assets/SHA256SUMS.txt
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$RELEASE_TAG" --title "ART — Acousmatic Régie Tools ${ART_VERSION}" --notes "Paquets desktop ART validés automatiquement : lancement réel sur macOS, Windows et Linux ; Universal Mac vérifié arm64 + x86_64 ; signature macOS ad-hoc vérifiée ; checksums SHA-256 fournis." --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" release-assets/* --target "$GITHUB_SHA" --title "ART — Acousmatic Régie Tools ${ART_VERSION}" --notes "Paquets desktop ART validés automatiquement : lancement réel sur macOS, Windows et Linux ; Universal Mac vérifié arm64 + x86_64 ; signature macOS ad-hoc vérifiée ; checksums SHA-256 fournis." --repo "$GITHUB_REPOSITORY"
+          fi
