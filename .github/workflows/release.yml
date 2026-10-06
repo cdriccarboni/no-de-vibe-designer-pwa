@@ -47,6 +47,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Generate unified No[co]de brand assets
+        run: node scripts/generate-brand-assets.mjs
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -74,6 +76,7 @@ jobs:
           JSON
           npx cap add android
           npx cap sync android
+          node scripts/generate-brand-assets.mjs
           sed -i "s/versionCode [0-9][0-9]*/versionCode ${VERSION_CODE}/" android/app/build.gradle
           sed -i "s/versionName \"[^\"]*\"/versionName \"${APP_VERSION}\"/" android/app/build.gradle
       - name: Build Android
@@ -111,6 +114,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Generate unified No[co]de brand assets
+        run: node scripts/generate-brand-assets.mjs
       - name: Resolve version
         shell: bash
         run: |
@@ -208,6 +213,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Generate unified No[co]de brand assets
+        run: node scripts/generate-brand-assets.mjs
       - name: Resolve version
         shell: bash
         run: |
@@ -254,6 +261,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Generate unified No[co]de brand assets
+        run: node scripts/generate-brand-assets.mjs
       - name: Resolve version
         shell: bash
         run: |
