@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ART — Acousmatic Régie Tools",
+  "mainBinaryName": "ART",
+  "version": "7.2.8",
+  "identifier": "fr.acousmatictheatre.art",
+  "build": { "frontendDist": "splash" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [{
+      "label": "main",
+      "title": "ART — Acousmatic Régie Tools",
+      "width": 1440,
+      "height": 900,
+      "minWidth": 900,
+      "minHeight": 620,
+      "resizable": true,
+      "decorations": true,
+      "transparent": false,
+      "url": "index.html",
+      "center": true,
+      "backgroundColor": "#000000",
+      "maximizable": true
+    }],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "category": "Productivity",
+    "shortDescription": "ART — Acousmatic Régie Tools",
+    "longDescription": "Outils de régie, production et tournée pour le spectacle vivant.",
+    "icon": ["icons/32x32.png","icons/128x128.png","icons/128x128@2x.png","icons/icon.icns","icons/icon.ico"],
+    "macOS": { "signingIdentity": "-", "minimumSystemVersion": "11.0" }
+  }
+}
