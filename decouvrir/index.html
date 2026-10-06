@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090b0d">
+<meta name="description" content="No[co]de Vibe Designer — environnement visuel pour connecter image, son, vidéo, lumière, capteurs, réseau et IA.">
+<title>No[co]de Vibe Designer — Découvrir</title>
+<link rel="icon" href="../icons/nocode-rings.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/nocode-rings.svg">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#090b0d;--bg2:#0d1013;--panel:#171a1e;--panel2:#1d2126;--line:#2d333b;--line2:#454d57;
+  --text:#f1f3f5;--muted:#9ba4ae;--accent:#d7b86a;--accent2:#8fa79d;--ok:#7ca587;--grid:rgba(215,184,106,.09);
+  --shadow:0 18px 60px rgba(0,0,0,.28)
+}
+html[data-theme="light"]{
+  color-scheme:light;
+  --bg:#ece9e2;--bg2:#e4dfd6;--panel:#f7f5f0;--panel2:#eeeae3;--line:#cbc5ba;--line2:#aea79c;
+  --text:#24272a;--muted:#6f746f;--accent:#9a7b37;--accent2:#6f8a7f;--ok:#5e7e67;--grid:rgba(154,123,55,.12);
+  --shadow:0 14px 42px rgba(0,0,0,.10)
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:13px Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+a{color:inherit}.topbar{position:sticky;top:0;z-index:60;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;padding:10px clamp(14px,3vw,34px);background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none;min-width:0}.brand img{width:42px;height:42px;border:1px solid var(--line2);border-radius:8px}.brand b{display:block;font-size:13px}.brand .co{font-size:.62em;vertical-align:.2em}.brand span:last-child{display:block;color:var(--muted);font-size:9px;letter-spacing:.15em;margin-top:2px}
+.surface-nav{display:flex;justify-content:center;gap:3px;overflow:auto;scrollbar-width:none}.surface-nav::-webkit-scrollbar{display:none}.surface-nav a{padding:7px 9px;border-radius:7px;text-decoration:none;color:var(--muted);font-size:10px;font-weight:750;white-space:nowrap}.surface-nav a:hover,.surface-nav a:focus-visible{background:var(--panel2);color:var(--text);outline:none}
+.theme-toggle{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.theme-toggle button{border:0;background:transparent;color:var(--muted);padding:7px 9px;font:inherit;font-size:10px;font-weight:800;cursor:pointer}.theme-toggle button.active{background:var(--panel2);color:var(--text)}
+.hero,.story,.final{position:relative;overflow:hidden;background-color:var(--bg);background-image:radial-gradient(circle at 1px 1px,var(--grid) 1.1px,transparent 0);background-size:24px 24px;border-bottom:1px solid var(--line)}
+.hero{min-height:76vh;display:flex;align-items:center;padding:clamp(80px,11vw,150px) clamp(20px,7vw,88px)}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 78% 24%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 34%),radial-gradient(circle at 18% 82%,color-mix(in srgb,var(--accent2) 10%,transparent),transparent 28%);pointer-events:none}
+.hero-copy{position:relative;z-index:4;max-width:870px}.kicker{margin:0;color:var(--accent);font-size:10px;letter-spacing:.18em;font-weight:850;text-transform:uppercase}
+h1,h2{margin:10px 0 0;line-height:.92;letter-spacing:-.06em}h1{font-size:clamp(62px,10vw,142px);max-width:9ch}h2{font-size:clamp(42px,7vw,92px);max-width:13ch}.hero p.lede,.intro{max-width:770px;color:var(--muted);font-size:clamp(17px,2vw,25px);line-height:1.5}.hero p.lede{margin:26px 0 0}
+.hero-logo{width:78px;height:78px;border-radius:16px;border:1px solid var(--line2);box-shadow:var(--shadow);margin-bottom:24px}
+.tag{position:absolute;right:2%;top:12px;font-size:clamp(62px,13vw,190px);font-weight:950;letter-spacing:-.08em;opacity:.035;white-space:nowrap;pointer-events:none}
+.patch-node{position:absolute;width:160px;border:1px solid var(--line2);border-radius:9px;background:var(--panel2);box-shadow:var(--shadow);z-index:2;overflow:hidden}.patch-node b{display:block;padding:8px 10px;border-bottom:1px solid var(--line);font-size:10px}.patch-node span{display:block;padding:8px 10px;color:var(--muted);font:9px ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.45}.patch-node i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent2);margin-right:6px}.n1{right:7%;top:18%}.n2{right:25%;bottom:13%}.n3{right:5%;bottom:7%}
+.wires{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}.wires path{fill:none;stroke:color-mix(in srgb,var(--accent2) 75%,var(--text));stroke-width:2;opacity:.62}
+.start-zone{padding:24px clamp(20px,7vw,88px) clamp(52px,7vw,88px);border-bottom:1px solid var(--line);background:var(--bg)}.start-label{margin:0 0 12px;color:var(--muted);font-size:9px;letter-spacing:.16em;font-weight:850;text-transform:uppercase}.start-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:1180px}.start-card{min-height:154px;padding:22px;border:1px solid var(--line);border-radius:14px;background:var(--panel);text-decoration:none;display:flex;flex-direction:column;justify-content:space-between;gap:18px}.start-card.primary{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel))}.start-head{display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:18px}.start-head em{font-style:normal;color:var(--accent);font-size:23px}.start-card>span:last-child{max-width:46ch;color:var(--muted);font-size:13px;line-height:1.48}
+.story,.final{padding:clamp(82px,10vw,148px) clamp(20px,7vw,88px);scroll-margin-top:70px}.intro{margin:24px 0 0}.node-flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:42px}.flow-node{padding:11px 13px;border:1px solid var(--line2);border-radius:8px;background:var(--panel);font-weight:750}.flow-node i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent2);margin-right:7px}.link{height:2px;min-width:28px;max-width:70px;flex:1;background:linear-gradient(90deg,transparent,var(--accent2),transparent)}
+.feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:42px}.feature{padding:20px;border:1px solid var(--line);border-radius:11px;background:var(--panel);min-width:0}.feature b{display:flex;align-items:center;gap:8px}.feature b i{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}.feature p{margin:9px 0 0;color:var(--muted);font-size:13px;line-height:1.48}
+.surface-panel{display:grid;grid-template-columns:minmax(180px,.42fr) minmax(0,1fr);gap:18px;margin-top:42px;padding:18px;border:1px solid var(--line2);border-radius:14px;background:var(--panel);box-shadow:var(--shadow)}.surface-ui{min-height:260px;border:1px solid var(--line);border-radius:10px;background:var(--bg);background-image:linear-gradient(90deg,transparent 23px,color-mix(in srgb,var(--line) 60%,transparent) 24px),linear-gradient(transparent 23px,color-mix(in srgb,var(--line) 60%,transparent) 24px);background-size:24px 24px;position:relative;overflow:hidden}.surface-ui::before,.surface-ui::after{content:"";position:absolute;border:1px solid var(--line2);background:var(--panel2);border-radius:7px}.surface-ui::before{width:34%;height:48%;left:7%;top:12%}.surface-ui::after{width:42%;height:28%;right:8%;bottom:13%}.surface-copy{align-self:center}.surface-copy h3{font-size:clamp(28px,4vw,48px);margin:0;letter-spacing:-.04em}.surface-copy p{color:var(--muted);font-size:15px;line-height:1.55;max-width:50ch}.surface-copy a{display:inline-flex;margin-top:10px;padding:9px 11px;border:1px solid var(--line2);border-radius:7px;text-decoration:none;font-weight:800}.surface-copy a:hover{border-color:var(--accent)}
+.platforms{display:flex;flex-wrap:wrap;gap:8px;margin-top:34px}.platforms span{padding:9px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--muted);font-weight:750}
+.final{min-height:70vh;display:flex;flex-direction:column;justify-content:center}.final img{width:72px;height:72px;border-radius:14px;border:1px solid var(--line2);margin-bottom:22px}.final-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:30px}.final-actions a{min-width:210px;display:flex;justify-content:space-between;gap:14px;padding:13px 15px;border:1px solid var(--line2);border-radius:9px;background:var(--panel);text-decoration:none;font-weight:850}.final-actions a:first-child{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel))}
+@media(max-width:900px){.topbar{grid-template-columns:1fr auto}.surface-nav{grid-column:1/-1;grid-row:2;justify-content:flex-start}.feature-grid{grid-template-columns:1fr 1fr}.surface-panel{grid-template-columns:1fr}.patch-node.n2{display:none}}
+@media(max-width:620px){.brand span:last-child{display:none}.hero{min-height:auto;padding-top:86px;padding-bottom:100px}.start-grid,.feature-grid{grid-template-columns:1fr}.patch-node{width:120px}.patch-node.n3{display:none}.n1{right:4%;top:11%}.tag{font-size:62px}.story,.final{padding-top:76px;padding-bottom:76px}}
+@media(prefers-reduced-motion:no-preference){.patch-node{animation:float 4s ease-in-out infinite alternate}.n2{animation-delay:-1.4s}.n3{animation-delay:-2.2s}@keyframes float{from{transform:translateY(-3px)}to{transform:translateY(5px)}}.start-card,.feature{transition:transform .18s ease,border-color .18s ease}.start-card:hover,.feature:hover{transform:translateY(-2px);border-color:var(--accent2)}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.patch-node{animation:none}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../?chooser=1">
+    <img src="../icons/nocode-rings.svg" alt="">
+    <span><b>No<span class="co">[co]</span>de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></span>
+  </a>
+  <nav class="surface-nav" aria-label="Découvrir les interfaces">
+    <a href="#designer">Designer</a>
+    <a href="#show">Show</a>
+    <a href="#mobile">Mobile</a>
+    <a href="#regie">Régie</a>
+    <a href="#plateau">Plateau</a>
+    <a href="#camera">Caméra</a>
+  </nav>
+  <div class="theme-toggle" aria-label="Thème">
+    <button type="button" data-theme="dark">Sombre</button>
+    <button type="button" data-theme="light">Clair</button>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <svg class="wires" viewBox="0 0 1000 650" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M825 120 C720 180 735 315 650 375"/>
+    <path d="M650 375 C760 425 735 530 835 565"/>
+  </svg>
+  <div class="patch-node n1"><b><i></i>Camera Input</b><span>1920×1080<br>30 fps</span></div>
+  <div class="patch-node n2"><b><i></i>Analyze Motion</b><span>threshold .42<br>motion → .73</span></div>
+  <div class="patch-node n3"><b><i></i>OSC / DMX Out</b><span>/motion/value<br>universe 1</span></div>
+  <div class="tag" aria-hidden="true">&lt;NO[CO]DE&gt;</div>
+  <div class="hero-copy">
+    <img class="hero-logo" src="../icons/nocode-rings.svg" alt="Logo No[co]de">
+    <p class="kicker">Vibe · Patch · Stage</p>
+    <h1>Imagine.<br>Connecte.<br>Construis.</h1>
+    <p class="lede">Un environnement visuel pour relier image, son, vidéo, lumière, contrôle, capteurs, réseau et IA — sans enfermer l’idée dans un workflow unique.</p>
+  </div>
+</section>
+
+<section class="start-zone">
+  <p class="start-label">Entrer dans No[co]de</p>
+  <div class="start-grid">
+    <a class="start-card primary" href="../desktop/index.html?surface=designer">
+      <span class="start-head"><b>Essayer dans le navigateur</b><em>→</em></span>
+      <span>Ouvrir directement Designer et explorer No[co]de en PWA.</span>
+    </a>
+    <a class="start-card" href="../install/">
+      <span class="start-head"><b>Installer No[co]de</b><em>↓</em></span>
+      <span>Web/PWA, macOS, Windows, Linux et Android : choisir la bonne enveloppe pour le même environnement.</span>
+    </a>
+  </div>
+</section>
+
+<section class="story">
+  <div class="tag" aria-hidden="true">&lt;IDEA&gt;</div>
+  <p class="kicker">Du langage au réseau</p>
+  <h2>« Je veux que la caméra contrôle la lumière. »</h2>
+  <p class="intro">No[co]de part de l’intention, construit une architecture visuelle, puis te laisse reprendre chaque node, chaque câble et chaque paramètre.</p>
+  <div class="node-flow"><span class="flow-node"><i></i>Camera</span><span class="link"></span><span class="flow-node"><i></i>Analyze</span><span class="link"></span><span class="flow-node"><i></i>Map</span><span class="link"></span><span class="flow-node"><i></i>DMX</span></div>
+</section>
+
+<section class="story">
+  <div class="tag" aria-hidden="true">&lt;NODES&gt;</div>
+  <p class="kicker">Tout devient une brique</p>
+  <h2>Un langage visuel pour relier le réel.</h2>
+  <div class="feature-grid">
+    <article class="feature"><b><i></i>Image & vidéo</b><p>Caméra, NDI, mapping, masques, projection, shaders et particules.</p></article>
+    <article class="feature"><b><i></i>Audio</b><p>Entrées, analyse, déclenchements, mapping et Pure Data / libpd.</p></article>
+    <article class="feature"><b><i></i>Contrôle</b><p>OSC, MIDI, API, WebRTC, fichiers et communications réseau.</p></article>
+    <article class="feature"><b><i></i>Lumière</b><p>DMX, Art-Net, sACN et passerelles vers le plateau.</p></article>
+    <article class="feature"><b><i></i>Capteurs</b><p>Arduino, ESP32, Bluetooth, mobile et données physiques.</p></article>
+    <article class="feature"><b><i></i>IA locale</b><p>Décrire, générer, ajuster puis reprendre entièrement la main.</p></article>
+  </div>
+</section>
+
+<section id="designer" class="story">
+  <div class="tag" aria-hidden="true">&lt;DESIGNER&gt;</div>
+  <p class="kicker">Surface complète</p>
+  <h2>Designer.</h2>
+  <div class="surface-panel"><div class="surface-ui" aria-hidden="true"></div><div class="surface-copy"><h3>Construire le réseau.</h3><p>Canvas, Library, Inspector, Timeline, Preview et Vibe réunis dans l’interface de création complète.</p><a href="../desktop/index.html?surface=designer">Ouvrir Designer →</a></div></div>
+</section>
+
+<section id="show" class="story">
+  <div class="tag" aria-hidden="true">&lt;SHOW&gt;</div>
+  <p class="kicker">Exploitation</p>
+  <h2>Show.</h2>
+  <div class="surface-panel"><div class="surface-ui" aria-hidden="true"></div><div class="surface-copy"><h3>Jouer plutôt qu’éditer.</h3><p>Ouvrir un projet, lancer, mettre en pause, suivre les cues, la timeline et les courbes sans garder tout l’atelier de création à l’écran.</p><a href="../show/index.html?surface=show">Ouvrir Show →</a></div></div>
+</section>
+
+<section id="mobile" class="story">
+  <div class="tag" aria-hidden="true">&lt;MOBILE&gt;</div>
+  <p class="kicker">Compact · tactile</p>
+  <h2>Mobile.</h2>
+  <div class="surface-panel"><div class="surface-ui" aria-hidden="true"></div><div class="surface-copy"><h3>Le réseau dans la poche.</h3><p>Interface compacte pour capteurs, patch, conduite et accès rapide depuis téléphone ou tablette.</p><a href="../mobile/index.html?surface=mobile">Ouvrir Mobile →</a></div></div>
+</section>
+
+<section id="regie" class="story">
+  <div class="tag" aria-hidden="true">&lt;RÉGIE&gt;</div>
+  <p class="kicker">Companion Studio</p>
+  <h2>Régie.</h2>
+  <div class="surface-panel"><div class="surface-ui" aria-hidden="true"></div><div class="surface-copy"><h3>Un poste dédié au contexte.</h3><p>Pages Son, Lumière, Vidéo et Plateau pour transformer un appareil en surface de contrôle adaptée à l’exploitation.</p><a href="../studio/index.html?surface=regie">Ouvrir Régie →</a></div></div>
+</section>
+
+<section id="plateau" class="story">
+  <div class="tag" aria-hidden="true">&lt;PLATEAU&gt;</div>
+  <p class="kicker">Simplifier l’interface</p>
+  <h2>Plateau.</h2>
+  <div class="surface-panel"><div class="surface-ui" aria-hidden="true"></div><div class="surface-copy"><h3>Montrer seulement ce qui sert.</h3><p>Une surface pensée pour l’action : commandes utiles, conduite et retours, sans imposer tout l’environnement de conception.</p><a href="../studio/index.html?surface=plateau">Ouvrir Plateau →</a></div></div>
+</section>
+
+<section id="camera" class="story">
+  <div class="tag" aria-hidden="true">&lt;CAMERA&gt;</div>
+  <p class="kicker">Remote Camera</p>
+  <h2>Caméra.</h2>
+  <div class="surface-panel"><div class="surface-ui" aria-hidden="true"></div><div class="surface-copy"><h3>N’importe quel appareil peut devenir une caméra.</h3><p>Remote Camera WebRTC permet d’ajouter facilement une source vidéo au réseau depuis un appareil équipé d’une caméra.</p><a href="../companion/index.html?surface=camera">Ouvrir Caméra →</a></div></div>
+</section>
+
+<section class="story">
+  <div class="tag" aria-hidden="true">&lt;BRIDGE&gt;</div>
+  <p class="kicker">Un pont plutôt qu’une cage</p>
+  <h2>Travaille avec tes outils.</h2>
+  <p class="intro">No[co]de est conçu pour relier des environnements et des protocoles, pas pour les remplacer : TouchDesigner, Max, Pure Data, Processing, Isadora, contrôleurs, caméras et régies peuvent rester dans la boucle.</p>
+  <div class="platforms"><span>TouchDesigner</span><span>Max</span><span>Pure Data</span><span>Processing</span><span>Isadora</span><span>OSC</span><span>MIDI</span><span>DMX</span><span>NDI</span></div>
+</section>
+
+<section class="story">
+  <div class="tag" aria-hidden="true">&lt;EVERYWHERE&gt;</div>
+  <p class="kicker">Une base · plusieurs enveloppes</p>
+  <h2>Web ou desktop.</h2>
+  <p class="intro">Découvre No[co]de immédiatement en PWA, ou installe la version adaptée à ton ordinateur pour travailler avec les intégrations locales.</p>
+  <div class="platforms"><span>Web / PWA</span><span>macOS</span><span>Windows</span><span>Linux</span><span>Android</span></div>
+</section>
+
+<section class="final">
+  <div class="tag" aria-hidden="true">&lt;/NO[CO]DE&gt;</div>
+  <img src="../icons/nocode-rings.svg" alt="">
+  <p class="kicker">No[co]de Vibe Designer</p>
+  <h2>Stop connecting apps.<br>Start connecting ideas.</h2>
+  <div class="final-actions"><a href="../desktop/index.html?surface=designer">Essayer No[co]de <span>→</span></a><a href="../install/">Installer <span>↓</span></a></div>
+</section>
+</main>
+
+<script>
+const root=document.documentElement;
+const buttons=[...document.querySelectorAll('[data-theme]')];
+function setTheme(theme){
+  root.dataset.theme=theme;
+  buttons.forEach(button=>button.classList.toggle('active',button.dataset.theme===theme));
+  try{localStorage.setItem('nocode.discover.theme',theme)}catch{}
+}
+let saved='';
+try{saved=localStorage.getItem('nocode.discover.theme')||''}catch{}
+if(saved!=='dark'&&saved!=='light')saved=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+setTheme(saved);
+buttons.forEach(button=>button.addEventListener('click',()=>setTheme(button.dataset.theme)));
+</script>
+</body>
+</html>
