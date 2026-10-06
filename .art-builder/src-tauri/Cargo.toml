@@ -1,0 +1,20 @@
+[package]
+name = "art-desktop"
+version = "7.2.8"
+description = "ART — Acousmatic Régie Tools"
+authors = ["Acousmatic Theatre"]
+edition = "2021"
+
+[lib]
+name = "art_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+url = "2"
+uuid = { version = "1", features = ["v4"] }
