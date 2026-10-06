@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/remote-schema.json",
+  "identifier": "art-production-oauth",
+  "description": "Pont OAuth natif limité au domaine ART.",
+  "windows": ["main"],
+  "platforms": ["linux", "macOS", "windows"],
+  "remote": { "urls": ["https://art.acousmatic-theatre.fr/*"] },
+  "permissions": ["allow-google-oauth-system-browser"]
+}
