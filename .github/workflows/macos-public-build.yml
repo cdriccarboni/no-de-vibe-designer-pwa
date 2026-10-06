@@ -34,6 +34,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Generate unified No[co]de brand assets
+        run: node scripts/generate-brand-assets.mjs
 
       - name: Resolve app version
         shell: bash
