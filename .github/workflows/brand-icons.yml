@@ -1,0 +1,34 @@
+name: Refresh No[co]de brand icons
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "icons/nocode-rings.svg"
+      - "scripts/generate-brand-assets.mjs"
+      - ".github/workflows/brand-icons.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  icons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Generate unified brand PNGs
+        run: node scripts/generate-brand-assets.mjs
+      - name: Commit generated web icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add icons/*.png mobile/icons/*.png
+          if git diff --cached --quiet; then
+            echo "Brand icons already current."
+            exit 0
+          fi
+          git -c user.email=cdriccarboni@users.noreply.github.com -c user.name=cdriccarboni commit -m "chore(brand): refresh generated No[co]de icons"
+          git push origin HEAD:main
