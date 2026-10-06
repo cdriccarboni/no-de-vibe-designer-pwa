@@ -263,14 +263,14 @@ export async function directOllamaProbe(baseUrl = LOCAL_AI_DEFAULTS.baseUrl, opt
   const target = new URL(String(baseUrl).replace(/\/+$/, ""));
   const pageProtocol = options.pageProtocol || globalThis?.location?.protocol || "";
   const loopback = loopbackHost(target.hostname);
-  const mixed = classifyLocalAiFailure({ pageProtocol, targetProtocol: target.protocol, model: options.model });
-  if (mixed?.code === "mixed_content") throw throwLocalAiFailure(mixed);
+  const targetAddressSpace = loopback ? "loopback" : "local";
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const started = Date.now();
   try {
-    const res = await fetch(target.origin + "/api/tags", { method: "GET", cache: "no-store", signal: controller.signal });
+    const request = new Request(target.origin + "/api/tags", { method:"GET", mode:"cors", cache:"no-store", signal:controller.signal, targetAddressSpace });
+    const res = await fetch(request);
     if (!res.ok) {
       const failure = classifyLocalAiFailure({
         status: res.status,
@@ -305,6 +305,7 @@ export async function directOllamaProbe(baseUrl = LOCAL_AI_DEFAULTS.baseUrl, opt
       targetProtocol: target.protocol,
       corsBlocked,
       loopback,
+      localTarget:true,
       probeTimeout: true,
       binaryPresent: options.binaryPresent,
       model: options.model
@@ -317,26 +318,44 @@ export async function directOllamaProbe(baseUrl = LOCAL_AI_DEFAULTS.baseUrl, opt
 
 export async function directOllamaChat({ baseUrl, model, system, user, temperature = .15, numPredict = 1800 } = {}) {
   if (!isTrustedLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige localhost ou une IP privée du réseau local");
-  const res = await fetch(String(baseUrl).replace(/\/+$/, "") + "/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      stream: false,
-      format: "json",
-      options: { temperature, num_predict: Math.max(512, Math.min(12000, Number(numPredict) || 1800)) },
-      messages: [{ role: "system", content: system }, { role: "user", content: user }]
-    })
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    const failure = classifyLocalAiFailure({
-      status: res.status,
-      message: ("Ollama HTTP " + res.status + " · " + body.slice(0, 180)).trim(),
-      endpoint: "chat",
-      model
+  const target = new URL(String(baseUrl).replace(/\/+$/, ""));
+  const loopback = loopbackHost(target.hostname);
+  const targetAddressSpace = loopback ? "loopback" : "local";
+  try {
+    const request = new Request(target.origin + "/api/chat", {
+      method:"POST",
+      mode:"cors",
+      targetAddressSpace,
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({
+        model,
+        stream:false,
+        format:"json",
+        options:{ temperature, num_predict:Math.max(512, Math.min(12000, Number(numPredict) || 1800)) },
+        messages:[{ role:"system", content:system }, { role:"user", content:user }]
+      })
     });
-    throw throwLocalAiFailure(failure);
+    const res = await fetch(request);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      const failure = classifyLocalAiFailure({
+        status:res.status,
+        message:("Ollama HTTP " + res.status + " · " + body.slice(0, 180)).trim(),
+        endpoint:"chat",
+        model
+      });
+      throw throwLocalAiFailure(failure);
+    }
+    return res.json();
+  } catch (error) {
+    if (error?.failure) throw error;
+    const failure = classifyLocalAiFailure(factsFromLocalAiError(error, {
+      pageProtocol:globalThis?.location?.protocol || "",
+      targetProtocol:target.protocol,
+      loopback,
+      localTarget:true,
+      model
+    })) || { code:"unreachable", message:"Ollama local inaccessible", responded:false };
+    throw throwLocalAiFailure(failure, error);
   }
-  return res.json();
 }
