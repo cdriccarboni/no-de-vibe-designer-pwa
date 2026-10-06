@@ -42,7 +42,7 @@ jobs:
           APP_VERSION="$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' shared/version.js | head -1)"
           test -n "$APP_VERSION"
           echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
-          echo "Resolved No-de Vibe Designer $APP_VERSION"
+          echo "Resolved No[co]de Vibe Designer $APP_VERSION"
 
       - name: Syntax check PWA runtime
         run: |
@@ -56,7 +56,7 @@ jobs:
           cat > package.json <<JSON
           {
             "name": "no-de-vibe-designer-mac-public",
-            "productName": "No-de Vibe Designer",
+            "productName": "No[co]de Vibe Designer",
             "version": "$APP_VERSION",
             "private": true,
             "main": "electron/main.cjs",
@@ -66,7 +66,7 @@ jobs:
             },
             "build": {
               "appId": "fr.acousmatic.nodevibedesigner",
-              "productName": "No-de Vibe Designer",
+              "productName": "No[co]de Vibe Designer",
               "asar": true,
               "files": [
                 "electron/**/*",
@@ -170,7 +170,7 @@ jobs:
               height: 930,
               minWidth: 1024,
               minHeight: 700,
-              title: "No-de Vibe Designer",
+              title: "No[co]de Vibe Designer",
               backgroundColor: "#101214",
               titleBarStyle: "hiddenInset",
               trafficLightPosition: { x: 14, y: 16 },
@@ -249,7 +249,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APP_DIR="dist/mac-universal/No-de Vibe Designer.app"
+          APP_DIR="dist/mac-universal/No[co]de Vibe Designer.app"
 
           test -d "$APP_DIR"
           xattr -cr "$APP_DIR" || true
@@ -264,7 +264,7 @@ jobs:
 
           codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 
-          MAIN_BIN="$APP_DIR/Contents/MacOS/No-de Vibe Designer"
+          MAIN_BIN="$APP_DIR/Contents/MacOS/No[co]de Vibe Designer"
           file "$MAIN_BIN" | tee macos-architecture.txt
           lipo -info "$MAIN_BIN" | grep -q "arm64"
           lipo -info "$MAIN_BIN" | grep -q "x86_64"
@@ -277,7 +277,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APP_DIR="dist/mac-universal/No-de Vibe Designer.app"
+          APP_DIR="dist/mac-universal/No[co]de Vibe Designer.app"
           NOTARY_ZIP="$RUNNER_TEMP/No-de-Vibe-Designer-notary.zip"
 
           ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$NOTARY_ZIP"
@@ -294,10 +294,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APP_DIR="dist/mac-universal/No-de Vibe Designer.app"
+          APP_DIR="dist/mac-universal/No[co]de Vibe Designer.app"
           LOG="$RUNNER_TEMP/no-de-startup.log"
 
-          ELECTRON_ENABLE_LOGGING=1 "$APP_DIR/Contents/MacOS/No-de Vibe Designer" >"$LOG" 2>&1 &
+          ELECTRON_ENABLE_LOGGING=1 "$APP_DIR/Contents/MacOS/No[co]de Vibe Designer" >"$LOG" 2>&1 &
           PID=$!
 
           sleep 8
@@ -316,7 +316,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          APP_DIR="dist/mac-universal/No-de Vibe Designer.app"
+          APP_DIR="dist/mac-universal/No[co]de Vibe Designer.app"
           ZIP="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.zip"
           DMG="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.dmg"
           STAGE="$RUNNER_TEMP/no-de-dmg"
@@ -325,10 +325,10 @@ jobs:
           mkdir -p "$STAGE"
 
           ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ZIP"
-          ditto "$APP_DIR" "$STAGE/No-de Vibe Designer.app"
+          ditto "$APP_DIR" "$STAGE/No[co]de Vibe Designer.app"
           ln -s /Applications "$STAGE/Applications"
 
-          hdiutil create             -volname "No-de Vibe Designer"             -srcfolder "$STAGE"             -ov             -format UDZO             "$DMG"
+          hdiutil create             -volname "No[co]de Vibe Designer"             -srcfolder "$STAGE"             -ov             -format UDZO             "$DMG"
 
           test -s "$ZIP"
           test -s "$DMG"
@@ -352,16 +352,16 @@ jobs:
           mkdir -p "$TMP_ZIP" "$TMP_DMG"
 
           ditto -x -k "$ZIP" "$TMP_ZIP"
-          ZIP_APP="$TMP_ZIP/No-de Vibe Designer.app"
+          ZIP_APP="$TMP_ZIP/No[co]de Vibe Designer.app"
           codesign --verify --deep --strict --verbose=2 "$ZIP_APP"
-          lipo -info "$ZIP_APP/Contents/MacOS/No-de Vibe Designer" | grep -q "arm64"
-          lipo -info "$ZIP_APP/Contents/MacOS/No-de Vibe Designer" | grep -q "x86_64"
+          lipo -info "$ZIP_APP/Contents/MacOS/No[co]de Vibe Designer" | grep -q "arm64"
+          lipo -info "$ZIP_APP/Contents/MacOS/No[co]de Vibe Designer" | grep -q "x86_64"
 
           MOUNT_POINT="$(hdiutil attach "$DMG" -readonly -nobrowse | tail -1 | awk '{for(i=3;i<=NF;i++) printf "%s%s",$i,(i<NF?OFS:"") }')"
-          test -d "$MOUNT_POINT/No-de Vibe Designer.app"
-          codesign --verify --deep --strict --verbose=2 "$MOUNT_POINT/No-de Vibe Designer.app"
-          lipo -info "$MOUNT_POINT/No-de Vibe Designer.app/Contents/MacOS/No-de Vibe Designer" | grep -q "arm64"
-          lipo -info "$MOUNT_POINT/No-de Vibe Designer.app/Contents/MacOS/No-de Vibe Designer" | grep -q "x86_64"
+          test -d "$MOUNT_POINT/No[co]de Vibe Designer.app"
+          codesign --verify --deep --strict --verbose=2 "$MOUNT_POINT/No[co]de Vibe Designer.app"
+          lipo -info "$MOUNT_POINT/No[co]de Vibe Designer.app/Contents/MacOS/No[co]de Vibe Designer" | grep -q "arm64"
+          lipo -info "$MOUNT_POINT/No[co]de Vibe Designer.app/Contents/MacOS/No[co]de Vibe Designer" | grep -q "x86_64"
           hdiutil detach "$MOUNT_POINT"
 
       - name: Prepare stable aliases and checksums
@@ -396,7 +396,7 @@ jobs:
           TAG="v$APP_VERSION"
 
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG"               --target "$GITHUB_SHA"               --title "No-de Vibe Designer $APP_VERSION"               --notes "Build de distribution No-de Vibe Designer $APP_VERSION."               || gh release view "$TAG" >/dev/null
+            gh release create "$TAG"               --target "$GITHUB_SHA"               --title "No[co]de Vibe Designer $APP_VERSION"               --notes "Build de distribution No[co]de Vibe Designer $APP_VERSION."               || gh release view "$TAG" >/dev/null
           fi
 
           upload_asset() {

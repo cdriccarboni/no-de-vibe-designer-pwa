@@ -1,4 +1,4 @@
-name: Release No-de Vibe Designer — Universal
+name: Release No[co]de Vibe Designer — Universal
 
 on:
   workflow_dispatch:
@@ -70,7 +70,7 @@ jobs:
           mkdir -p www
           rsync -a ./ www/ --exclude ".git" --exclude ".github" --exclude "node_modules" --exclude "www" --exclude "android" --exclude "downloads" --exclude "play" --exclude "package.json" --exclude "package-lock.json"
           cat > capacitor.config.json <<'JSON'
-          {"appId":"fr.acousmatic.nodevibedesigner","appName":"No-de Vibe Designer","webDir":"www","bundledWebRuntime":false,"server":{"androidScheme":"https"},"android":{"allowMixedContent":true}}
+          {"appId":"fr.acousmatic.nodevibedesigner","appName":"No[co]de Vibe Designer","webDir":"www","bundledWebRuntime":false,"server":{"androidScheme":"https"},"android":{"allowMixedContent":true}}
           JSON
           npx cap add android
           npx cap sync android
@@ -95,8 +95,7 @@ jobs:
         run: |
           mkdir -p release-assets
           cp android/app/build/outputs/apk/debug/app-debug.apk "release-assets/No-de-Vibe-Designer-${APP_VERSION}-Android-debug.apk"
-          cp android/app/build/outputs/bundle/release/app-release.aab "release-assets/No-de-Vibe-Designer-${APP_VERSION}-unsigned.aab"
-          if [ -f "No-de-Vibe-Designer-${APP_VERSION}-play.aab" ]; then cp "No-de-Vibe-Designer-${APP_VERSION}-play.aab" release-assets/; fi
+          # Public release: APK only. AABs stay internal/Play-only.
           (cd release-assets && sha256sum * > SHA256SUMS-Android.txt)
       - uses: actions/upload-artifact@v4
         with:
@@ -122,7 +121,7 @@ jobs:
         shell: bash
         run: |
           cat > package.json <<JSON
-          {"name":"no-de-vibe-designer-universal","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"mac":{"category":"public.app-category.graphics-design","identity":null,"target":[{"target":"dir","arch":["arm64","x64"]}]}}}
+          {"name":"no-de-vibe-designer-universal","productName":"No[co]de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No[co]de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"mac":{"category":"public.app-category.graphics-design","identity":null,"target":[{"target":"dir","arch":["arm64","x64"]}]}}}
           JSON
           mkdir -p electron
           cat > electron/main.cjs <<'JS'
@@ -131,7 +130,7 @@ jobs:
           let server;
           function root(){ return app.isPackaged ? path.join(process.resourcesPath,"app.asar") : path.join(__dirname,".."); }
           function type(p){ const e=path.extname(p).toLowerCase(); return ({".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".mjs":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".svg":"image/svg+xml",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webmanifest":"application/manifest+json",".wasm":"application/wasm"})[e]||"application/octet-stream"; }
-          async function create(){ const r=root(); const port=await new Promise((resolve,reject)=>{server=http.createServer((req,res)=>{let rel=decodeURIComponent((req.url||"/").split("?")[0]).replace(/^\/+/, "")||"index.html";let p=path.normalize(path.join(r,rel));if(!p.startsWith(path.normalize(r))){res.writeHead(403);return res.end("Forbidden");}try{if(fs.statSync(p).isDirectory())p=path.join(p,"index.html");}catch{}if(!fs.existsSync(p)){res.writeHead(404);return res.end("Not found");}res.writeHead(200,{"Content-Type":type(p),"Cache-Control":"no-cache"});fs.createReadStream(p).pipe(res);});server.on("error",reject);server.listen(17654,"127.0.0.1",()=>resolve(server.address().port));}); const win=new BrowserWindow({width:1440,height:930,minWidth:1024,minHeight:700,title:"No-de Vibe Designer",backgroundColor:"#101214",webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); session.defaultSession.setPermissionRequestHandler((_wc,p,cb)=>cb(p==="media"||p==="geolocation"||p==="notifications")); await win.loadURL("http://127.0.0.1:"+port+"/desktop/"); win.webContents.setWindowOpenHandler(({url})=>{if(url.startsWith("http://127.0.0.1:"+port+"/"))return{action:"allow"};shell.openExternal(url);return{action:"deny"};}); }
+          async function create(){ const r=root(); const port=await new Promise((resolve,reject)=>{server=http.createServer((req,res)=>{let rel=decodeURIComponent((req.url||"/").split("?")[0]).replace(/^\/+/, "")||"index.html";let p=path.normalize(path.join(r,rel));if(!p.startsWith(path.normalize(r))){res.writeHead(403);return res.end("Forbidden");}try{if(fs.statSync(p).isDirectory())p=path.join(p,"index.html");}catch{}if(!fs.existsSync(p)){res.writeHead(404);return res.end("Not found");}res.writeHead(200,{"Content-Type":type(p),"Cache-Control":"no-cache"});fs.createReadStream(p).pipe(res);});server.on("error",reject);server.listen(17654,"127.0.0.1",()=>resolve(server.address().port));}); const win=new BrowserWindow({width:1440,height:930,minWidth:1024,minHeight:700,title:"No[co]de Vibe Designer",backgroundColor:"#101214",webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); session.defaultSession.setPermissionRequestHandler((_wc,p,cb)=>cb(p==="media"||p==="geolocation"||p==="notifications")); await win.loadURL("http://127.0.0.1:"+port+"/desktop/"); win.webContents.setWindowOpenHandler(({url})=>{if(url.startsWith("http://127.0.0.1:"+port+"/"))return{action:"allow"};shell.openExternal(url);return{action:"deny"};}); }
           if(app.requestSingleInstanceLock()) app.whenReady().then(create); else app.quit(); app.on("window-all-closed",()=>{try{server?.close()}catch{};app.quit();});
           JS
           npm install --no-audit --no-fund
@@ -142,9 +141,9 @@ jobs:
           npx electron-builder --mac dir --arm64 --publish never
           npx electron-builder --mac dir --x64 --publish never
           npx electron-builder --mac dir --universal --publish never
-          ARM_APP="dist/mac-arm64/No-de Vibe Designer.app"
-          X64_APP="dist/mac/No-de Vibe Designer.app"
-          UNI_APP="dist/mac-universal/No-de Vibe Designer.app"
+          ARM_APP="dist/mac-arm64/No[co]de Vibe Designer.app"
+          X64_APP="dist/mac/No[co]de Vibe Designer.app"
+          UNI_APP="dist/mac-universal/No[co]de Vibe Designer.app"
           test -d "$ARM_APP"
           test -d "$X64_APP"
           test -d "$UNI_APP"
@@ -154,15 +153,15 @@ jobs:
           codesign --verify --deep --strict "$ARM_APP"
           codesign --verify --deep --strict "$X64_APP"
           codesign --verify --deep --strict "$UNI_APP"
-          lipo -info "$UNI_APP/Contents/MacOS/No-de Vibe Designer" | grep -q "arm64"
-          lipo -info "$UNI_APP/Contents/MacOS/No-de Vibe Designer" | grep -q "x86_64"
+          lipo -info "$UNI_APP/Contents/MacOS/No[co]de Vibe Designer" | grep -q "arm64"
+          lipo -info "$UNI_APP/Contents/MacOS/No[co]de Vibe Designer" | grep -q "x86_64"
           mkdir -p release-assets
 
           UNI_STAGE="$RUNNER_TEMP/no-de-universal"
           rm -rf "$UNI_STAGE"; mkdir -p "$UNI_STAGE"
-          cp -R "$UNI_APP" "$UNI_STAGE/No-de Vibe Designer.app"
+          cp -R "$UNI_APP" "$UNI_STAGE/No[co]de Vibe Designer.app"
           printf '%s\n' \
-            "No-de Vibe Designer $APP_VERSION · Universal" \
+            "No[co]de Vibe Designer $APP_VERSION · Universal" \
             "Application universelle Apple Silicon + Intel." \
             "Build ad-hoc signé, sans abonnement Apple Developer." \
             "Si macOS bloque le premier lancement :" \
@@ -170,28 +169,28 @@ jobs:
             "2. Réglages Système > Confidentialité et sécurité > Ouvrir quand même." \
             "Aucune commande Terminal n'est nécessaire." \
             > "$UNI_STAGE/À LIRE - PREMIER LANCEMENT.txt"
-          ditto -c -k --sequesterRsrc --keepParent "$UNI_STAGE/No-de Vibe Designer.app" "release-assets/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$UNI_STAGE/No[co]de Vibe Designer.app" "release-assets/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.zip"
           UNI_DMG="release-assets/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.dmg"
-          hdiutil create -volname "No-de Vibe Designer $APP_VERSION Universal" -srcfolder "$UNI_STAGE" -ov -format UDZO "$UNI_DMG"
+          hdiutil create -volname "No[co]de Vibe Designer $APP_VERSION Universal" -srcfolder "$UNI_STAGE" -ov -format UDZO "$UNI_DMG"
 
           for ARCH in arm64 x64; do
             if [ "$ARCH" = "arm64" ]; then APP="$ARM_APP"; else APP="$X64_APP"; fi
             STAGE="$RUNNER_TEMP/no-de-$ARCH"
             rm -rf "$STAGE"; mkdir -p "$STAGE"
-            cp -R "$APP" "$STAGE/No-de Vibe Designer.app"
+            cp -R "$APP" "$STAGE/No[co]de Vibe Designer.app"
             printf '%s\n' \
-              "No-de Vibe Designer $APP_VERSION · $ARCH" \
+              "No[co]de Vibe Designer $APP_VERSION · $ARCH" \
               "Build ad-hoc signé, sans abonnement Apple Developer." \
               "Si macOS bloque le premier lancement :" \
               "1. tente une ouverture normale ;" \
               "2. Réglages Système > Confidentialité et sécurité > Ouvrir quand même." \
               "Aucune commande Terminal n'est nécessaire." \
               > "$STAGE/À LIRE - PREMIER LANCEMENT.txt"
-            ditto -c -k --sequesterRsrc --keepParent "$STAGE/No-de Vibe Designer.app" "release-assets/No-de-Vibe-Designer-${APP_VERSION}-macOS-$ARCH.zip"
+            ditto -c -k --sequesterRsrc --keepParent "$STAGE/No[co]de Vibe Designer.app" "release-assets/No-de-Vibe-Designer-${APP_VERSION}-macOS-$ARCH.zip"
             DMG="release-assets/No-de-Vibe-Designer-${APP_VERSION}-macOS-$ARCH.dmg"
-            if ! hdiutil create -volname "No-de Vibe Designer $APP_VERSION $ARCH" -srcfolder "$STAGE" -ov -format UDZO "$DMG"; then
+            if ! hdiutil create -volname "No[co]de Vibe Designer $APP_VERSION $ARCH" -srcfolder "$STAGE" -ov -format UDZO "$DMG"; then
               sleep 3
-              hdiutil create -volname "No-de Vibe Designer $APP_VERSION $ARCH" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+              hdiutil create -volname "No[co]de Vibe Designer $APP_VERSION $ARCH" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
             fi
           done
           (cd release-assets && shasum -a 256 * > SHA256SUMS-macOS.txt)
@@ -219,7 +218,7 @@ jobs:
         shell: bash
         run: |
           cat > package.json <<JSON
-          {"name":"no-de-vibe-designer-universal","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"win":{"target":[{"target":"nsis","arch":["x64"]}],"artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Windows-x64-Setup.exe"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true,"createStartMenuShortcut":true}}}
+          {"name":"no-de-vibe-designer-universal","productName":"No[co]de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No[co]de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"win":{"target":[{"target":"nsis","arch":["x64"]}],"artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Windows-x64-Setup.exe"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true,"createStartMenuShortcut":true}}}
           JSON
           mkdir -p electron
           cat > electron/main.cjs <<'JS'
@@ -228,7 +227,7 @@ jobs:
           let server;
           function root(){ return app.isPackaged ? path.join(process.resourcesPath,"app.asar") : path.join(__dirname,".."); }
           function type(p){ const e=path.extname(p).toLowerCase(); return ({".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".mjs":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".svg":"image/svg+xml",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webmanifest":"application/manifest+json",".wasm":"application/wasm"})[e]||"application/octet-stream"; }
-          async function create(){ const r=root(); const port=await new Promise((resolve,reject)=>{server=http.createServer((req,res)=>{let rel=decodeURIComponent((req.url||"/").split("?")[0]).replace(/^\/+/, "")||"index.html";let p=path.normalize(path.join(r,rel));if(!p.startsWith(path.normalize(r))){res.writeHead(403);return res.end("Forbidden");}try{if(fs.statSync(p).isDirectory())p=path.join(p,"index.html");}catch{}if(!fs.existsSync(p)){res.writeHead(404);return res.end("Not found");}res.writeHead(200,{"Content-Type":type(p),"Cache-Control":"no-cache"});fs.createReadStream(p).pipe(res);});server.on("error",reject);server.listen(0,"127.0.0.1",()=>resolve(server.address().port));}); const win=new BrowserWindow({width:1440,height:930,minWidth:1024,minHeight:700,title:"No-de Vibe Designer",backgroundColor:"#101214",webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); session.defaultSession.setPermissionRequestHandler((_wc,p,cb)=>cb(p==="media"||p==="geolocation"||p==="notifications")); await win.loadURL("http://127.0.0.1:"+port+"/desktop/"); win.webContents.setWindowOpenHandler(({url})=>{if(url.startsWith("http://127.0.0.1:"+port+"/"))return{action:"allow"};shell.openExternal(url);return{action:"deny"};}); }
+          async function create(){ const r=root(); const port=await new Promise((resolve,reject)=>{server=http.createServer((req,res)=>{let rel=decodeURIComponent((req.url||"/").split("?")[0]).replace(/^\/+/, "")||"index.html";let p=path.normalize(path.join(r,rel));if(!p.startsWith(path.normalize(r))){res.writeHead(403);return res.end("Forbidden");}try{if(fs.statSync(p).isDirectory())p=path.join(p,"index.html");}catch{}if(!fs.existsSync(p)){res.writeHead(404);return res.end("Not found");}res.writeHead(200,{"Content-Type":type(p),"Cache-Control":"no-cache"});fs.createReadStream(p).pipe(res);});server.on("error",reject);server.listen(0,"127.0.0.1",()=>resolve(server.address().port));}); const win=new BrowserWindow({width:1440,height:930,minWidth:1024,minHeight:700,title:"No[co]de Vibe Designer",backgroundColor:"#101214",webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); session.defaultSession.setPermissionRequestHandler((_wc,p,cb)=>cb(p==="media"||p==="geolocation"||p==="notifications")); await win.loadURL("http://127.0.0.1:"+port+"/desktop/"); win.webContents.setWindowOpenHandler(({url})=>{if(url.startsWith("http://127.0.0.1:"+port+"/"))return{action:"allow"};shell.openExternal(url);return{action:"deny"};}); }
           app.whenReady().then(create); app.on("window-all-closed",()=>{try{server?.close()}catch{};app.quit();});
           JS
           npm install --no-audit --no-fund
@@ -265,7 +264,7 @@ jobs:
         shell: bash
         run: |
           cat > package.json <<JSON
-          {"name":"no-de-vibe-designer-universal","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"linux":{"target":["AppImage","deb","tar.gz"],"category":"Graphics","artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Linux-x64.\${ext}"}}}
+          {"name":"no-de-vibe-designer-universal","productName":"No[co]de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No[co]de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"linux":{"target":["AppImage","deb","tar.gz"],"category":"Graphics","artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Linux-x64.\${ext}"}}}
           JSON
           mkdir -p electron
           cat > electron/main.cjs <<'JS'
@@ -274,7 +273,7 @@ jobs:
           let server;
           function root(){ return app.isPackaged ? path.join(process.resourcesPath,"app.asar") : path.join(__dirname,".."); }
           function type(p){ const e=path.extname(p).toLowerCase(); return ({".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".mjs":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".svg":"image/svg+xml",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webmanifest":"application/manifest+json",".wasm":"application/wasm"})[e]||"application/octet-stream"; }
-          async function create(){ const r=root(); const port=await new Promise((resolve,reject)=>{server=http.createServer((req,res)=>{let rel=decodeURIComponent((req.url||"/").split("?")[0]).replace(/^\/+/, "")||"index.html";let p=path.normalize(path.join(r,rel));if(!p.startsWith(path.normalize(r))){res.writeHead(403);return res.end("Forbidden");}try{if(fs.statSync(p).isDirectory())p=path.join(p,"index.html");}catch{}if(!fs.existsSync(p)){res.writeHead(404);return res.end("Not found");}res.writeHead(200,{"Content-Type":type(p),"Cache-Control":"no-cache"});fs.createReadStream(p).pipe(res);});server.on("error",reject);server.listen(0,"127.0.0.1",()=>resolve(server.address().port));}); const win=new BrowserWindow({width:1440,height:930,minWidth:1024,minHeight:700,title:"No-de Vibe Designer",backgroundColor:"#101214",webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); session.defaultSession.setPermissionRequestHandler((_wc,p,cb)=>cb(p==="media"||p==="geolocation"||p==="notifications")); await win.loadURL("http://127.0.0.1:"+port+"/desktop/"); win.webContents.setWindowOpenHandler(({url})=>{if(url.startsWith("http://127.0.0.1:"+port+"/"))return{action:"allow"};shell.openExternal(url);return{action:"deny"};}); }
+          async function create(){ const r=root(); const port=await new Promise((resolve,reject)=>{server=http.createServer((req,res)=>{let rel=decodeURIComponent((req.url||"/").split("?")[0]).replace(/^\/+/, "")||"index.html";let p=path.normalize(path.join(r,rel));if(!p.startsWith(path.normalize(r))){res.writeHead(403);return res.end("Forbidden");}try{if(fs.statSync(p).isDirectory())p=path.join(p,"index.html");}catch{}if(!fs.existsSync(p)){res.writeHead(404);return res.end("Not found");}res.writeHead(200,{"Content-Type":type(p),"Cache-Control":"no-cache"});fs.createReadStream(p).pipe(res);});server.on("error",reject);server.listen(0,"127.0.0.1",()=>resolve(server.address().port));}); const win=new BrowserWindow({width:1440,height:930,minWidth:1024,minHeight:700,title:"No[co]de Vibe Designer",backgroundColor:"#101214",webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); session.defaultSession.setPermissionRequestHandler((_wc,p,cb)=>cb(p==="media"||p==="geolocation"||p==="notifications")); await win.loadURL("http://127.0.0.1:"+port+"/desktop/"); win.webContents.setWindowOpenHandler(({url})=>{if(url.startsWith("http://127.0.0.1:"+port+"/"))return{action:"allow"};shell.openExternal(url);return{action:"deny"};}); }
           app.whenReady().then(create); app.on("window-all-closed",()=>{try{server?.close()}catch{};app.quit();});
           JS
           npm install --no-audit --no-fund
@@ -319,13 +318,13 @@ jobs:
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
             gh release edit "$RELEASE_TAG" \
-              --title "No-de Vibe Designer $APP_VERSION · Universal" \
+              --title "No[co]de Vibe Designer $APP_VERSION · Universal" \
               --notes "Build universel No[co]de : Web/PWA, macOS Apple Silicon + Intel, Windows x64, Linux x64 et Android. Toutes les variantes partagent le même runtime et le même format de projet." \
               --target "$GITHUB_SHA" \
               --repo "$GITHUB_REPOSITORY"
           else
             gh release create "$RELEASE_TAG" release-assets/* \
-              --title "No-de Vibe Designer $APP_VERSION · Universal" \
+              --title "No[co]de Vibe Designer $APP_VERSION · Universal" \
               --notes "Build universel No[co]de : Web/PWA, macOS Apple Silicon + Intel, Windows x64, Linux x64 et Android. Toutes les variantes partagent le même runtime et le même format de projet." \
               --target "$GITHUB_SHA" \
               --repo "$GITHUB_REPOSITORY"

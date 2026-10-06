@@ -21,7 +21,7 @@ a{color:inherit}.shell{position:relative;width:min(1220px,94vw);margin:auto;padd
 details{position:relative;z-index:1;border-top:1px solid var(--line);margin-top:15px;padding-top:11px}summary{cursor:pointer;font-size:11px;font-weight:680;color:#ccd2d7}details p,details ol{margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.6}details ol{padding-left:18px}
 .surfaces{margin-top:28px;border:1px solid #405048;border-radius:16px;background:#101714;padding:20px}.surfaces h3{margin:0 0 6px;font-size:19px}.surfaces p{margin:0;color:#9eaea6;font-size:12px;line-height:1.55}.surface-tags{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:14px}.surface-tags span{border:1px solid #34413c;border-radius:8px;padding:10px;text-align:center;background:#141d19;color:#b8c6bf;font-size:10px}
 .footer{display:flex;align-items:center;gap:12px;margin-top:34px;padding-top:18px;border-top:1px solid var(--line);color:#69737b;font-size:10px}.footer a{margin-left:auto;text-decoration:none;color:#9aa4ac}
-@media(max-width:760px){.shell{padding-top:14px}.hero{grid-template-columns:1fr;padding-top:42px}.hero h1{font-size:50px}.grid{grid-template-columns:1fr}.card.macos{grid-column:auto}.surface-tags{grid-template-columns:repeat(2,1fr)}.top .brand{font-size:14px}.back{font-size:0}.back::after{content:"Retour";font-size:10px}}
+@media(max-width:760px){.shell{padding-top:14px}.hero{grid-template-columns:1fr;padding-top:42px}.hero h1{font-size:50px}.grid{grid-template-columns:1fr}.card.macos{grid-column:auto}.surface-tags{grid-template-columns:repeat(2,1fr)}.surface-tags span:last-child{grid-column:1/-1}.top .brand{font-size:14px}.back{font-size:0}.back::after{content:"Retour";font-size:10px}}
 </style>
 </head>
 <body>
@@ -98,9 +98,9 @@ details{position:relative;z-index:1;border-top:1px solid var(--line);margin-top:
   <article class="card" data-platform="android">
     <div class="card-head"><span class="platform-icon">AND</span><span class="status"><i></i><span>Test</span></span></div>
     <small class="overline">Mobile / plateau</small><h2>Android</h2>
-    <p>APK direct pour les tests terrain. L’AAB Play reste affiché comme non signé tant que la configuration de signature Google Play n’est pas disponible.</p>
-    <div class="tags"><span class="tag sage">APK</span><span class="tag">AAB</span><span class="tag">Mobile dédié</span></div>
-    <div class="actions"><a class="download sage disabled" data-asset="No-de-Vibe-Designer-{v}-Android-debug.apk" href="#">APK test</a><a class="download disabled" data-asset="No-de-Vibe-Designer-{v}-unsigned.aab" href="#">AAB · à signer</a></div>
+    <p>APK direct pour les tests terrain. La version Google Play est distribuée uniquement via le Play Store lorsqu’elle est signée et validée.</p>
+    <div class="tags"><span class="tag sage">APK</span><span class="tag">Mobile dédié</span><span class="tag">Play Store</span></div>
+    <div class="actions"><a class="download sage disabled" data-asset="No-de-Vibe-Designer-{v}-Android-debug.apk" href="#">APK test</a></div>
     <div class="recommended-note">Recommandé pour cet appareil</div>
   </article>
 </section>
@@ -117,9 +117,9 @@ details{position:relative;z-index:1;border-top:1px solid var(--line);margin-top:
 (async()=>{
   const releaseBase="https://github.com/cdriccarboni/no-de-vibe-designer-pwa/releases";
   const apiBase="https://api.github.com/repos/cdriccarboni/no-de-vibe-designer-pwa/releases/tags/";
-  let info={version:"3.3.6",files:"?",cacheRevision:"—"};
+  let info={version:"3.3.7",files:"?",cacheRevision:"—"};
   try{info=await fetch("../build-info.json",{cache:"no-store"}).then(r=>r.json())}catch{}
-  const version=info.version||"3.3.6", tag="v"+version;
+  const version=info.version||"3.3.7", tag="v"+version;
   const ua=(navigator.userAgent||"").toLowerCase();
   const platform=(navigator.userAgentData?.platform||navigator.platform||"").toLowerCase();
   let detected="web", label="Web / PWA";

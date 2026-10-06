@@ -101,7 +101,7 @@ jobs:
           cat > capacitor.config.json <<'EOF'
           {
             "appId": "fr.acousmatic.nodevibedesigner",
-            "appName": "No-de Vibe Designer",
+            "appName": "No[co]de Vibe Designer",
             "webDir": "www",
             "bundledWebRuntime": false,
             "server": {
@@ -134,7 +134,7 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
           {
-            echo "No-de Vibe Designer ${APP_VERSION}"
+            echo "No[co]de Vibe Designer ${APP_VERSION}"
             echo
             "$AAPT" dump badging "$APK" | grep -E '^package:|^application-label:|^sdkVersion:|^targetSdkVersion:' || true
             echo
@@ -181,7 +181,7 @@ jobs:
             "$PLAY_UPLOAD_KEY_ALIAS"
 
           {
-            echo "No-de Vibe Designer ${APP_VERSION} — Play AAB"
+            echo "No[co]de Vibe Designer ${APP_VERSION} — Play AAB"
             echo
             jarsigner -verify -strict -verbose -certs android/app/build/outputs/bundle/release/No-de-Vibe-Designer-${APP_VERSION}-play.aab
             echo
@@ -251,7 +251,7 @@ jobs:
               body={
                   "track": track,
                   "releases": [{
-                      "name": f"No-de Vibe Designer {app_version}",
+                      "name": f"No[co]de Vibe Designer {app_version}",
                       "versionCodes": [version_code],
                       "status": "completed",
                   }],
@@ -270,11 +270,6 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: No-de-Vibe-Designer-${{ env.APP_VERSION }}-android-unsigned-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
-          if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
         if: steps.signing.outputs.ready == 'true'
@@ -293,32 +288,29 @@ jobs:
         run: |
           set -euo pipefail
           APK_SRC="android/app/build/outputs/apk/debug/app-debug.apk"
-          AAB_SRC="android/app/build/outputs/bundle/release/app-release.aab"
           APK="No-de-Vibe-Designer-${APP_VERSION}-Android-debug.apk"
           APK_STABLE="No-de-Vibe-Designer-Android-debug.apk"
-          AAB="No-de-Vibe-Designer-${APP_VERSION}-unsigned.aab"
           cp "$APK_SRC" "$APK"
           cp "$APK_SRC" "$APK_STABLE"
-          cp "$AAB_SRC" "$AAB"
-          sha256sum "$APK" "$APK_STABLE" "$AAB" > SHA256SUMS-Android.txt
+          sha256sum "$APK" "$APK_STABLE" > SHA256SUMS-Android.txt
           TAG="v${APP_VERSION}"
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "No-de Vibe Designer ${APP_VERSION}" --notes "Build de distribution No-de Vibe Designer ${APP_VERSION}." || gh release view "$TAG" >/dev/null
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "No[co]de Vibe Designer ${APP_VERSION}" --notes "Build de distribution No[co]de Vibe Designer ${APP_VERSION}." || gh release view "$TAG" >/dev/null
           fi
-          gh release upload "$TAG" "$APK" "$APK_STABLE" "$AAB" SHA256SUMS-Android.txt --clobber
+          gh release upload "$TAG" "$APK" "$APK_STABLE" SHA256SUMS-Android.txt --clobber
 
       - name: Build summary
         if: always()
         shell: bash
         run: |
           {
-            echo "## No-de Vibe Designer ${APP_VERSION}"
+            echo "## No[co]de Vibe Designer ${APP_VERSION}"
             echo
             echo "- package: \`${PACKAGE_NAME}\`"
             echo "- versionCode: \`${VERSION_CODE}\`"
             echo "- target: Android 16 / API 36"
             echo "- debug APK: built"
-            echo "- unsigned AAB: built"
+            echo "- AAB Play: généré en interne, jamais exposé comme téléchargement public"
             if [ "${{ steps.signing.outputs.ready }}" = "true" ]; then
               echo "- Play-signed AAB: built + verified"
             else
