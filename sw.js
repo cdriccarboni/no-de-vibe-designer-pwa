@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.7-multi-brand-installer";
+const CACHE = "nvd-3.3.8-unified-rings-brand";
 const ASSETS = [
   "./src/core/StageSafety.js",
   "./companion/companion.css",
@@ -24,6 +24,7 @@ const ASSETS = [
   "./icons/icon-512.png",
   "./icons/icon-maskable-192.png",
   "./icons/icon-maskable-512.png",
+  "./icons/nocode-rings.svg",
   "./index.html",
   "./install/index.html",
   "./manifest.webmanifest",
