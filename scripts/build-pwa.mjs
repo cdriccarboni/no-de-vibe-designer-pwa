@@ -57,7 +57,7 @@ spawnSync(process.execPath, [path.join(root, "scripts", "make-icons.mjs")], { st
 copyDir(path.join(root, "shared"), path.join(dist, "shared"));
 copyDir(path.join(root, "src"), path.join(dist, "src"));
 copyDir(path.join(root, "docs", "manual"), path.join(dist, "manuel"));
-copyDir(path.join(root, "mobile", "icons"), path.join(dist, "icons"));
+copyDir(path.join(root, "mobile", "icons"), path.join(dist, "icons"));\nif (fs.existsSync(path.join(root, "install"))) copyDir(path.join(root, "install"), path.join(dist, "install"));
 
 write("index.html", read("index.html"));
 
