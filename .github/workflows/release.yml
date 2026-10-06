@@ -122,7 +122,7 @@ jobs:
         shell: bash
         run: |
           cat > package.json <<JSON
-          {"name":"no-de-vibe-designer-universal","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"mac":{"category":"public.app-category.graphics-design","identity":null,"target":[{"target":"dir","arch":["arm64","x64"]}]}}}
+          {"name":"no-de-vibe-designer-universal","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"mac":{"category":"public.app-category.graphics-design","identity":null,"target":[{"target":"dir","arch":["arm64","x64"]}]}}}
           JSON
           mkdir -p electron
           cat > electron/main.cjs <<'JS'
@@ -164,7 +164,7 @@ jobs:
               "Aucune commande Terminal n'est nécessaire." \
               > "$STAGE/À LIRE - PREMIER LANCEMENT.txt"
             ditto -c -k --sequesterRsrc --keepParent "$STAGE/No-de Vibe Designer.app" "release-assets/No-de-Vibe-Designer-${APP_VERSION}-macOS-$ARCH.zip"
-            hdiutil create -volname "No-de Vibe Designer $APP_VERSION" -srcfolder "$STAGE" -ov -format UDZO "release-assets/No-de-Vibe-Designer-${APP_VERSION}-macOS-$ARCH.dmg"
+            DMG="release-assets/No-de-Vibe-Designer-${APP_VERSION}-macOS-$ARCH.dmg"\n            if ! hdiutil create -volname "No-de Vibe Designer $APP_VERSION $ARCH" -srcfolder "$STAGE" -ov -format UDZO "$DMG"; then\n              sleep 3\n              hdiutil create -volname "No-de Vibe Designer $APP_VERSION $ARCH" -srcfolder "$STAGE" -ov -format UDZO "$DMG"\n            fi
           done
           (cd release-assets && shasum -a 256 * > SHA256SUMS-macOS.txt)
       - uses: actions/upload-artifact@v4
@@ -191,7 +191,7 @@ jobs:
         shell: bash
         run: |
           cat > package.json <<JSON
-          {"name":"no-de-vibe-designer-universal","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"win":{"target":[{"target":"nsis","arch":["x64"]}],"artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Windows-x64-Setup.exe"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true,"createStartMenuShortcut":true}}}
+          {"name":"no-de-vibe-designer-universal","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"win":{"target":[{"target":"nsis","arch":["x64"]}],"artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Windows-x64-Setup.exe"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true,"createStartMenuShortcut":true}}}
           JSON
           mkdir -p electron
           cat > electron/main.cjs <<'JS'
@@ -237,7 +237,7 @@ jobs:
         shell: bash
         run: |
           cat > package.json <<JSON
-          {"name":"no-de-vibe-designer-universal","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"linux":{"target":["AppImage","deb","tar.gz"],"category":"Graphics","artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Linux-x64.${ext}"}}}
+          {"name":"no-de-vibe-designer-universal","productName":"No-de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No-de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"linux":{"target":["AppImage","deb","tar.gz"],"category":"Graphics","artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Linux-x64.${ext}"}}}
           JSON
           mkdir -p electron
           cat > electron/main.cjs <<'JS'
