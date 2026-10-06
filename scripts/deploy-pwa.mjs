@@ -40,7 +40,7 @@ run("git", ["clone", "--depth", "1", PUBLISH_REPO, work]);
 // Replace only generated PWA surfaces. Preserve public CI, release metadata,
 // privacy/play documentation and stable download pages.
 const generated = [
-  "desktop", "mobile", "studio", "companion", "shared", "src", "manuel", "icons",
+  "desktop", "mobile", "studio", "companion", "shared", "src", "manuel", "icons", "install",
   "index.html", "manifest.webmanifest", "sw.js", "build-info.json"
 ];
 for (const entry of generated) fs.rmSync(path.join(work, entry), { recursive: true, force: true });
