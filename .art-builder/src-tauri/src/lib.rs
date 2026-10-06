@@ -104,12 +104,14 @@ async fn google_oauth_system_browser(app: AppHandle, scope: String, select_accou
     let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     let nonce = Uuid::new_v4().simple().to_string();
-    let mut q = form_urlencoded::Serializer::new(String::new());
-    q.append_pair("port", &port.to_string());
-    q.append_pair("nonce", &nonce);
-    q.append_pair("scope", clean);
-    q.append_pair("select_account", if select_account { "1" } else { "0" });
-    let browser_url = format!("https://art.acousmatic-theatre.fr/oauth/native?{}", q.finish());
+    let browser_url = {
+        let mut q = form_urlencoded::Serializer::new(String::new());
+        q.append_pair("port", &port.to_string());
+        q.append_pair("nonce", &nonce);
+        q.append_pair("scope", clean);
+        q.append_pair("select_account", if select_account { "1" } else { "0" });
+        format!("https://art.acousmatic-theatre.fr/oauth/native?{}", q.finish())
+    };
     app.opener().open_url(browser_url, None::<&str>).map_err(|e| format!("Impossible d’ouvrir le navigateur système : {e}"))?;
     tauri::async_runtime::spawn_blocking(move || wait_for_callback(listener, nonce)).await.map_err(|e| e.to_string())?
 }
