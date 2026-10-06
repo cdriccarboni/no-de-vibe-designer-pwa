@@ -653,6 +653,16 @@ function buildLibrary() {
   if (mode) mode.style.display = expCount ? "flex" : "none";
 }
 
+// NVD_LIBRARY_BOOTSTRAP_GUARD
+// La palette doit exister avant les initialisations secondaires : une erreur
+// ailleurs dans Designer ne doit plus pouvoir laisser la Library vide.
+try {
+  buildLibrary();
+  document.documentElement.dataset.libraryReady = "1";
+} catch (error) {
+  console.error("LIBRARY_BOOTSTRAP", error);
+}
+
 function startEngineDownload(url) {
   if (typeof window.nvdDesktop?.openExternal === "function") {
     window.nvdDesktop.openExternal(url).catch(error => log(`Téléchargement · ${error?.message || error}`));

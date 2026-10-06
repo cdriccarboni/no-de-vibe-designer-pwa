@@ -98,7 +98,7 @@ a{color:inherit}.shell{width:min(1180px,94vw);margin:auto;padding:28px 0 72px}
   let version="";
   let info=null;
   try{info=await fetch("../build-info.json",{cache:"no-store"}).then(r=>r.json());version=info.version||""}catch{}
-  if(!version) version="3.3.1";
+  if(!version) version="3.3.2";
   const tag="v"+version;
   const asset=(name)=>releaseBase+"/download/"+tag+"/"+name.replaceAll("{v}",version);
   const links={
