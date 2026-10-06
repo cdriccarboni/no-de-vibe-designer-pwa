@@ -9,7 +9,6 @@ export const SURFACE_PREF_KEY = "nvd.surface.preference";
 
 export const SURFACES = Object.freeze([
   { id:"designer", label:"Designer", detail:"Canvas · Library · Timeline · Vibe", path:"desktop/index.html" },
-  { id:"show", label:"Show", detail:"Conduite · cues · timeline · scène", path:"show/index.html?surface=show" },
   { id:"mobile", label:"Mobile", detail:"Interface compacte · capteurs · conduite", path:"mobile/index.html" },
   { id:"regie", label:"Régie", detail:"Companion Studio · pages personnalisables", path:"studio/index.html?surface=regie" },
   { id:"plateau", label:"Plateau", detail:"Companion Studio directement en mode Plateau", path:"studio/index.html?surface=plateau" },

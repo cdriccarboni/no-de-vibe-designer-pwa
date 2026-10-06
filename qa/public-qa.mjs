@@ -33,7 +33,7 @@ const updateNoticeJs = fs.readFileSync(new URL("../shared/update-notice.js", imp
 assert(updateNoticeJs.includes("MISE À JOUR NO[CO]DE"), "Global update popup is present");
 assert(updateNoticeJs.includes("APP_VERSION"), "Update popup follows the shared version");
 assert(updateNoticeJs.includes("../install/"), "Update popup links to Installer");
-assert(fs.readFileSync(new URL("../show/show.js", import.meta.url), "utf8").includes('installSurfaceSwitcher({ current:"show" })'), "Show receives shared surface/update UI");
+assert(fs.readFileSync(new URL("../show/show.js", import.meta.url), "utf8").includes("installUpdateNotice()"), "Show receives shared update popup");
 assert(libraryDesktopApp.includes("NVD_LIBRARY_BOOTSTRAP_GUARD"), "Designer has the early Library bootstrap guard");
 assert(libraryDesktopApp.indexOf("NVD_LIBRARY_BOOTSTRAP_GUARD") < libraryDesktopApp.indexOf("function startEngineDownload"), "Library bootstrap runs before secondary Designer startup");
 assert(SURFACES.length === 5, "five switchable No-de surfaces are available");

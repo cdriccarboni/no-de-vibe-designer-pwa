@@ -1,4 +1,4 @@
-import { installSurfaceSwitcher } from "../shared/surface-switcher.js";
+import { installUpdateNotice } from "../shared/update-notice.js";
 import {
   loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow,
   fireCue, saveShow, restoreShow, askShow, setKeyframe, timelineRows, showMonitor, CX_NOTE, CX_BRIDGE_URL
@@ -6,7 +6,7 @@ import {
 import { browserProbeRegistry, selectAgentsForRequest } from "../shared/agent-registry.js";
 import { executeWaveShader, nativeBridgeLabel, runShaderAgent } from "../shared/shader-agent.js";
 
-installSurfaceSwitcher({ current:"show" });
+installUpdateNotice();
 
 const SAVE_KEY = "nvd.show.save";
 let session = loadExampleScene();
