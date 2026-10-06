@@ -3,119 +3,204 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#101214">
+<meta name="theme-color" content="#090b0d">
 <title>Installer No[co]de Vibe Designer</title>
-<link rel="icon" href="../icons/icon-192.png" type="image/png">
+<link rel="icon" href="../icons/nocode-rings.svg" type="image/svg+xml">
 <style>
-:root{color-scheme:dark;--bg:#0d0f11;--panel:#15191d;--panel2:#1a1f24;--line:#303840;--text:#edf0f2;--muted:#97a0a8;--sage:#8fa79d;--gold:#d7b86a;--danger:#c97868;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 50% -15%,#252b2f 0,#111417 42%,#0b0d0f 100%);color:var(--text);min-height:100dvh}
-a{color:inherit}.shell{width:min(1180px,94vw);margin:auto;padding:28px 0 72px}
-.top{display:flex;align-items:center;gap:14px;margin-bottom:46px}.mark{width:48px;height:48px;border-radius:11px;background:#0f1113;border:1px solid var(--line);display:grid;place-items:center;color:var(--gold);font-weight:800}.brand{font-weight:760;font-size:19px}.brand small{display:block;color:var(--muted);font-size:10px;letter-spacing:.16em;margin-top:3px}.back{margin-left:auto;text-decoration:none;border:1px solid var(--line);border-radius:9px;padding:9px 12px;color:var(--muted)}
-.hero{padding:20px 0 34px;max-width:900px}.eyebrow{color:var(--gold);font-size:11px;letter-spacing:.18em;text-transform:uppercase}.hero h1{font-size:clamp(38px,7vw,78px);line-height:.96;letter-spacing:-.055em;margin:12px 0 18px}.hero p{font-size:clamp(15px,2vw,19px);line-height:1.6;color:#b7bec4;max-width:780px}.version{display:inline-flex;gap:8px;align-items:center;border:1px solid #52605d;background:#17201d;border-radius:99px;padding:7px 11px;font-size:12px;color:#c8d6cf}.dot{width:7px;height:7px;border-radius:50%;background:var(--sage)}
-.callout{margin:18px 0 30px;padding:17px 19px;border:1px solid #5b5033;border-radius:14px;background:#1e1a10;color:#ded1a9;line-height:1.55}.callout b{color:#f0d98c}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{border:1px solid var(--line);background:linear-gradient(145deg,#171b1f,#111417);border-radius:17px;padding:20px;box-shadow:0 16px 50px #0003}.card.featured{border-color:#5b5033}.os{display:flex;gap:10px;align-items:center}.os strong{font-size:21px}.badge{margin-left:auto;border:1px solid var(--line);border-radius:99px;padding:4px 8px;color:var(--muted);font-size:10px}.card p{color:var(--muted);font-size:13px;line-height:1.55;min-height:42px}.actions{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0}.btn{display:inline-flex;text-decoration:none;align-items:center;justify-content:center;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#20262b;font-size:12px;font-weight:650}.btn.primary{border-color:#7b6a3e;background:#2a2416;color:#f1d98c}.btn.sage{border-color:#52605d;background:#18211e;color:#c9d7d0}.steps{border-top:1px solid var(--line);margin-top:16px;padding-top:14px;color:#aeb6bc;font-size:12px;line-height:1.65}.steps b{color:var(--text)}.steps ol{padding-left:20px;margin:7px 0}
-.core{margin-top:28px;border:1px solid #52605d;border-radius:18px;padding:22px;background:#111916}.core h2{margin:0 0 8px}.core p{margin:0;color:#aab9b1;line-height:1.6}.matrix{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:18px}.chip{text-align:center;border:1px solid #34413c;border-radius:10px;padding:10px 6px;font-size:11px;color:#bdcac4;background:#151d1a}
-.faq{margin-top:38px}.faq h2{font-size:25px}.faq details{border-top:1px solid var(--line);padding:14px 2px}.faq summary{cursor:pointer;font-weight:650}.faq details p{color:var(--muted);line-height:1.6;font-size:13px}
-.foot{margin-top:42px;color:#69737b;font-size:11px;line-height:1.6}
-@media(max-width:760px){.grid{grid-template-columns:1fr}.matrix{grid-template-columns:repeat(2,1fr)}.shell{padding-top:18px}.top{margin-bottom:28px}.hero h1{font-size:46px}.card p{min-height:0}}
+:root{color-scheme:dark;--bg:#090b0d;--panel:#14181c;--panel2:#1a1f24;--line:#2d333b;--line2:#454d57;--text:#f1f3f5;--muted:#98a2ab;--gold:#d7b86a;--sage:#8fa79d;--ok:#7ca587;--red:#c97868;--blue:#7fa4c0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;min-height:100dvh;background:var(--bg);color:var(--text);overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent 31px,#ffffff08 32px),linear-gradient(transparent 31px,#ffffff08 32px);background-size:32px 32px;mask-image:linear-gradient(to bottom,#0008,transparent 72%);opacity:.45}
+body::after{content:"";position:fixed;width:680px;height:680px;left:50%;top:-480px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle,#d7b86a22 0,#8fa79d0e 36%,transparent 68%);pointer-events:none}
+a{color:inherit}.shell{position:relative;width:min(1220px,94vw);margin:auto;padding:24px 0 72px}
+.top{display:flex;align-items:center;gap:11px;min-height:48px}.brandmark{width:42px;height:42px;border:1px solid var(--line2);border-radius:9px;background:#0e1114;display:grid;place-items:center;overflow:hidden}.brandmark img{width:100%;height:100%}.brand{font-weight:780;font-size:17px}.brand small{display:block;margin-top:2px;color:var(--muted);font-size:9px;letter-spacing:.17em}.back{margin-left:auto;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 11px;background:#12161a;color:var(--muted);font-size:11px}
+.hero{padding:72px 0 34px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr);gap:28px;align-items:end}.eyebrow{display:flex;align-items:center;gap:8px;color:var(--gold);font-size:10px;letter-spacing:.18em;font-weight:780}.eyebrow i{width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 18px #d7b86a88}.hero h1{font-size:clamp(48px,7vw,86px);line-height:.9;letter-spacing:-.06em;margin:13px 0 20px}.hero h1 em{font-style:normal;color:var(--sage)}.hero p{margin:0;max-width:720px;color:#b3bbc2;font-size:16px;line-height:1.65}.hero-side{border:1px solid var(--line);border-radius:14px;background:#101419cc;padding:16px;box-shadow:0 20px 60px #0005}.detect{display:flex;align-items:center;gap:9px;font-size:12px}.detect-dot{width:8px;height:8px;border-radius:50%;background:var(--sage);box-shadow:0 0 16px #8fa79d99}.detect strong{color:#dbe5e0}.release-line{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);line-height:1.5}
+.notice{margin:0 0 18px;display:flex;gap:12px;align-items:flex-start;border:1px solid #4a4330;border-radius:13px;padding:14px 16px;background:#17150f}.notice b{color:#ebd38f}.notice p{margin:3px 0 0;color:#b8ad8d;font-size:11px;line-height:1.5}.notice-icon{width:26px;height:26px;display:grid;place-items:center;border:1px solid #665b38;border-radius:7px;color:var(--gold);flex:none}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{position:relative;overflow:hidden;border:1px solid var(--line);background:linear-gradient(145deg,#171b1f,#101316);border-radius:16px;padding:19px;box-shadow:0 16px 48px #0003;transition:border-color .18s,transform .18s}.card:hover{transform:translateY(-1px);border-color:var(--line2)}.card.recommended{border-color:var(--gold);box-shadow:0 0 0 1px #d7b86a20,0 20px 70px #0005}.card.detected-primary{grid-column:1/-1;padding:24px;background:linear-gradient(130deg,#171b1f 0,#171a18 55%,#111819 100%)}.card.detected-primary::after{content:"";position:absolute;right:-70px;top:-100px;width:320px;height:320px;border-radius:50%;border:1px solid #d7b86a22;box-shadow:0 0 0 48px #8fa79d0a,0 0 0 96px #d7b86a08;pointer-events:none}
+.card-head{display:flex;align-items:center;gap:10px;position:relative;z-index:1}.platform-icon{width:34px;height:34px;border:1px solid var(--line2);border-radius:9px;background:#101316;display:grid;place-items:center;color:var(--gold);font-size:13px;font-weight:800}.status{margin-left:auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 8px;font-size:9px;color:var(--muted);background:#101316}.status i{width:6px;height:6px;border-radius:50%;background:var(--ok)}.status.building i{background:var(--gold)}.card small.overline{display:block;margin-top:18px;color:var(--muted);font-size:9px;letter-spacing:.14em;text-transform:uppercase}.card h2{font-size:27px;margin:5px 0 6px;letter-spacing:-.025em}.card.detected-primary h2{font-size:34px}.card p{position:relative;z-index:1;margin:0;color:var(--muted);font-size:12px;line-height:1.55;max-width:820px}.tags{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0}.tag{border:1px solid var(--line);border-radius:99px;padding:4px 7px;background:#0e1114;color:#aeb7bf;font-size:9px}.tag.gold{border-color:#665b38;color:#e0c777}.tag.sage{border-color:#495c55;color:#b9cbc3}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;position:relative;z-index:1}.download{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;border:1px solid var(--line2);border-radius:8px;padding:0 12px;background:#20262b;text-decoration:none;font-size:11px;font-weight:720}.download.primary{border-color:#7b6a3e;background:#292316;color:#f0d88d}.download.sage{border-color:#52605d;background:#18211e;color:#c9d7d0}.download.disabled{pointer-events:none;opacity:.42}.download .arrow{opacity:.6}.recommended-note{display:none;margin-top:12px;color:var(--gold);font-size:10px;font-weight:760}.card.recommended .recommended-note{display:block}
+details{position:relative;z-index:1;border-top:1px solid var(--line);margin-top:15px;padding-top:11px}summary{cursor:pointer;font-size:11px;font-weight:680;color:#ccd2d7}details p,details ol{margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.6}details ol{padding-left:18px}
+.surfaces{margin-top:28px;border:1px solid #405048;border-radius:16px;background:#101714;padding:20px}.surfaces h3{margin:0 0 6px;font-size:19px}.surfaces p{margin:0;color:#9eaea6;font-size:12px;line-height:1.55}.surface-tags{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:14px}.surface-tags button{border:1px solid #34413c;border-radius:8px;padding:10px;text-align:center;background:#141d19;color:#b8c6bf;font:700 10px inherit;letter-spacing:.02em;cursor:pointer;transition:border-color .16s,background .16s,color .16s,transform .16s}.surface-tags button:hover,.surface-tags button:focus-visible{border-color:#d7b86a;background:#1b211c;color:#f0d88d;transform:translateY(-1px);outline:none}.surface-tags button::after{content:"  ·  ?";opacity:.55}
+.surface-help{width:min(520px,calc(100vw - 30px));border:1px solid #52605a;border-radius:14px;padding:0;background:#0e1512;color:#eef3f0;box-shadow:0 24px 80px #000b}.surface-help::backdrop{background:#000b;backdrop-filter:blur(5px)}.surface-help-inner{position:relative;display:grid;gap:10px;padding:20px}.surface-help-kicker{font:800 9px var(--font-mono,monospace);letter-spacing:.14em;color:#d7b86a}.surface-help h3{margin:0;font-size:24px}.surface-help p{margin:0;color:#aebbb4;font-size:12px;line-height:1.6}.surface-help-note{padding:10px;border:1px solid #34413c;border-radius:9px;background:#121b17;color:#c7d4cd!important}.surface-help-close{position:absolute;right:10px;top:10px;width:34px;height:34px;border:1px solid #38433d;border-radius:8px;background:#151c18;color:#c7d0cb;font-size:18px;cursor:pointer}.surface-help-close:hover,.surface-help-close:focus-visible{border-color:#d7b86a;color:#f0d88d;outline:none}
+.footer{display:flex;align-items:center;gap:12px;margin-top:34px;padding-top:18px;border-top:1px solid var(--line);color:#69737b;font-size:10px}.footer a{margin-left:auto;text-decoration:none;color:#9aa4ac}
+@media(max-width:760px){.shell{padding-top:14px}.hero{grid-template-columns:1fr;padding-top:42px}.hero h1{font-size:50px}.grid{grid-template-columns:1fr}.card.detected-primary{grid-column:auto}.surface-tags{grid-template-columns:repeat(2,1fr)}.surface-tags button:last-child{grid-column:1/-1}.top .brand{font-size:14px}.back{font-size:0}.back::after{content:"Retour";font-size:10px}}
 </style>
 </head>
 <body>
-<div class="shell">
-<header class="top"><div class="mark">N[c]</div><div class="brand">No[co]de Vibe Designer<small>VIBE · PATCH · STAGE</small></div><a class="back" href="../?chooser=1">← Ouvrir No[co]de</a></header>
+<main class="shell">
+<header class="top">
+  <a class="brandmark" href="../desktop/index.html?surface=designer" aria-label="Ouvrir No[co]de"><img src="../icons/nocode-rings.svg" alt="No[co]de Vibe Designer"></a>
+  <div class="brand">No[co]de Vibe Designer<small>VIBE · PATCH · STAGE</small></div>
+  <a class="back" href="../desktop/index.html?surface=designer">← Retour au Designer</a>
+</header>
 
 <section class="hero">
-<div class="eyebrow">Une application · plusieurs plateformes</div>
-<h1>No[co]de<br>partout.</h1>
-<p>Le Designer, la régie, le Show, le Mobile et la Remote Camera reposent sur le <b>même cœur No[co]de</b>. Choisis seulement l’enveloppe adaptée à ta machine : navigateur, application desktop ou Android.</p>
-<div id="versionBadge" class="version"><span class="dot"></span><span>Version actuelle : chargement…</span></div>
+  <div>
+    <div class="eyebrow"><i></i> NO[CO]DE UNIVERSAL</div>
+    <h1>Créer ici.<br><em>Jouer partout.</em></h1>
+    <p>Le Designer, la régie, le Show, le Mobile et la Remote Camera partagent le même cœur. Choisis l’enveloppe adaptée à ta machine ; tes projets restent les mêmes.</p>
+  </div>
+  <aside class="hero-side">
+    <div class="detect"><span class="detect-dot"></span><span>Version recommandée : <strong id="detectedPlatform">détection…</strong></span></div>
+    <div id="releaseState" class="release-line">Vérification de la release courante…</div>
+  </aside>
 </section>
 
-<div class="callout"><b>Mises à jour alignées.</b> Les builds Web, macOS, Windows, Linux et Android utilisent le même numéro de version et le même runtime. Les fonctions de patch, la Library et les projets restent compatibles d’une plateforme à l’autre.</div>
-
-<section class="grid">
-<article class="card featured">
-<div class="os"><strong>Web / PWA</strong><span class="badge">recommandé pour tester</span></div>
-<p>Aucune installation lourde. Fonctionne dans un navigateur moderne et peut s’installer comme une application.</p>
-<div class="actions"><a class="btn primary" href="../desktop/index.html?surface=designer">Ouvrir Designer</a><a class="btn" href="../?chooser=1">Choisir une interface</a></div>
-<div class="steps"><b>Installer la PWA</b><ol><li>Ouvre No[co]de dans Chrome, Edge ou Brave.</li><li>Choisis « Installer l’application » dans le menu du navigateur.</li><li>No[co]de apparaît ensuite comme une application autonome.</li></ol></div>
-</article>
-
-<article class="card">
-<div class="os"><strong>macOS</strong><span class="badge">Apple Silicon + Intel</span></div>
-<p>Application desktop autonome avec accès caméra/micro et comportement de fenêtre natif. DMG et ZIP séparés selon l’architecture.</p>
-<div class="actions"><a id="macArmDmg" class="btn sage" href="#">DMG Apple Silicon</a><a id="macIntelDmg" class="btn" href="#">DMG Intel</a><a id="macArmZip" class="btn" href="#">ZIP Apple Silicon</a></div>
-<div class="steps"><b>Premier lancement macOS</b><ol><li>Glisse No[co]de dans Applications.</li><li>Essaie de l’ouvrir normalement.</li><li>Si Gatekeeper bloque : Réglages Système → Confidentialité et sécurité → <b>Ouvrir quand même</b>. Aucun Terminal n’est nécessaire.</li></ol></div>
-</article>
-
-<article class="card">
-<div class="os"><strong>Windows</strong><span class="badge">x64</span></div>
-<p>Application Electron complète. L’installateur ajoute No[co]de comme une application classique ; le ZIP portable ne modifie pas le système.</p>
-<div class="actions"><a id="winSetup" class="btn sage" href="#">Installateur .exe</a><a id="winPortable" class="btn" href="#">Portable .zip</a></div>
-<div class="steps"><b>Installation Windows</b><ol><li>Télécharge l’installateur.</li><li>Si SmartScreen affiche un avertissement, vérifie que le fichier vient bien de cette page GitHub puis utilise « Informations complémentaires ».</li><li>La version portable peut simplement être décompressée et lancée.</li></ol></div>
-</article>
-
-<article class="card">
-<div class="os"><strong>Linux</strong><span class="badge">x64</span></div>
-<p>AppImage pour lancer directement, paquet .deb pour Debian/Ubuntu et archive tar.gz pour une installation manuelle.</p>
-<div class="actions"><a id="linuxAppImage" class="btn sage" href="#">AppImage</a><a id="linuxDeb" class="btn" href="#">.deb</a><a id="linuxTar" class="btn" href="#">tar.gz</a></div>
-<div class="steps"><b>Choisir le format</b><ol><li><b>AppImage :</b> le plus simple, un seul fichier.</li><li><b>.deb :</b> intégration classique sur Debian/Ubuntu.</li><li><b>tar.gz :</b> utile pour une installation portable ou personnalisée.</li></ol></div>
-</article>
-
-<article class="card">
-<div class="os"><strong>Android</strong><span class="badge">APK + AAB</span></div>
-<p>Interface mobile dédiée, capteurs, conduite et surfaces distantes. L’APK sert aux tests directs ; l’AAB est destiné à Google Play.</p>
-<div class="actions"><a id="androidApk" class="btn sage" href="#">APK test</a><a id="androidAab" class="btn" href="#">AAB Google Play · à signer</a></div>
-<div class="steps"><b>APK direct</b><ol><li>Télécharge l’APK depuis GitHub Releases.</li><li>Android peut demander l’autorisation d’installer depuis cette source.</li><li>Pour la diffusion publique, privilégier la version Google Play lorsqu’elle est disponible.</li></ol></div>
-</article>
-
-<article class="card">
-<div class="os"><strong>Remote / plateau</strong><span class="badge">sans installation</span></div>
-<p>Pour un téléphone caméra, un pupitre de régie ou une machine plateau ponctuelle, les surfaces Web restent les plus rapides.</p>
-<div class="actions"><a class="btn" href="../companion/index.html?surface=camera">Remote Camera</a><a class="btn" href="../studio/index.html?surface=regie">Régie</a><a class="btn" href="../show/index.html?surface=show">Show</a></div>
-<div class="steps">Une même machine peut changer de rôle sans changer de projet : Designer, Show, Mobile, Régie, Plateau ou Caméra.</div>
-</article>
+<section class="notice">
+  <div class="notice-icon">✓</div>
+  <div><b>Liens contrôlés avant affichage.</b><p>Un téléchargement n’est activé que si son fichier existe réellement dans la release GitHub correspondant à la version affichée.</p></div>
 </section>
 
-<section class="core">
-<h2>Un seul cœur No[co]de</h2>
-<p>La Library de nodes, le moteur de graphe, les fonctions Vibe, les formats de projet et les surfaces spectacle sont construits une seule fois. Les applications desktop et Android ne sont que des enveloppes autour de ce cœur commun.</p>
-<div class="matrix"><div class="chip">WEB / PWA</div><div class="chip">macOS</div><div class="chip">WINDOWS</div><div class="chip">LINUX</div><div class="chip">ANDROID</div></div>
+<section class="grid" aria-label="Versions No[co]de">
+  <article id="macos" class="card macos" data-platform="mac">
+    <div class="card-head"><span class="platform-icon">⌘</span><span id="macStatus" class="status building"><i></i><span>Vérification</span></span></div>
+    <small class="overline">Priorité No[co]de · création & régie</small>
+    <h2>macOS Universal</h2>
+    <p>Le choix principal : une vraie application No[co]de autonome, sans chrome de navigateur. Le paquet Universal contient Apple Silicon et Intel dans la même application ; les builds séparés restent disponibles en secours.</p>
+    <div class="tags"><span class="tag gold">PRIORITÉ</span><span class="tag sage">Apple Silicon + Intel</span><span class="tag">DMG</span><span class="tag">ZIP</span><span id="macVersionTag" class="tag">v…</span></div>
+    <div class="actions">
+      <a id="macUniversalDmg" class="download primary disabled" data-asset="No-de-Vibe-Designer-{v}-macOS-universal.dmg" href="#">DMG Universal <span class="arrow">↘</span></a>
+      <a id="macUniversalZip" class="download sage disabled" data-asset="No-de-Vibe-Designer-{v}-macOS-universal.zip" href="#">ZIP Universal</a>
+      <a id="macArmDmg" class="download disabled" data-asset="No-de-Vibe-Designer-{v}-macOS-arm64.dmg" href="#">DMG Apple Silicon</a>
+      <a id="macIntelDmg" class="download disabled" data-asset="No-de-Vibe-Designer-{v}-macOS-x64.dmg" href="#">DMG Intel</a>
+    </div>
+    <div class="recommended-note">Recommandé pour cet appareil</div>
+    <details open><summary>Installation macOS</summary><ol><li>Télécharge le DMG Universal.</li><li>Ouvre-le puis glisse No[co]de Vibe Designer dans Applications.</li><li>Lance l’application depuis Applications.</li><li>Si Gatekeeper bloque la première ouverture : Réglages Système → Confidentialité et sécurité → Ouvrir quand même. Aucun Terminal n’est nécessaire.</li></ol></details>
+    <details><summary>Pourquoi garder Apple Silicon / Intel séparés ?</summary><p>Ce sont des paquets de secours utiles au diagnostic. Le paquet Universal reste le téléchargement recommandé.</p></details>
+  </article>
+
+  <article class="card" data-platform="web">
+    <div class="card-head"><span class="platform-icon">WEB</span><span class="status"><i></i><span>Stable</span></span></div>
+    <small class="overline">Toujours à jour</small><h2>Web / PWA</h2>
+    <p>Pour essayer immédiatement No[co]de, ouvrir un projet depuis n’importe quel ordinateur ou installer une PWA sans paquet desktop.</p>
+    <div class="tags"><span class="tag sage">PWA</span><span class="tag">Sans installation</span></div>
+    <div class="actions"><a class="download sage" href="../desktop/index.html?surface=designer">Ouvrir le Designer <span class="arrow">→</span></a><a class="download" href="../?chooser=1">Choisir une interface</a></div>
+    <div class="recommended-note">Recommandé pour cet appareil</div>
+    <details><summary>Installer comme application</summary><p>Dans Chrome, Edge ou Brave, utilise « Installer l’application ». Sur iPhone/iPad, ouvre la PWA dans Safari puis « Sur l’écran d’accueil ».</p></details>
+  </article>
+
+  <article class="card" data-platform="windows">
+    <div class="card-head"><span class="platform-icon">WIN</span><span class="status"><i></i><span>Stable</span></span></div>
+    <small class="overline">Poste de création</small><h2>Windows x64</h2>
+    <p>Installateur classique ou archive portable. Même moteur de patch et même format de projet.</p>
+    <div class="tags"><span class="tag">EXE</span><span class="tag">Portable ZIP</span></div>
+    <div class="actions"><a class="download sage disabled" data-asset="No-de-Vibe-Designer-{v}-Windows-x64-Setup.exe" href="#">Installer .exe</a><a class="download disabled" data-asset="No-de-Vibe-Designer-{v}-Windows-x64-portable.zip" href="#">Portable .zip</a></div>
+    <div class="recommended-note">Recommandé pour cet appareil</div>
+  </article>
+
+  <article class="card" data-platform="linux">
+    <div class="card-head"><span class="platform-icon">LIN</span><span class="status"><i></i><span>Stable</span></span></div>
+    <small class="overline">Machines techniques</small><h2>Linux x64</h2>
+    <p>AppImage pour lancer directement, paquet DEB pour Debian/Ubuntu et archive portable.</p>
+    <div class="tags"><span class="tag">AppImage</span><span class="tag">DEB</span><span class="tag">tar.gz</span></div>
+    <div class="actions"><a class="download sage disabled" data-asset="No-de-Vibe-Designer-{v}-Linux-x64.AppImage" href="#">AppImage</a><a class="download disabled" data-asset="No-de-Vibe-Designer-{v}-Linux-x64.deb" href="#">.deb</a><a class="download disabled" data-asset="No-de-Vibe-Designer-{v}-Linux-x64.tar.gz" href="#">tar.gz</a></div>
+    <div class="recommended-note">Recommandé pour cet appareil</div>
+  </article>
+
+  <article class="card" data-platform="android">
+    <div class="card-head"><span class="platform-icon">AND</span><span class="status"><i></i><span>Test</span></span></div>
+    <small class="overline">Mobile / plateau</small><h2>Android</h2>
+    <p>APK direct pour les tests terrain. La version Google Play est distribuée uniquement via le Play Store lorsqu’elle est signée et validée.</p>
+    <div class="tags"><span class="tag sage">APK</span><span class="tag">Mobile dédié</span><span class="tag">Play Store</span></div>
+    <div class="actions"><a class="download sage disabled" data-asset="No-de-Vibe-Designer-{v}-Android-debug.apk" href="#">APK test</a></div>
+    <div class="recommended-note">Recommandé pour cet appareil</div>
+  </article>
 </section>
 
-<section class="faq">
-<h2>À savoir</h2>
-<details><summary>Quel format choisir pour essayer No[co]de ?</summary><p>La PWA est le moyen le plus immédiat. Pour un usage régulier en répétition ou en spectacle, la version desktop de ton système offre une fenêtre autonome et une installation plus classique.</p></details>
-<details><summary>Mes projets passent-ils d’un système à l’autre ?</summary><p>Oui : les variantes utilisent le même format de projet No[co]de. Les fonctions qui dépendent d’un matériel ou d’une API système peuvent évidemment varier selon la machine.</p></details>
-<details><summary>Pourquoi macOS ou Windows peuvent-ils afficher un avertissement ?</summary><p>No[co]de est distribué sans abonnement de signature commerciale Apple et les builds communautaires Windows peuvent aussi être inconnus des systèmes de réputation. Utilise uniquement les fichiers provenant de la release GitHub officielle liée ici.</p></details>
+<section class="surfaces">
+  <h3>Un cœur · cinq surfaces</h3>
+  <p>Changer de machine ne change pas ton projet. Seule l’interface utilisée pour travailler ou jouer évolue. Clique sur une surface pour comprendre son rôle.</p>
+  <div class="surface-tags" aria-label="Découvrir les cinq surfaces No[co]de">
+    <button type="button" data-surface-help="designer">DESIGNER</button>
+    <button type="button" data-surface-help="mobile">MOBILE</button>
+    <button type="button" data-surface-help="regie">RÉGIE</button>
+    <button type="button" data-surface-help="plateau">PLATEAU</button>
+    <button type="button" data-surface-help="camera">REMOTE CAMERA</button>
+  </div>
 </section>
 
-<div class="foot">No[co]de Vibe Designer · projet de Cédric Carboni · builds officiels : GitHub Releases.<br><span id="buildInfo">Vérification du build…</span></div>
-</div>
+<dialog id="surfaceHelp" class="surface-help" aria-labelledby="surfaceHelpTitle">
+  <div class="surface-help-inner">
+    <button type="button" class="surface-help-close" aria-label="Fermer">×</button>
+    <small class="surface-help-kicker">UN CŒUR · PLUSIEURS FAÇONS DE L'UTILISER</small>
+    <h3 id="surfaceHelpTitle"></h3>
+    <p id="surfaceHelpText"></p>
+    <p id="surfaceHelpNote" class="surface-help-note"></p>
+  </div>
+</dialog>
+
+<footer class="footer"><span>No[co]de Vibe Designer · build officiel GitHub</span><a href="../desktop/index.html?surface=designer">Ouvrir No[co]de ↗</a></footer>
+</main>
 <script>
 (async()=>{
   const releaseBase="https://github.com/cdriccarboni/no-de-vibe-designer-pwa/releases";
-  let version="";
-  let info=null;
-  try{info=await fetch("../build-info.json",{cache:"no-store"}).then(r=>r.json());version=info.version||""}catch{}
-  if(!version) version="3.3.1";
-  const tag="v"+version;
-  const asset=(name)=>releaseBase+"/download/"+tag+"/"+name.replaceAll("{v}",version);
-  const links={
-    macArmDmg:"No-de-Vibe-Designer-{v}-macOS-arm64.dmg",
-    macIntelDmg:"No-de-Vibe-Designer-{v}-macOS-x64.dmg",
-    macArmZip:"No-de-Vibe-Designer-{v}-macOS-arm64.zip",
-    winSetup:"No-de-Vibe-Designer-{v}-Windows-x64-Setup.exe",
-    winPortable:"No-de-Vibe-Designer-{v}-Windows-x64-portable.zip",
-    linuxAppImage:"No-de-Vibe-Designer-{v}-Linux-x64.AppImage",
-    linuxDeb:"No-de-Vibe-Designer-{v}-Linux-x64.deb",
-    linuxTar:"No-de-Vibe-Designer-{v}-Linux-x64.tar.gz",
-    androidApk:"No-de-Vibe-Designer-{v}-Android-debug.apk",
-    androidAab:"No-de-Vibe-Designer-{v}-unsigned.aab"
+  const apiBase="https://api.github.com/repos/cdriccarboni/no-de-vibe-designer-pwa/releases/tags/";
+  let info={version:"3.3.7",files:"?",cacheRevision:"—"};
+  try{info=await fetch("../build-info.json",{cache:"no-store"}).then(r=>r.json())}catch{}
+  const version=info.version||"3.3.7", tag="v"+version;
+  const ua=(navigator.userAgent||"").toLowerCase();
+  const platform=(navigator.userAgentData?.platform||navigator.platform||"").toLowerCase();
+  let detected="web", label="Web / PWA";
+  if(/mac|iphone|ipad|ipod/.test(platform+" "+ua)){detected=/iphone|ipad|ipod/.test(ua)?"web":"mac";label=detected==="mac"?"macOS":"iPhone / iPad · PWA"}
+  else if(/android/.test(ua)){detected="android";label="Android"}
+  else if(/win/.test(platform+" "+ua)){detected="windows";label="Windows"}
+  else if(/linux/.test(platform+" "+ua)){detected="linux";label="Linux"}
+  document.getElementById("detectedPlatform").textContent=label;
+  const platformCards=[...document.querySelectorAll("[data-platform]")];
+  platformCards.forEach(c=>{c.classList.toggle("recommended",c.dataset.platform===detected);c.classList.remove("detected-primary")});
+  const detectedCard=platformCards.find(c=>c.dataset.platform===detected);
+  const platformGrid=document.querySelector(".grid");
+  if(detectedCard&&platformGrid){
+    detectedCard.classList.add("detected-primary");
+    platformGrid.prepend(detectedCard);
+  }
+  document.getElementById("macVersionTag").textContent="v"+version;
+
+  let names=new Set();
+  try{
+    const rel=await fetch(apiBase+tag,{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(r.status));
+    names=new Set((rel.assets||[]).map(a=>a.name));
+    document.getElementById("releaseState").textContent="Release "+tag+" vérifiée · "+names.size+" fichiers publiés · cache "+(info.cacheRevision||"—");
+  }catch{
+    document.getElementById("releaseState").textContent="Build "+version+" · vérification GitHub indisponible pour le moment.";
+  }
+
+  const assets=[...document.querySelectorAll("[data-asset]")];
+  for(const link of assets){
+    const name=link.dataset.asset.replaceAll("{v}",version);
+    if(names.has(name)){
+      link.href=releaseBase+"/download/"+tag+"/"+name;
+      link.classList.remove("disabled");
+      link.setAttribute("aria-disabled","false");
+    }else{
+      link.removeAttribute("href");
+      link.classList.add("disabled");
+      link.setAttribute("aria-disabled","true");
+      link.title="Build en cours de préparation";
+    }
+  }
+  const surfaceCopy={
+    designer:{title:"Designer",text:"L’atelier de création complet : tu construis le réseau de nodes, relies audio, vidéo, contrôle et logique, règles la timeline et prépares le projet.",note:"C’est la surface principale pour fabriquer et modifier un projet No[co]de."},
+    mobile:{title:"Mobile",text:"Une interface pensée pour le téléphone ou la tablette : gros contrôles tactiles, accès rapide et commandes utiles sans transporter l’interface complète du Designer.",note:"Le projet reste le même : seule la façon de le piloter change."},
+    regie:{title:"Régie",text:"La vue exploitation : déclencher, surveiller et piloter le spectacle avec une interface plus directe, conçue pour le live et moins chargée que l’espace de création.",note:"On prépare dans Designer, puis on exploite plus sereinement en Régie."},
+    plateau:{title:"Plateau",text:"Une surface simplifiée pour les besoins du plateau : accès aux actions et informations nécessaires sans exposer toute la construction technique du patch.",note:"Pratique pour donner un contrôle ciblé à une personne sur scène ou en coulisses."},
+    camera:{title:"Remote Camera",text:"Transforme un téléphone ou un appareil distant en caméra reliée au projet No[co]de, utilisable pour la vidéo, le suivi ou les interactions du réseau.",note:"Elle se connecte au même projet : pas besoin de reconstruire un système séparé."}
   };
-  for(const [id,name] of Object.entries(links)){const el=document.getElementById(id);if(el)el.href=asset(name)}
-  document.querySelector("#versionBadge span:last-child").textContent="Version actuelle : "+version;
-  document.getElementById("buildInfo").textContent=info?("Build "+version+" · "+(info.files||"?")+" fichiers · cache "+(info.cacheRevision||"—")):"Version "+version;
+  const surfaceDialog=document.getElementById("surfaceHelp");
+  const surfaceTitle=document.getElementById("surfaceHelpTitle");
+  const surfaceText=document.getElementById("surfaceHelpText");
+  const surfaceNote=document.getElementById("surfaceHelpNote");
+  document.querySelectorAll("[data-surface-help]").forEach(button=>button.addEventListener("click",()=>{
+    const copy=surfaceCopy[button.dataset.surfaceHelp];if(!copy)return;
+    surfaceTitle.textContent=copy.title;surfaceText.textContent=copy.text;surfaceNote.textContent=copy.note;
+    if(typeof surfaceDialog.showModal==="function")surfaceDialog.showModal();else surfaceDialog.setAttribute("open","");
+  }));
+  surfaceDialog.querySelector(".surface-help-close").addEventListener("click",()=>surfaceDialog.close());
+  surfaceDialog.addEventListener("click",event=>{if(event.target===surfaceDialog)surfaceDialog.close()});
+
+  const macReady=assets.filter(a=>a.id==="macUniversalDmg"||a.id==="macUniversalZip").some(a=>!a.classList.contains("disabled"));
+  const macStatus=document.getElementById("macStatus");
+  macStatus.classList.toggle("building",!macReady);
+  macStatus.querySelector("span").textContent=macReady?"Stable · Universal":"Universal en préparation";
 })();
 </script>
 </body>
