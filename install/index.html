@@ -65,7 +65,7 @@ a{color:inherit}.shell{width:min(1180px,94vw);margin:auto;padding:28px 0 72px}
 <article class="card">
 <div class="os"><strong>Android</strong><span class="badge">APK + AAB</span></div>
 <p>Interface mobile dédiée, capteurs, conduite et surfaces distantes. L’APK sert aux tests directs ; l’AAB est destiné à Google Play.</p>
-<div class="actions"><a id="androidApk" class="btn sage" href="#">APK test</a><a id="androidAab" class="btn" href="#">AAB Play</a></div>
+<div class="actions"><a id="androidApk" class="btn sage" href="#">APK test</a><a id="androidAab" class="btn" href="#">AAB Google Play · à signer</a></div>
 <div class="steps"><b>APK direct</b><ol><li>Télécharge l’APK depuis GitHub Releases.</li><li>Android peut demander l’autorisation d’installer depuis cette source.</li><li>Pour la diffusion publique, privilégier la version Google Play lorsqu’elle est disponible.</li></ol></div>
 </article>
 
@@ -111,7 +111,7 @@ a{color:inherit}.shell{width:min(1180px,94vw);margin:auto;padding:28px 0 72px}
     linuxDeb:"No-de-Vibe-Designer-{v}-Linux-x64.deb",
     linuxTar:"No-de-Vibe-Designer-{v}-Linux-x64.tar.gz",
     androidApk:"No-de-Vibe-Designer-{v}-Android-debug.apk",
-    androidAab:"No-de-Vibe-Designer-{v}-play.aab"
+    androidAab:"No-de-Vibe-Designer-{v}-unsigned.aab"
   };
   for(const [id,name] of Object.entries(links)){const el=document.getElementById(id);if(el)el.href=asset(name)}
   document.querySelector("#versionBadge span:last-child").textContent="Version actuelle : "+version;
