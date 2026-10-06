@@ -141,15 +141,39 @@ jobs:
           set -euo pipefail
           npx electron-builder --mac dir --arm64 --publish never
           npx electron-builder --mac dir --x64 --publish never
+          npx electron-builder --mac dir --universal --publish never
           ARM_APP="dist/mac-arm64/No-de Vibe Designer.app"
           X64_APP="dist/mac/No-de Vibe Designer.app"
+          UNI_APP="dist/mac-universal/No-de Vibe Designer.app"
           test -d "$ARM_APP"
           test -d "$X64_APP"
+          test -d "$UNI_APP"
           codesign --force --deep --sign - "$ARM_APP"
           codesign --force --deep --sign - "$X64_APP"
+          codesign --force --deep --sign - "$UNI_APP"
           codesign --verify --deep --strict "$ARM_APP"
           codesign --verify --deep --strict "$X64_APP"
+          codesign --verify --deep --strict "$UNI_APP"
+          lipo -info "$UNI_APP/Contents/MacOS/No-de Vibe Designer" | grep -q "arm64"
+          lipo -info "$UNI_APP/Contents/MacOS/No-de Vibe Designer" | grep -q "x86_64"
           mkdir -p release-assets
+
+          UNI_STAGE="$RUNNER_TEMP/no-de-universal"
+          rm -rf "$UNI_STAGE"; mkdir -p "$UNI_STAGE"
+          cp -R "$UNI_APP" "$UNI_STAGE/No-de Vibe Designer.app"
+          printf '%s\n' \
+            "No-de Vibe Designer $APP_VERSION · Universal" \
+            "Application universelle Apple Silicon + Intel." \
+            "Build ad-hoc signé, sans abonnement Apple Developer." \
+            "Si macOS bloque le premier lancement :" \
+            "1. tente une ouverture normale ;" \
+            "2. Réglages Système > Confidentialité et sécurité > Ouvrir quand même." \
+            "Aucune commande Terminal n'est nécessaire." \
+            > "$UNI_STAGE/À LIRE - PREMIER LANCEMENT.txt"
+          ditto -c -k --sequesterRsrc --keepParent "$UNI_STAGE/No-de Vibe Designer.app" "release-assets/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.zip"
+          UNI_DMG="release-assets/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.dmg"
+          hdiutil create -volname "No-de Vibe Designer $APP_VERSION Universal" -srcfolder "$UNI_STAGE" -ov -format UDZO "$UNI_DMG"
+
           for ARCH in arm64 x64; do
             if [ "$ARCH" = "arm64" ]; then APP="$ARM_APP"; else APP="$X64_APP"; fi
             STAGE="$RUNNER_TEMP/no-de-$ARCH"

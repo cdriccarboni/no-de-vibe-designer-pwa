@@ -25,6 +25,10 @@ const libraryDesktopHtml = fs.readFileSync(new URL("../desktop/index.html", impo
 const libraryDesktopApp = fs.readFileSync(new URL("../desktop/app.js", import.meta.url), "utf8");
 assert(/id=["']libraryList["']/.test(libraryDesktopHtml), "Designer mounts the Library list");
 assert(/id=["']search["']/.test(libraryDesktopHtml), "Designer mounts the Library search");
+assert(/data-pref-tab=["']install["']/.test(libraryDesktopHtml), "Designer exposes Installer from Preferences");
+const installerHtml = fs.readFileSync(new URL("../install/index.html", import.meta.url), "utf8");
+assert(installerHtml.includes("macOS Universal"), "Installer prioritizes macOS Universal");
+assert(installerHtml.includes("No-de-Vibe-Designer-{v}-macOS-universal.dmg"), "Installer targets Universal DMG");
 assert(libraryDesktopApp.includes("NVD_LIBRARY_BOOTSTRAP_GUARD"), "Designer has the early Library bootstrap guard");
 assert(libraryDesktopApp.indexOf("NVD_LIBRARY_BOOTSTRAP_GUARD") < libraryDesktopApp.indexOf("function startEngineDownload"), "Library bootstrap runs before secondary Designer startup");
 assert(SURFACES.length === 5, "five switchable No-de surfaces are available");

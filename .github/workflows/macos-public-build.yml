@@ -75,7 +75,10 @@ jobs:
                 "mobile/**/*",
                 "studio/**/*",
                 "companion/**/*",
+                "show/**/*",
                 "manuel/**/*",
+                "install/**/*",
+                "src/**/*",
                 "icons/**/*",
                 "index.html",
                 "manifest.webmanifest",
@@ -85,7 +88,7 @@ jobs:
               "mac": {
                 "category": "public.app-category.graphics-design",
                 "identity": null,
-                "target": [{"target":"dir","arch":["arm64"]}]
+                "target": [{"target":"dir","arch":["universal"]}]
               }
             }
           }
@@ -205,8 +208,8 @@ jobs:
 
           npm install --no-audit --no-fund
 
-      - name: Build unpacked Apple Silicon app
-        run: npx electron-builder --mac dir --arm64 --publish never
+      - name: Build unpacked Universal macOS app
+        run: npx electron-builder --mac dir --universal --publish never
 
       - name: Detect Apple Developer ID configuration
         shell: bash
@@ -246,7 +249,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APP_DIR="dist/mac-arm64/No-de Vibe Designer.app"
+          APP_DIR="dist/mac-universal/No-de Vibe Designer.app"
 
           test -d "$APP_DIR"
           xattr -cr "$APP_DIR" || true
@@ -263,7 +266,8 @@ jobs:
 
           MAIN_BIN="$APP_DIR/Contents/MacOS/No-de Vibe Designer"
           file "$MAIN_BIN" | tee macos-architecture.txt
-          file "$MAIN_BIN" | grep -qi "arm64"
+          lipo -info "$MAIN_BIN" | grep -q "arm64"
+          lipo -info "$MAIN_BIN" | grep -q "x86_64"
 
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_DIR/Contents/Info.plist" | grep -qx "fr.acousmatic.nodevibedesigner"
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_DIR/Contents/Info.plist" | grep -qx "$APP_VERSION"
@@ -273,7 +277,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APP_DIR="dist/mac-arm64/No-de Vibe Designer.app"
+          APP_DIR="dist/mac-universal/No-de Vibe Designer.app"
           NOTARY_ZIP="$RUNNER_TEMP/No-de-Vibe-Designer-notary.zip"
 
           ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$NOTARY_ZIP"
@@ -290,7 +294,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APP_DIR="dist/mac-arm64/No-de Vibe Designer.app"
+          APP_DIR="dist/mac-universal/No-de Vibe Designer.app"
           LOG="$RUNNER_TEMP/no-de-startup.log"
 
           ELECTRON_ENABLE_LOGGING=1 "$APP_DIR/Contents/MacOS/No-de Vibe Designer" >"$LOG" 2>&1 &
@@ -312,9 +316,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          APP_DIR="dist/mac-arm64/No-de Vibe Designer.app"
-          ZIP="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"
-          DMG="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"
+          APP_DIR="dist/mac-universal/No-de Vibe Designer.app"
+          ZIP="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.zip"
+          DMG="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.dmg"
           STAGE="$RUNNER_TEMP/no-de-dmg"
 
           rm -rf "$STAGE" "$ZIP" "$DMG"
@@ -341,8 +345,8 @@ jobs:
 
           TMP_ZIP="$RUNNER_TEMP/no-de-zip-check"
           TMP_DMG="$RUNNER_TEMP/no-de-dmg-check"
-          ZIP="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"
-          DMG="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"
+          ZIP="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.zip"
+          DMG="dist/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.dmg"
 
           rm -rf "$TMP_ZIP" "$TMP_DMG"
           mkdir -p "$TMP_ZIP" "$TMP_DMG"
@@ -350,32 +354,34 @@ jobs:
           ditto -x -k "$ZIP" "$TMP_ZIP"
           ZIP_APP="$TMP_ZIP/No-de Vibe Designer.app"
           codesign --verify --deep --strict --verbose=2 "$ZIP_APP"
-          file "$ZIP_APP/Contents/MacOS/No-de Vibe Designer" | grep -qi "arm64"
+          lipo -info "$ZIP_APP/Contents/MacOS/No-de Vibe Designer" | grep -q "arm64"
+          lipo -info "$ZIP_APP/Contents/MacOS/No-de Vibe Designer" | grep -q "x86_64"
 
           MOUNT_POINT="$(hdiutil attach "$DMG" -readonly -nobrowse | tail -1 | awk '{for(i=3;i<=NF;i++) printf "%s%s",$i,(i<NF?OFS:"") }')"
           test -d "$MOUNT_POINT/No-de Vibe Designer.app"
           codesign --verify --deep --strict --verbose=2 "$MOUNT_POINT/No-de Vibe Designer.app"
-          file "$MOUNT_POINT/No-de Vibe Designer.app/Contents/MacOS/No-de Vibe Designer" | grep -qi "arm64"
+          lipo -info "$MOUNT_POINT/No-de Vibe Designer.app/Contents/MacOS/No-de Vibe Designer" | grep -q "arm64"
+          lipo -info "$MOUNT_POINT/No-de Vibe Designer.app/Contents/MacOS/No-de Vibe Designer" | grep -q "x86_64"
           hdiutil detach "$MOUNT_POINT"
 
       - name: Prepare stable aliases and checksums
         shell: bash
         run: |
           set -euo pipefail
-          cp "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip" "dist/No-de-Vibe-Designer-macOS-arm64.zip"
-          cp "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg" "dist/No-de-Vibe-Designer-macOS-arm64.dmg"
+          cp "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.zip" "dist/No-de-Vibe-Designer-macOS-universal.zip"
+          cp "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.dmg" "dist/No-de-Vibe-Designer-macOS-universal.dmg"
 
           cd dist
-          shasum -a 256             "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"             "No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"             "No-de-Vibe-Designer-macOS-arm64.zip"             "No-de-Vibe-Designer-macOS-arm64.dmg"             > SHA256SUMS-macOS.txt
+          shasum -a 256             "No-de-Vibe-Designer-$APP_VERSION-macOS-universal.zip"             "No-de-Vibe-Designer-$APP_VERSION-macOS-universal.dmg"             "No-de-Vibe-Designer-macOS-universal.zip"             "No-de-Vibe-Designer-macOS-universal.dmg"             > SHA256SUMS-macOS.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: No-de-Vibe-Designer-${{ env.APP_VERSION }}-macOS-arm64
+          name: No-de-Vibe-Designer-${{ env.APP_VERSION }}-macOS-universal
           path: |
-            dist/No-de-Vibe-Designer-${{ env.APP_VERSION }}-macOS-arm64.zip
-            dist/No-de-Vibe-Designer-${{ env.APP_VERSION }}-macOS-arm64.dmg
-            dist/No-de-Vibe-Designer-macOS-arm64.zip
-            dist/No-de-Vibe-Designer-macOS-arm64.dmg
+            dist/No-de-Vibe-Designer-${{ env.APP_VERSION }}-macOS-universal.zip
+            dist/No-de-Vibe-Designer-${{ env.APP_VERSION }}-macOS-universal.dmg
+            dist/No-de-Vibe-Designer-macOS-universal.zip
+            dist/No-de-Vibe-Designer-macOS-universal.dmg
             dist/SHA256SUMS-macOS.txt
             macos-architecture.txt
             macos-signing.txt
@@ -404,8 +410,8 @@ jobs:
             return 1
           }
 
-          upload_asset "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.zip"
-          upload_asset "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-arm64.dmg"
-          upload_asset "dist/No-de-Vibe-Designer-macOS-arm64.zip"
-          upload_asset "dist/No-de-Vibe-Designer-macOS-arm64.dmg"
+          upload_asset "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.zip"
+          upload_asset "dist/No-de-Vibe-Designer-$APP_VERSION-macOS-universal.dmg"
+          upload_asset "dist/No-de-Vibe-Designer-macOS-universal.zip"
+          upload_asset "dist/No-de-Vibe-Designer-macOS-universal.dmg"
           upload_asset "dist/SHA256SUMS-macOS.txt"

@@ -44,7 +44,7 @@
 <div id="app">
   <header class="topbar">
     <div class="brand"><div><b>No<span class="co">[co]</span>de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v3.3.2</span>
+    <span class="badge">v3.3.3</span>
     <span id="showLockBadge" class="show-lock-badge" role="status" aria-live="polite" hidden>Spectacle verrouillé</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
@@ -186,6 +186,7 @@
     <div class="preferences-head"><b>Préférences</b><button id="preferencesClose" type="button">×</button></div>
     <div class="preferences-tabs">
       <button type="button" data-pref-tab="general" class="active">Général</button>
+      <button type="button" data-pref-tab="install">Installer</button>
       <button type="button" data-pref-tab="appearance">Interface</button>
       <button type="button" data-pref-tab="canvas">Patch Canvas</button>
       <button type="button" data-pref-tab="ai">IA / Vibe</button>
@@ -202,6 +203,19 @@
         <label>Charger l’exemple WOW interactif si projet vide <input id="prefLoadDemo" type="checkbox" checked></label>
         <label>Mode technique <input id="prefTechnicalMode" type="checkbox"></label>
         <div id="backendReport" class="hint"></div>
+      </div>
+      <div data-pref-panel="install" class="hidden">
+        <div class="install-pref-card">
+          <div class="install-pref-kicker">NO[CO]DE · UNIVERSAL</div>
+          <h3>Installer No[co]de sur cette machine</h3>
+          <p>Une seule base de projet, plusieurs enveloppes. La version macOS Universal est prioritaire pour la création et la régie ; Windows, Linux, Android et la PWA restent disponibles depuis la même page.</p>
+          <div class="install-pref-tags"><span>macOS Universal</span><span>DMG + ZIP</span><span>Windows</span><span>Linux</span><span>Android</span><span>Web/PWA</span></div>
+          <div class="install-pref-actions">
+            <a class="smallbtn primary-link" href="../install/#macos">Installer / mettre à jour</a>
+            <a class="smallbtn" href="../install/">Voir toutes les plateformes</a>
+          </div>
+          <p class="hint">Les boutons de téléchargement ne sont activés sur la page Installer que lorsque le fichier correspondant existe réellement dans la release GitHub courante.</p>
+        </div>
       </div>
       <div data-pref-panel="appearance" class="hidden">
         <label>Couleur dominante <input id="accentColor" type="color" value="#d7b86a"></label>
