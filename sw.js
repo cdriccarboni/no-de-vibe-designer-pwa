@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.1-multi-31dbd87fbf";
+const CACHE = "nvd-3.3.1-multi-a4e73d76b3";
 const ASSETS = [
   "./src/core/StageSafety.js",
   "./companion/companion.css",
@@ -155,7 +155,11 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await cache.addAll(ASSETS);
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", (event) => {
@@ -196,11 +200,28 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const critical = req.destination === "script"
+    || req.destination === "style"
+    || url.pathname.endsWith(".json")
+    || url.pathname.endsWith(".webmanifest");
+
   event.respondWith((async () => {
-    const cached = await caches.match(req);
+    const cache = await caches.open(CACHE);
+    if (critical) {
+      try {
+        const fresh = await fetch(req, { cache: "no-store" });
+        cache.put(req, fresh.clone());
+        return fresh;
+      } catch {
+        const cached = await cache.match(req);
+        if (cached) return cached;
+        return new Response("Hors ligne", { status: 503 });
+      }
+    }
+
+    const cached = await cache.match(req);
     if (cached) return cached;
     const fresh = await fetch(req);
-    const cache = await caches.open(CACHE);
     cache.put(req, fresh.clone());
     return fresh;
   })());
