@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>NSCameraUsageDescription</key><string>ART utilise la caméra uniquement lorsque vous ouvrez un outil caméra.</string>
+<key>NSMicrophoneUsageDescription</key><string>ART utilise le microphone uniquement pour les outils audio et intercom.</string>
+<key>NSLocalNetworkUsageDescription</key><string>ART accède au réseau local pour les outils de régie qui communiquent avec les appareils du plateau.</string>
+</dict></plist>
