@@ -19,7 +19,7 @@ main{width:min(980px,94vw);padding:30px;border:1px solid #2a3036;border-radius:2
 .status{font-size:13px;color:#aab2b8;margin:0 0 16px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .card{display:flex;flex-direction:column;gap:5px;padding:16px;border:1px solid #333b42;border-radius:13px;background:#181c20;color:#edf0f2;text-decoration:none}
 .card:hover,.card:focus{border-color:#d7b86a;outline:none}.card b{font-size:17px}.card span{color:#98a1a8;font-size:12px;line-height:1.4}
-.note{margin-top:18px;color:#788189;font-size:11px;line-height:1.5}.auto{border-color:#52605d}.installer-card{grid-column:1/-1}.copyright-link{color:inherit;text-decoration:none}.copyright-link .copyright-hover{display:none}.copyright-link:hover .copyright-default,.copyright-link:focus-visible .copyright-default{display:none}.copyright-link:hover .copyright-hover,.copyright-link:focus-visible .copyright-hover{display:inline}.copyright-link:hover,.copyright-link:focus-visible{color:#d7b86a}
+.note{margin-top:18px;color:#788189;font-size:11px;line-height:1.5}.github-link{display:inline-block;margin-top:4px;color:#8f989f;text-decoration:none}.github-link:hover,.github-link:focus-visible{color:#d7b86a;outline:none}.auto{border-color:#52605d}.installer-card{grid-column:1/-1}.copyright-link{color:inherit;text-decoration:none}.copyright-link .copyright-hover{display:none}.copyright-link:hover .copyright-default,.copyright-link:focus-visible .copyright-default{display:none}.copyright-link:hover .copyright-hover,.copyright-link:focus-visible .copyright-hover{display:inline}.copyright-link:hover,.copyright-link:focus-visible{color:#d7b86a}
 @media(max-width:700px){main{padding:18px}.grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -38,7 +38,7 @@ main{width:min(980px,94vw);padding:30px;border:1px solid #2a3036;border-radius:2
     <a id="autoLink" class="card auto" href="./?auto=1&chooser=1"><b>Auto</b><span>Ordinateur → Designer · téléphone/tablette → Mobile. Le choix manuel reste toujours disponible.</span></a>
     <a class="card installer-card" href="./install/" style="border-color:#5b5033"><b>Installer / Télécharger</b><span>Web/PWA · macOS · Windows · Linux · Android — une seule base, plusieurs enveloppes.</span></a>
   </div>
-  <div class="note">Une même machine peut prendre n’importe quel rôle. Choisis simplement l’interface à ouvrir.</div>
+  <div class="note">Une même machine peut prendre n’importe quel rôle. Choisis simplement l’interface à ouvrir.<br><a class="github-link" href="https://github.com/cdriccarboni/no-de-vibe-designer-pwa" target="_blank" rel="noopener noreferrer">GitHub ↗</a></div>
 </main>
 <script>
 const KEY="nvd.surface.preference";
