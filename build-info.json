@@ -1,9 +1,9 @@
 {
   "name": "No[co]de Vibe Designer",
-  "version": "3.3.4",
-  "builtAt": "2026-10-06T07:50:44.000Z",
+  "version": "3.3.5",
+  "builtAt": "2026-10-06T07:57:30.000Z",
   "files": 147,
-  "cacheRevision": "3.3.4-update-popup",
+  "cacheRevision": "3.3.5-multi-update-popup",
   "surfaces": [
     "designer",
     "show",
@@ -12,5 +12,5 @@
     "plateau",
     "camera"
   ],
-  "sourceCommit": "bc452e045abcd81c1f8e7a0644e333f962a1a321"
+  "sourceCommit": "6180a88c8fa8f72892a9512fee46478f6a283ba1"
 }
