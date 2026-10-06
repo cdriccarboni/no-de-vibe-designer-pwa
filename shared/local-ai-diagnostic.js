@@ -39,7 +39,7 @@ export function classifyLocalAiFailure(facts = {}) {
     || /model ['"]?.+['"]? not found/i.test(message);
   const fetchFailed = /failed to fetch|fetch failed|networkerror|network error|load failed|econnreset|enotfound|ehostunreach|etimedout|socket hang up/i.test(message)
     || ["ENOTFOUND", "EHOSTUNREACH", "ETIMEDOUT", "ECONNRESET", "UND_ERR_CONNECT_TIMEOUT"].includes(code);
-  const mixed = (page === "https:" || facts.securePage === true) && target === "http:";
+  const mixed = facts.localTarget !== true && (page === "https:" || facts.securePage === true) && target === "http:";
   const hasSignal = mixed || modelMissing || corsBlocked || connectionRefused || aborted || fetchFailed || status >= 400 || !!message;
   if (!hasSignal) return null;
 
