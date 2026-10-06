@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-google-oauth-system-browser"
+description = "Autorise uniquement le pont OAuth Google vers le navigateur système."
+commands.allow = ["google_oauth_system_browser"]
