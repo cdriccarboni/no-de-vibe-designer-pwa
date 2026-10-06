@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.1-multi-01e97ecf96";
+const CACHE = "nvd-3.3.1-multi-31dbd87fbf";
 const ASSETS = [
   "./src/core/StageSafety.js",
   "./companion/companion.css",
@@ -25,6 +25,7 @@ const ASSETS = [
   "./icons/icon-maskable-192.png",
   "./icons/icon-maskable-512.png",
   "./index.html",
+  "./install/index.html",
   "./manifest.webmanifest",
   "./manuel/captures/patch-camera-shader.svg",
   "./manuel/captures/ui-overview.svg",
