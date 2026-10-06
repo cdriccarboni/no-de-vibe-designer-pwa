@@ -1,3 +1,4 @@
+import { installUpdateNotice } from "./update-notice.js";
 /**
  * No-de Surface Switcher
  * Une même machine peut devenir Designer, interface mobile, régie tablette,
@@ -8,6 +9,7 @@ export const SURFACE_PREF_KEY = "nvd.surface.preference";
 
 export const SURFACES = Object.freeze([
   { id:"designer", label:"Designer", detail:"Canvas · Library · Timeline · Vibe", path:"desktop/index.html" },
+  { id:"show", label:"Show", detail:"Conduite · cues · timeline · scène", path:"show/index.html?surface=show" },
   { id:"mobile", label:"Mobile", detail:"Interface compacte · capteurs · conduite", path:"mobile/index.html" },
   { id:"regie", label:"Régie", detail:"Companion Studio · pages personnalisables", path:"studio/index.html?surface=regie" },
   { id:"plateau", label:"Plateau", detail:"Companion Studio directement en mode Plateau", path:"studio/index.html?surface=plateau" },
@@ -111,6 +113,7 @@ export function installSurfaceSwitcher({current="designer",label="Interface"}={}
   document.addEventListener("click",(e)=>{if(!wrap.contains(e.target))close();});
   document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   document.body.appendChild(wrap);
+  queueMicrotask(()=>installUpdateNotice());
 }
 
 
@@ -118,7 +121,6 @@ export function installSurfaceSwitcher({current="designer",label="Interface"}={}
 export function getSurfaceList() {
   return [
     ...SURFACES.map(s => ({ id:s.id, label:s.label, url:"/" + s.path })),
-    { id:"show", label:"Show", url:"/show/index.html?surface=show" },
     { id:"auto", label:"Auto", url:"/index.html?auto=1" }
   ];
 }

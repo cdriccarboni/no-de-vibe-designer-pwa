@@ -29,6 +29,11 @@ assert(/data-pref-tab=["']install["']/.test(libraryDesktopHtml), "Designer expos
 const installerHtml = fs.readFileSync(new URL("../install/index.html", import.meta.url), "utf8");
 assert(installerHtml.includes("macOS Universal"), "Installer prioritizes macOS Universal");
 assert(installerHtml.includes("No-de-Vibe-Designer-{v}-macOS-universal.dmg"), "Installer targets Universal DMG");
+const updateNoticeJs = fs.readFileSync(new URL("../shared/update-notice.js", import.meta.url), "utf8");
+assert(updateNoticeJs.includes("MISE À JOUR NO[CO]DE"), "Global update popup is present");
+assert(updateNoticeJs.includes("APP_VERSION"), "Update popup follows the shared version");
+assert(updateNoticeJs.includes("../install/"), "Update popup links to Installer");
+assert(fs.readFileSync(new URL("../show/show.js", import.meta.url), "utf8").includes('installSurfaceSwitcher({ current:"show" })'), "Show receives shared surface/update UI");
 assert(libraryDesktopApp.includes("NVD_LIBRARY_BOOTSTRAP_GUARD"), "Designer has the early Library bootstrap guard");
 assert(libraryDesktopApp.indexOf("NVD_LIBRARY_BOOTSTRAP_GUARD") < libraryDesktopApp.indexOf("function startEngineDownload"), "Library bootstrap runs before secondary Designer startup");
 assert(SURFACES.length === 5, "five switchable No-de surfaces are available");

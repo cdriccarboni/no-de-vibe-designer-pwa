@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.3-multi-installer-mac-universal";
+const CACHE = "nvd-3.3.4-update-popup";
 const ASSETS = [
   "./src/core/StageSafety.js",
   "./companion/companion.css",
@@ -137,6 +137,7 @@ const ASSETS = [
   "./shared/subpatch.js",
   "./shared/supernodes-v3.js",
   "./shared/surface-switcher.js",
+  "./shared/update-notice.js",
   "./shared/vendor/libpd/LICENSE.txt",
   "./shared/vendor/libpd/libpd.js",
   "./shared/vendor/libpd/libpd.wasm",

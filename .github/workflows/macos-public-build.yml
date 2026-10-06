@@ -157,7 +157,7 @@ jobs:
               });
 
               server.on("error", reject);
-              server.listen(0, "127.0.0.1", () => resolve(server.address().port));
+              server.listen(17654, "127.0.0.1", () => resolve(server.address().port));
             });
           }
 
@@ -198,7 +198,7 @@ jobs:
             });
           }
 
-          app.whenReady().then(createWindow);
+          if (app.requestSingleInstanceLock()) app.whenReady().then(createWindow); else app.quit();
 
           app.on("window-all-closed", () => {
             try { server?.close(); } catch {}

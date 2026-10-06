@@ -1,9 +1,9 @@
 {
   "name": "No[co]de Vibe Designer",
-  "version": "3.3.3",
-  "builtAt": "2026-10-06T07:40:00.000Z",
+  "version": "3.3.4",
+  "builtAt": "2026-10-06T07:50:44.000Z",
   "files": 147,
-  "cacheRevision": "3.3.3-installer-mac-universal",
+  "cacheRevision": "3.3.4-update-popup",
   "surfaces": [
     "designer",
     "show",
@@ -12,5 +12,5 @@
     "plateau",
     "camera"
   ],
-  "sourceCommit": "2ca4f69386515bc483e225f465371eedcc5aace3"
+  "sourceCommit": "bc452e045abcd81c1f8e7a0644e333f962a1a321"
 }
