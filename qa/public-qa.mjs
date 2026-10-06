@@ -21,12 +21,12 @@ console.log(`No-de Vibe Designer public QA ${APP_VERSION}`);
 
 const publicBuildInfo = JSON.parse(fs.readFileSync(new URL("../build-info.json", import.meta.url), "utf8"));
 assert(publicBuildInfo.version === APP_VERSION, `runtime version matches build-info (${APP_VERSION})`);
-const desktopHtml = fs.readFileSync(new URL("../desktop/index.html", import.meta.url), "utf8");
-const desktopApp = fs.readFileSync(new URL("../desktop/app.js", import.meta.url), "utf8");
-assert(/id=["']libraryList["']/.test(desktopHtml), "Designer mounts the Library list");
-assert(/id=["']search["']/.test(desktopHtml), "Designer mounts the Library search");
-assert(desktopApp.includes("NVD_LIBRARY_BOOTSTRAP_GUARD"), "Designer has the early Library bootstrap guard");
-assert(desktopApp.indexOf("NVD_LIBRARY_BOOTSTRAP_GUARD") < desktopApp.indexOf("function startEngineDownload"), "Library bootstrap runs before secondary Designer startup");
+const libraryDesktopHtml = fs.readFileSync(new URL("../desktop/index.html", import.meta.url), "utf8");
+const libraryDesktopApp = fs.readFileSync(new URL("../desktop/app.js", import.meta.url), "utf8");
+assert(/id=["']libraryList["']/.test(libraryDesktopHtml), "Designer mounts the Library list");
+assert(/id=["']search["']/.test(libraryDesktopHtml), "Designer mounts the Library search");
+assert(libraryDesktopApp.includes("NVD_LIBRARY_BOOTSTRAP_GUARD"), "Designer has the early Library bootstrap guard");
+assert(libraryDesktopApp.indexOf("NVD_LIBRARY_BOOTSTRAP_GUARD") < libraryDesktopApp.indexOf("function startEngineDownload"), "Library bootstrap runs before secondary Designer startup");
 assert(SURFACES.length === 5, "five switchable No-de surfaces are available");
 const surfaceMem = new Map();
 const surfaceStorage = {
