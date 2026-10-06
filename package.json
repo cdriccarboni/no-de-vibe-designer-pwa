@@ -28,7 +28,10 @@
     "release:check": "npm run audit:production && npm test && npm run check && npm run build:pwa",
     "android:aab": "node scripts/build-android.mjs --aab",
     "deploy:pwa": "node scripts/deploy-pwa.mjs",
-    "audit:production": "node tests/run.mjs"
+    "audit:production": "node tests/run.mjs",
+    "dist:mac:universal": "electron-builder --mac dir --arm64 --x64",
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:linux": "electron-builder --linux AppImage deb tar.gz --x64"
   },
   "build": {
     "appId": "fr.acousmatic.nodevibedesigner",
@@ -49,6 +52,7 @@
       "studio/**/*",
       "companion/**/*",
       "bridge/**/*",
+      "install/**/*",
       "index.html",
       "package.json"
     ],
@@ -65,13 +69,8 @@
         {
           "target": "dir",
           "arch": [
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "arm64"
+            "arm64",
+            "x64"
           ]
         }
       ],
@@ -86,17 +85,46 @@
     "linux": {
       "target": [
         {
-          "target": "zip",
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
           "arch": [
             "x64"
           ]
         }
       ],
       "category": "Graphics",
-      "artifactName": "No-de-Vibe-Designer-${version}-${arch}-linux.${ext}"
+      "artifactName": "No-de-Vibe-Designer-${version}-Linux-${arch}.${ext}"
     },
     "asar": true,
-    "backgroundColor": "#090d16"
+    "backgroundColor": "#090d16",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "No-de-Vibe-Designer-${version}-Windows-${arch}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.2",
