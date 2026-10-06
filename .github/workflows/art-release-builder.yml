@@ -55,8 +55,8 @@ jobs:
           codesign -dv --verbose=4 "$APP" 2>&1 | tee /tmp/art-codesign.txt
           open "$APP"
           sleep 8
-          pgrep -f "$BIN" >/dev/null
-          pkill -f "$BIN" || true
+          pgrep -x "ART" >/dev/null
+          pkill -x "ART" || true
       - name: Build Apple Silicon
         run: npx tauri build --target aarch64-apple-darwin --bundles dmg
       - name: Validate Apple Silicon
