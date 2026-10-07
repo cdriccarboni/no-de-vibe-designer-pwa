@@ -56,3 +56,43 @@ jobs:
       - name: Deploy Cloudflare Pages
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
         run: npx --yes wrangler@4 pages deploy dist/pwa --project-name=no-de-vibe-designer --branch=main --commit-dirty=true
+
+
+  publish-github-pages-repo:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      NVD_PWA_PUBLISH_TOKEN: ${{ secrets.NVD_PWA_PUBLISH_TOKEN }}
+      NVD_PWA_PUBLISH_REPO: https://github.com/cdriccarboni/no-de-vibe-designer-pwa.git
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: no-de-pwa
+          path: dist/pwa
+      - name: Publish GitHub Pages mirror
+        if: ${{ env.NVD_PWA_PUBLISH_TOKEN != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          AUTH_REPO="https://x-access-token:${NVD_PWA_PUBLISH_TOKEN}@github.com/cdriccarboni/no-de-vibe-designer-pwa.git"
+          WORK="$(mktemp -d)"
+          git clone --depth 1 "$AUTH_REPO" "$WORK"
+          for entry in desktop mobile studio companion show shared src manuel icons install index.html manifest.webmanifest sw.js build-info.json; do
+            rm -rf "$WORK/$entry"
+          done
+          cp -R dist/pwa/. "$WORK/"
+          touch "$WORK/.nojekyll"
+          VERSION="$(node -p "require('./package.json').version")"
+          printf '# No[co]de Vibe Designer — public PWA\n\nBuilt artifacts only. Source: private `no-de-vibe-designer`.\n\n- Public URL: https://cdriccarboni.github.io/no-de-vibe-designer-pwa/\n- Version: %s\n' "$VERSION" > "$WORK/README.md"
+          git -C "$WORK" add -A
+          if ! git -C "$WORK" diff --cached --quiet; then
+            git -C "$WORK" -c user.name=cdriccarboni -c user.email=cdriccarboni@users.noreply.github.com commit -m "deploy: No[co]de Vibe Designer PWA $VERSION"
+            git -C "$WORK" push origin HEAD:main
+          fi
+      - name: Publish token not configured
+        if: ${{ env.NVD_PWA_PUBLISH_TOKEN == '' }}
+        run: echo "NVD_PWA_PUBLISH_TOKEN absent — Cloudflare remains the automatic deployment path."
