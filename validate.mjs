@@ -55,5 +55,6 @@ const preset=createRegiePreset("radio");
 assert(preset.pages.some(p=>(p.widgets||[]).some(w=>w.binding?.kind==="broadcast")),"Companion radio preset present");
 
 console.log("VALIDATION_OK",files.length,"js files checked");
+if (process.env.CI) process.exit(0);
 const port=Number(process.env.PORT)||8080;
 http.createServer((req,res)=>{res.writeHead(200,{"content-type":"application/json"});res.end(JSON.stringify({ok:true,validation:"NVD radio safe"}));}).listen(port,"0.0.0.0",()=>console.log("LISTEN",port));
