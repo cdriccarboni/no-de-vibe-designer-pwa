@@ -90,12 +90,93 @@ let imageVibeState = { analysis:null, previewUrl:"" };
 let agentAutoScanAttempted = false;
 let rcSession = null;
 const DEMO_DISMISSED_KEY = `nvd.demo.dismissed.${APP_VERSION}`;
+const VIBE_DRAFT_KEY = "nvd.vibe.last-prompt";
+const CX_DRAFT_KEY = "nvd.cx.last-prompt";
 let demoReturnProject = null;
 
-function setDemoBanner(active) {
+function savePromptDraft(key, value) {
+  try { localStorage.setItem(key, String(value || "")); } catch { /* storage unavailable */ }
+}
+
+function restorePromptDraft(selector, key) {
+  const field = $(selector);
+  if (!field || field.value) return;
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) field.value = saved;
+  } catch { /* storage unavailable */ }
+}
+
+const RADIO_PAIR_URL = "https://radio-relay-production.up.railway.app/pair";
+const RADIO_PUBLIC_URL = "https://art.acousmatic-theatre.fr/radio-paillettes/en-ligne";
+const RADIO_OWNER_KEY = "nvd.radio.owner";
+
+function readRadioOwner() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RADIO_OWNER_KEY) || "null");
+    if (!parsed?.publishToken || !parsed?.publishEndpoint) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function pairRadioOwner(pin) {
+  const code = String(pin || "").trim();
+  if (!code) throw new Error("Code régie requis");
+  const response = await fetch(RADIO_PAIR_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pin: code })
+  });
+  if (!response.ok) throw new Error(response.status === 401 ? "Code régie incorrect" : `Appairage radio HTTP ${response.status}`);
+  const profile = await response.json();
+  if (!profile?.publishToken || !profile?.publishEndpoint) throw new Error("Profil radio incomplet");
+  localStorage.setItem(RADIO_OWNER_KEY, JSON.stringify(profile));
+  return profile;
+}
+
+function clearRadioOwner() {
+  try { localStorage.removeItem(RADIO_OWNER_KEY); } catch { /* storage unavailable */ }
+}
+
+function audioCaptureOptionsFromNode(node, profile = "interaction") {
+  const p = node?.params || {};
+  const broadcast = profile === "broadcast";
+  return {
+    deviceId: p.deviceId || "",
+    echoCancellation: p.echoCancellation === true,
+    noiseSuppression: p.noiseSuppression === true,
+    autoGainControl: p.autoGainControl === true,
+    channelCount: Number(p.channelCount ?? (broadcast ? 2 : 1)),
+    sampleRate: Number(p.sampleRate ?? 48000),
+    latency: Number(p.latency ?? (broadcast ? 0.02 : 0.01)),
+    inputGain: Number(p.inputGain ?? 1),
+    highpassHz: Number(p.highpassHz ?? 20),
+    compressor: p.compressor === true,
+    compressorThreshold: Number(p.compressorThreshold ?? -18),
+    limiter: p.limiter === true,
+    limiterThreshold: Number(p.limiterThreshold ?? -3),
+    monitor: Number(p.monitor ?? 0)
+  };
+}
+
+function paintNodeOnAir(node) {
+  const badge = document.querySelector(`.node[data-id="${node?.id}"] .node-on-air`);
+  if (!badge) return;
+  const live = node?.params?.onAir === true;
+  badge.classList.toggle("live", live);
+  badge.textContent = live ? "ON AIR" : "STANDBY";
+}
+
+function setDemoBanner(active, { immersive = true, title = "EXEMPLE · WOW INTERACTIF", hint = "Déplace la souris dans le Preview" } = {}) {
   const banner = $("#demoModeBanner");
   if (banner) banner.classList.toggle("hidden", !active);
-  document.body.classList.toggle("demo-mode", Boolean(active));
+  const titleEl = $("#demoModeTitle");
+  const hintEl = $("#demoModeHint");
+  if (titleEl) titleEl.textContent = title;
+  if (hintEl) hintEl.textContent = hint;
+  document.body.classList.toggle("demo-mode", Boolean(active && immersive));
 }
 
 function enterShowcaseDemo({ preserve = true } = {}) {
@@ -112,6 +193,70 @@ function enterShowcaseDemo({ preserve = true } = {}) {
   syncPlayButton();
   setDemoBanner(true);
   log("EXEMPLE · Wow interactif chargé · déplace la souris dans le Preview");
+}
+
+function enterProjectExample(factory, label) {
+  if (refuseCanvasEdit("chargement d'exemple")) return;
+  if (!demoReturnProject) {
+    try { demoReturnProject = JSON.parse(JSON.stringify(project)); } catch { demoReturnProject = newProject(); }
+  }
+  project = validateProject(factory());
+  graphPath = [];
+  selectedNode = null;
+  selection.clear();
+  redraw();
+  runtime.play();
+  syncPlayButton();
+  setDemoBanner(true, {
+    immersive: false,
+    title: `EXEMPLE · ${label.toUpperCase()}`,
+    hint: "EXIT restaure votre projet précédent"
+  });
+  log(`EXEMPLE · ${label} chargé · projet précédent préservé`);
+}
+
+function setStartupExampleEnabled(enabled) {
+  const prefs = readGeneralPrefsNow();
+  prefs.loadDemo = Boolean(enabled);
+  localStorage.setItem("nvd.general", JSON.stringify(prefs));
+  refreshExamplesMenuState();
+  log(`Exemples · démarrage ${enabled ? "activé" : "désactivé"}`);
+}
+
+function refreshExamplesMenuState() {
+  const btn = $("#toggleStartupExample");
+  if (!btn) return;
+  const enabled = readGeneralPrefsNow().loadDemo !== false;
+  btn.textContent = `Exemple au démarrage · ${enabled ? "ON" : "OFF"}`;
+  btn.classList.toggle("off", !enabled);
+}
+
+function closeExamplesMenu() {
+  $("#examplesMenu")?.classList.add("hidden");
+  $("#loadExampleBtn")?.setAttribute("aria-expanded", "false");
+}
+
+function loadExampleChoice(choice) {
+  closeExamplesMenu();
+  if (choice === "wow") return enterShowcaseDemo();
+  if (choice === "remote-ghost") return enterProjectExample(createRemoteGhostDemo, "Remote Camera · Ghost");
+  if (choice === "video-magicfx") return enterProjectExample(createVideoMagicFxDemo, "Vidéo · Magic FX");
+  if (choice === "stage-osc") return enterProjectExample(createStageOscDemo, "Régie · Stage / OSC");
+  if (choice === "startup") return setStartupExampleEnabled(readGeneralPrefsNow().loadDemo === false);
+  if (choice === "blank") {
+    if (project.nodes?.length && !confirm("Remplacer le projet actuel par un projet vide ?")) return;
+    project = newProject();
+    demoReturnProject = null;
+    graphPath = [];
+    selectedNode = null;
+    selection.clear();
+    setDemoBanner(false);
+    redraw();
+    history.clear();
+    commitHistory();
+    autosave();
+    log("EXEMPLES · projet vide");
+  }
 }
 
 function exitShowcaseDemo() {
@@ -654,16 +799,6 @@ function buildLibrary() {
   if (mode) mode.style.display = expCount ? "flex" : "none";
 }
 
-// NVD_LIBRARY_BOOTSTRAP_GUARD
-// La palette doit exister avant les initialisations secondaires : une erreur
-// ailleurs dans Designer ne doit plus pouvoir laisser la Library vide.
-try {
-  buildLibrary();
-  document.documentElement.dataset.libraryReady = "1";
-} catch (error) {
-  console.error("LIBRARY_BOOTSTRAP", error);
-}
-
 function startEngineDownload(url) {
   if (typeof window.nvdDesktop?.openExternal === "function") {
     window.nvdDesktop.openExternal(url).catch(error => log(`Téléchargement · ${error?.message || error}`));
@@ -998,6 +1133,33 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
     x, y,
     params: { enabled: true, duration: 5, opacity: 1, intensity: 1, host: "bridge", address: "/nvd/value", value: 0, fallback: 0, freq: 220, gain: 0.15, mode: "tone" }
   };
+  if (type === "audio-in") Object.assign(n.params, {
+    enabled:false, deviceId:"", echoCancellation:false, noiseSuppression:false, autoGainControl:false,
+    channelCount:1, sampleRate:48000, latency:0.01, inputGain:1, highpassHz:20,
+    compressor:false, compressorThreshold:-18, limiter:false, limiterThreshold:-3, monitor:0
+  });
+  if (type === "broadcast-in") Object.assign(n.params, {
+    enabled:false, deviceId:"", echoCancellation:false, noiseSuppression:false, autoGainControl:false,
+    channelCount:2, sampleRate:48000, latency:0.02, inputGain:1, highpassHz:40,
+    compressor:true, compressorThreshold:-18, limiter:true, limiterThreshold:-3, monitor:0
+  });
+  if (type === "radio-live") Object.assign(n.params, {
+    enabled:false, onAir:false, deviceId:"", echoCancellation:false, noiseSuppression:false, autoGainControl:false,
+    channelCount:2, sampleRate:48000, latency:0.02, inputGain:1, highpassHz:40,
+    compressor:true, compressorThreshold:-18, limiter:true, limiterThreshold:-3, monitor:0,
+    station:"Radio Paillettes", show:"", audioBitsPerSecond:128000, chunkMs:250
+  });
+  if (type === "stream-studio") Object.assign(n.params, {
+    enabled:true, onAir:false, station:"Radio Paillettes", show:"", audioBitsPerSecond:128000, chunkMs:250
+  });
+  if (type === "audio-mixer") Object.assign(n.params,{ gainA:1, gainB:1 });
+  if (type === "audio-gain" || type === "radio-bus") n.params.gain = 1;
+  if (type === "audio-limiter") n.params.threshold = -6;
+  if (type === "audio-monitor") n.params.monitor = 0;
+  if (type === "radio-out") Object.assign(n.params, {
+    enabled:true, onAir:false, transport:"relay", station:"Radio Paillettes", show:"",
+    audioBitsPerSecond:128000, chunkMs:250, iceServers:[]
+  });
   if (type === "libpd") n.params.patch = LIBPD_AUDIO_PATCH;
   if (type === "subpatch") ensureSubGraph(n);
   g.nodes.push(n);
@@ -1017,14 +1179,20 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
 
 function drawNode(n) {
   const el = document.createElement("div");
-  el.className = "node" + (isExecutable(n.type) ? " executable" : " unavailable");
+  const familyClass = String(n.type).startsWith("radio-")
+    ? " node-radio"
+    : (String(n.type).startsWith("audio-") || n.type === "broadcast-in")
+      ? " node-audio"
+      : (n.type === "stream-studio" ? " node-broadcast" : "");
+  el.className = "node" + (isExecutable(n.type) ? " executable" : " unavailable") + familyClass;
   el.dataset.id = n.id;
   el.title = nodeReadiness(n.type);
   el.style.left = n.x + "px";
   el.style.top = n.y + "px";
   const ports = portLabels(n.type, n) || spec(n.type)[1];
   el.className += selection.has(n.id) ? " sel" : "";
-  el.innerHTML = `<div class="nh">${n.title}${isExecutable(n.type) ? "" : " · ○"}</div><div class="nb">${ports.map((p, i) => {
+  const onAirNode = ["radio-live","radio-out","stream-studio"].includes(n.type);
+  el.innerHTML = `<div class="nh">${n.title}${isExecutable(n.type) ? "" : " · ○"}${onAirNode ? `<span class="node-on-air ${n.params?.onAir ? "live" : ""}">${n.params?.onAir ? "ON AIR" : "STANDBY"}</span>` : ""}</div><div class="nb">${ports.map((p, i) => {
     const dir = portDirection(n.type, i, ports.length, n);
     return `<div class="port port-${dir}">${dir === "in" ? `<span class="port-dot input" data-node="${n.id}" data-port-index="${i}" data-dir="in" title="Entrée ${p}"></span>` : ""}<span class="port-label">${p}</span>${dir === "out" ? `<span class="port-dot output" data-node="${n.id}" data-port-index="${i}" data-dir="out" title="Sortie ${p}"></span>` : ""}</div>`;
   }).join("")}</div>`;
@@ -1033,6 +1201,14 @@ function drawNode(n) {
   el.ondblclick = () => {
     if (n.type === "subpatch") enterSubpatch(n);
     else if (n.type === "shader") openShaderLab(n);
+    else {
+      selectNode(n.id);
+      showRightPane("inspector");
+      const panel = document.querySelector(".inspector");
+      panel?.classList.add("node-settings-focus");
+      panel?.scrollIntoView?.({ block:"nearest", behavior:"smooth" });
+      window.setTimeout(() => panel?.classList.remove("node-settings-focus"), 700);
+    }
   };
   attachPortInteractions(el);
   makeDraggable(el, n);
@@ -1252,6 +1428,57 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="field"><label>Fallback CC (0–1)</label><input id="nFb" type="range" min="0" max="1" step=".01" value="${n.params.fallback ?? 0}"></div>`;
     extra += `<p class="hint">Matériel MIDI : à vérifier sur périphérique réel. Test logiciel = bus interne.</p>`;
   }
+  if (["audio-in","broadcast-in","radio-live"].includes(n.type)) {
+    const broadcastProfile = n.type !== "audio-in";
+    extra += `<div class="audio-settings-card">
+      <div class="audio-settings-head"><b>${broadcastProfile ? "ENTRÉE BROADCAST" : "AUDIO IN"}</b><span>${n.params.enabled ? "OUVERTE" : "OFF"}</span></div>
+      <div class="field"><label>Entrée audio</label><select id="nAudioDevice"><option value="">Entrée système par défaut</option></select></div>
+      <div class="field"><label>Canaux</label><select id="nAudioChannels"><option value="1">Mono</option><option value="2">Stéréo</option></select></div>
+      <div class="field"><label>Fréquence</label><select id="nAudioSampleRate"><option value="44100">44,1 kHz</option><option value="48000">48 kHz</option><option value="96000">96 kHz</option></select></div>
+      <div class="field"><label>Gain entrée</label><input id="nAudioInputGain" type="range" min="0" max="3" step=".01" value="${n.params.inputGain ?? 1}"></div>
+      <div class="field"><label>Coupe-bas</label><input id="nAudioHighpass" type="range" min="10" max="240" step="1" value="${n.params.highpassHz ?? (broadcastProfile ? 40 : 20)}"><small>${n.params.highpassHz ?? (broadcastProfile ? 40 : 20)} Hz</small></div>
+      <div class="audio-toggle-grid">
+        <label><span>Écho</span><select id="nAudioEcho"><option value="false">OFF</option><option value="true">ON</option></select></label>
+        <label><span>Réduction bruit</span><select id="nAudioNoise"><option value="false">OFF</option><option value="true">ON</option></select></label>
+        <label><span>Gain auto</span><select id="nAudioAgc"><option value="false">OFF</option><option value="true">ON</option></select></label>
+        <label><span>Compresseur</span><select id="nAudioCompressor"><option value="false">OFF</option><option value="true">ON</option></select></label>
+        <label><span>Limiteur</span><select id="nAudioLimiter"><option value="false">OFF</option><option value="true">ON</option></select></label>
+      </div>
+      <div class="field"><label>Écoute locale</label><input id="nAudioCaptureMonitor" type="range" min="0" max="1" step=".01" value="${n.params.monitor ?? 0}"></div>
+      <div class="camera-actions"><button id="audioInputStart" type="button">OUVRIR L’ENTRÉE</button><button id="audioInputStop" class="stop" type="button">COUPER</button></div>
+      <p class="hint">Micro interne, interface USB/Thunderbolt ou console reconnue comme carte son. Aucune entrée ne s’ouvre sans action utilisateur.</p>
+    </div>`;
+  }
+  if (n.type === "audio-mixer") {
+    extra += `<div class="field"><label>Gain A</label><input id="nMixGainA" type="range" min="0" max="2" step=".01" value="${n.params.gainA ?? 1}"></div>`;
+    extra += `<div class="field"><label>Gain B</label><input id="nMixGainB" type="range" min="0" max="2" step=".01" value="${n.params.gainB ?? 1}"></div>`;
+  }
+  if (n.type === "audio-gain" || n.type === "radio-bus") {
+    extra += `<div class="field"><label>Gain</label><input id="nStreamGain" type="range" min="0" max="2" step=".01" value="${n.params.gain ?? 1}"></div>`;
+  }
+  if (n.type === "audio-limiter") {
+    extra += `<div class="field"><label>Seuil limiteur (dB)</label><input id="nLimiterThreshold" type="range" min="-36" max="0" step=".5" value="${n.params.threshold ?? -6}"></div>`;
+  }
+  if (n.type === "audio-monitor") {
+    extra += `<div class="field"><label>Écoute locale</label><input id="nAudioMonitor" type="range" min="0" max="1" step=".01" value="${n.params.monitor ?? 0}"></div><p class="hint">0 par défaut pour éviter le larsen.</p>`;
+  }
+  if (["radio-live","radio-out","stream-studio"].includes(n.type)) {
+    const owner = readRadioOwner();
+    const radioState = runtime.broadcastEngine?.state?.(n.id) || { detail:"STANDBY", live:false };
+    extra += `<div class="radio-live-card ${n.params.onAir ? "armed" : ""}">
+      <div class="radio-live-head"><b>RADIO PAILLETTES</b><span id="radioState">${htmlSafe(radioState.detail || "STANDBY")}</span></div>
+      ${owner
+        ? `<div class="radio-owner-ok"><span>✓ CE MAC EST ASSOCIÉ</span><button id="radioUnpairBtn" type="button">Dissocier</button></div>`
+        : `<div class="radio-pair"><input id="radioPairPin" inputmode="numeric" autocomplete="one-time-code" placeholder="Code régie à 6 chiffres"><button id="radioPairBtn" type="button">ASSOCIER CE MAC</button></div>`}
+      <div class="field"><label>Station</label><input id="nRadioStation" value="${htmlSafe(n.params.station || "Radio Paillettes")}"></div>
+      <div class="field"><label>Émission / session</label><input id="nRadioShow" value="${htmlSafe(n.params.show || "")}" placeholder="Lecture, installation…"></div>
+      <div class="field"><label>Débit audio</label><select id="nRadioBitrate"><option value="96000">96 kb/s</option><option value="128000">128 kb/s</option><option value="160000">160 kb/s</option><option value="192000">192 kb/s</option></select></div>
+      ${n.type === "radio-out" ? `<div class="field"><label>Transport avancé</label><select id="nRadioTransport"><option value="relay">Relais Radio Paillettes</option><option value="whip">WHIP personnalisé</option></select></div><div class="field"><label>Endpoint personnalisé</label><input id="nRadioEndpoint" value="${htmlSafe(n.params.endpoint || "")}" placeholder="laisser vide pour Radio Paillettes"></div>` : ""}
+      <div class="radio-air-actions"><button id="radioOnAirBtn" class="radio-on-air-btn" type="button">ON AIR</button><button id="radioStandbyBtn" class="radio-standby-btn" type="button">STANDBY</button></div>
+      <div class="radio-public-actions"><button id="radioCopyLinkBtn" type="button">Copier le lien</button><button id="radioOpenPublicBtn" type="button">Ouvrir la radio ↗</button></div>
+      <p class="hint">Un clic ON AIR suffit après l’association de ce Mac. Les identifiants restent locaux à cet appareil et ne sont jamais enregistrés dans le projet.</p>
+    </div>`;
+  }
   if (n.type === "audio" || n.type === "organicaudio") {
     extra += `<div class="field"><label>Fréquence</label><input id="nFreq" type="number" min="40" max="2000" value="${n.params.freq ?? 220}"></div>`;
     extra += `<div class="field"><label>Gain</label><input id="nGain" type="range" min="0" max="0.5" step=".01" value="${n.params.gain ?? 0.15}"></div>`;
@@ -1384,8 +1611,13 @@ function selectNode(id, { additive = false } = {}) {
   $("#nOpa").oninput = e => { n.params.opacity = +e.target.value; runtime.render(); autosave(); };
   $("#nEnabled").onchange = e => {
     n.params.enabled = e.target.value === "true";
-    if (!n.params.enabled && (n.type === "audio" || n.type === "organicaudio" || n.type === "soundmemo")) {
+    if (!n.params.enabled && (n.type === "audio" || n.type === "organicaudio" || n.type === "soundmemo" || ["audio-in","broadcast-in","radio-live","audio-mixer","audio-gain","audio-limiter","audio-monitor","radio-bus"].includes(n.type))) {
       sharedAudio.release(n.id);
+    }
+    if (!n.params.enabled && ["radio-live","radio-out","stream-studio"].includes(n.type)) {
+      n.params.onAir = false;
+      runtime.broadcastEngine?.stop?.(n.id).catch?.(() => {});
+      paintNodeOnAir(n);
     }
     if (["camera", "phone-camera-front", "phone-camera-back"].includes(n.type)) runtime.setProject(project);
     else runtime.render();
@@ -1488,6 +1720,167 @@ function selectNode(id, { additive = false } = {}) {
     }
   };
   if ($("#nFb")) $("#nFb").oninput = e => { n.params.fallback = +e.target.value; runtime.render(); autosave(); };
+  const captureProfile = n.type === "audio-in" ? "interaction" : "broadcast";
+  const restartCaptureIfOpen = () => {
+    if (!["audio-in","broadcast-in","radio-live"].includes(n.type)) return;
+    if (n.params.enabled) {
+      sharedAudio.release(n.id);
+      runtime.render();
+    }
+    autosave();
+  };
+  const populateAudioDevices = async () => {
+    const select = $("#nAudioDevice");
+    if (!select || !navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devicesList = await navigator.mediaDevices.enumerateDevices();
+      const current = n.params.deviceId || "";
+      select.innerHTML = '<option value="">Entrée système par défaut</option>';
+      devicesList.filter(device => device.kind === "audioinput").forEach((device, index) => {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.textContent = device.label || `Entrée audio ${index + 1}`;
+        select.appendChild(option);
+      });
+      select.value = current;
+    } catch { /* permissions not granted yet */ }
+  };
+  if ($("#nAudioDevice")) {
+    $("#nAudioDevice").value = n.params.deviceId || "";
+    $("#nAudioDevice").onchange = e => { n.params.deviceId = e.target.value; restartCaptureIfOpen(); commitHistory(); };
+    void populateAudioDevices();
+  }
+  for (const [id,key,numeric] of [
+    ["nAudioChannels","channelCount",true],
+    ["nAudioSampleRate","sampleRate",true],
+    ["nAudioInputGain","inputGain",true],
+    ["nAudioHighpass","highpassHz",true],
+    ["nAudioEcho","echoCancellation",false],
+    ["nAudioNoise","noiseSuppression",false],
+    ["nAudioAgc","autoGainControl",false],
+    ["nAudioCompressor","compressor",false],
+    ["nAudioLimiter","limiter",false],
+    ["nAudioCaptureMonitor","monitor",true]
+  ]) {
+    const field = $("#"+id);
+    if (!field) continue;
+    if (numeric) field.value = String(n.params[key] ?? (key === "channelCount" ? (captureProfile === "broadcast" ? 2 : 1) : key === "sampleRate" ? 48000 : key === "inputGain" ? 1 : key === "highpassHz" ? (captureProfile === "broadcast" ? 40 : 20) : 0));
+    else field.value = String(n.params[key] === true);
+    field.onchange = e => {
+      n.params[key] = numeric ? +e.target.value : e.target.value === "true";
+      restartCaptureIfOpen();
+      commitHistory();
+    };
+  }
+  if ($("#audioInputStart")) $("#audioInputStart").onclick = async () => {
+    try {
+      n.params.enabled = true;
+      $("#nEnabled").value = "true";
+      sharedAudio.release(n.id);
+      await sharedAudio.ensureInput(n.id, audioCaptureOptionsFromNode(n, captureProfile));
+      await populateAudioDevices();
+      runtime.render(); autosave(); commitHistory();
+      log(`${n.title} · entrée ouverte · ${sharedAudio.inputInfo(n.id)?.label || "entrée système"}`);
+      selectNode(n.id);
+    } catch (error) {
+      n.params.enabled = false;
+      $("#nEnabled").value = "false";
+      log(`${n.title} · entrée refusée · ${error?.message || error}`);
+    }
+  };
+  if ($("#audioInputStop")) $("#audioInputStop").onclick = () => {
+    n.params.enabled = false;
+    n.params.onAir = false;
+    $("#nEnabled").value = "false";
+    sharedAudio.release(n.id);
+    runtime.broadcastEngine?.stop?.(n.id).catch?.(() => {});
+    paintNodeOnAir(n);
+    runtime.render(); autosave(); commitHistory();
+    log(`${n.title} · entrée coupée`);
+  };
+  if ($("#nMixGainA")) $("#nMixGainA").oninput = e => { n.params.gainA = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nMixGainB")) $("#nMixGainB").oninput = e => { n.params.gainB = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nStreamGain")) $("#nStreamGain").oninput = e => { n.params.gain = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nLimiterThreshold")) $("#nLimiterThreshold").oninput = e => { n.params.threshold = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nAudioMonitor")) $("#nAudioMonitor").oninput = e => { n.params.monitor = +e.target.value; runtime.render(); autosave(); };
+  if ($("#radioPairBtn")) $("#radioPairBtn").onclick = async () => {
+    const button = $("#radioPairBtn");
+    button.disabled = true;
+    try {
+      await pairRadioOwner($("#radioPairPin")?.value || "");
+      log("Radio Paillettes · ce Mac est associé");
+      selectNode(n.id);
+    } catch (error) {
+      log(`Radio Paillettes · appairage refusé · ${error?.message || error}`);
+    } finally {
+      if (button?.isConnected) button.disabled = false;
+    }
+  };
+  if ($("#radioUnpairBtn")) $("#radioUnpairBtn").onclick = () => {
+    n.params.onAir = false;
+    runtime.broadcastEngine?.stop?.(n.id).catch?.(() => {});
+    clearRadioOwner();
+    paintNodeOnAir(n);
+    autosave();
+    log("Radio Paillettes · Mac dissocié");
+    selectNode(n.id);
+  };
+  if ($("#nRadioTransport")) {
+    $("#nRadioTransport").value = n.params.transport || "relay";
+    $("#nRadioTransport").onchange = e => { n.params.transport = e.target.value; autosave(); commitHistory(); };
+  }
+  if ($("#nRadioEndpoint")) $("#nRadioEndpoint").onchange = e => { n.params.endpoint = e.target.value.trim(); autosave(); commitHistory(); };
+  if ($("#nRadioStation")) $("#nRadioStation").onchange = e => { n.params.station = e.target.value.trim() || "Radio Paillettes"; autosave(); commitHistory(); };
+  if ($("#nRadioShow")) $("#nRadioShow").onchange = e => { n.params.show = e.target.value.trim(); autosave(); commitHistory(); };
+  if ($("#nRadioBitrate")) {
+    $("#nRadioBitrate").value = String(n.params.audioBitsPerSecond || 128000);
+    $("#nRadioBitrate").onchange = e => { n.params.audioBitsPerSecond = +e.target.value || 128000; autosave(); commitHistory(); };
+  }
+  if ($("#radioOnAirBtn")) $("#radioOnAirBtn").onclick = async () => {
+    const owner = readRadioOwner();
+    if (!owner) {
+      log("Radio Paillettes · associe d’abord ce Mac avec le code régie");
+      $("#radioPairPin")?.focus();
+      return;
+    }
+    try {
+      if (n.type === "radio-live") {
+        n.params.enabled = true;
+        if (!sharedAudio.audioValue(n.id)) {
+          await sharedAudio.ensureInput(n.id, audioCaptureOptionsFromNode(n, "broadcast"));
+        }
+      }
+      n.params.onAir = true;
+      paintNodeOnAir(n);
+      runtime.render(); autosave(); commitHistory();
+      log(`${n.title} · ON AIR demandé`);
+      window.setTimeout(() => {
+        const state = $("#radioState");
+        if (state) state.textContent = runtime.broadcastEngine?.state?.(n.id)?.detail || "CONNEXION…";
+      }, 450);
+    } catch (error) {
+      n.params.onAir = false;
+      paintNodeOnAir(n);
+      log(`${n.title} · ON AIR impossible · ${error?.message || error}`);
+    }
+  };
+  if ($("#radioStandbyBtn")) $("#radioStandbyBtn").onclick = () => {
+    n.params.onAir = false;
+    paintNodeOnAir(n);
+    runtime.broadcastEngine?.stop?.(n.id).finally?.(() => runtime.render());
+    const state = $("#radioState"); if (state) state.textContent = "STANDBY";
+    autosave(); commitHistory(); log(`${n.title} · STANDBY`);
+  };
+  if ($("#radioCopyLinkBtn")) $("#radioCopyLinkBtn").onclick = async () => {
+    const url = readRadioOwner()?.publicUrl || RADIO_PUBLIC_URL;
+    try { await navigator.clipboard.writeText(url); log("Radio Paillettes · lien public copié"); }
+    catch { log(`Radio Paillettes · lien public · ${url}`); }
+  };
+  if ($("#radioOpenPublicBtn")) $("#radioOpenPublicBtn").onclick = () => {
+    const url = readRadioOwner()?.publicUrl || RADIO_PUBLIC_URL;
+    if (typeof window.nvdDesktop?.openExternal === "function") window.nvdDesktop.openExternal(url).catch(() => {});
+    else window.open(url, "_blank", "noopener,noreferrer");
+  };
   if ($("#nFreq")) $("#nFreq").onchange = e => { n.params.freq = +e.target.value; runtime.render(); autosave(); commitHistory(); };
   if ($("#nGain")) $("#nGain").oninput = e => { n.params.gain = +e.target.value; runtime.render(); autosave(); };
   if ($("#nSmooth")) $("#nSmooth").oninput = e => { n.params.amount = +e.target.value; runtime.render(); autosave(); };
@@ -2672,6 +3065,8 @@ if (vibeVoiceButton) {
   vibeVoiceButton.addEventListener("click", toggleVibeVoice);
 }
 
+restorePromptDraft("#vibeText", VIBE_DRAFT_KEY);
+$("#vibeText")?.addEventListener("input", e => savePromptDraft(VIBE_DRAFT_KEY, e.target.value));
 $("#applyVibe").onclick = applyVibeFromUi;
 $("#vibeText").addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) {
@@ -2766,7 +3161,7 @@ async function sendCxChat() {
   const text = input?.value.trim() || "";
   if (!text) return;
   appendCxMessage("user", text);
-  if (input) input.value = "";
+  savePromptDraft(CX_DRAFT_KEY, text);
   const send = $("#cxChatSend");
   if (send) send.disabled = true;
   const status = appendCxMessage("status", "Génération…");
@@ -2803,6 +3198,8 @@ async function sendCxChat() {
     if (send) send.disabled = false;
   }
 }
+restorePromptDraft("#cxChatInput", CX_DRAFT_KEY);
+$("#cxChatInput")?.addEventListener("input", e => savePromptDraft(CX_DRAFT_KEY, e.target.value));
 $("#cxChatForm")?.addEventListener("submit", e => {
   e.preventDefault();
   sendCxChat();
@@ -3518,7 +3915,22 @@ if (project.nodes.length === 0 && generalPrefs.loadDemo !== false) {
   setDemoBanner(false);
 }
 $("#demoExitBtn")?.addEventListener("click", exitShowcaseDemo);
-$("#loadExampleBtn")?.addEventListener("click", () => enterShowcaseDemo());
+$("#loadExampleBtn")?.addEventListener("click", event => {
+  event.stopPropagation();
+  const menu = $("#examplesMenu");
+  const opening = menu?.classList.contains("hidden");
+  menu?.classList.toggle("hidden");
+  $("#loadExampleBtn")?.setAttribute("aria-expanded", opening ? "true" : "false");
+  refreshExamplesMenuState();
+});
+$("#examplesMenu")?.addEventListener("click", event => {
+  const choice = event.target?.closest?.("[data-example]")?.dataset?.example;
+  if (choice) loadExampleChoice(choice);
+});
+document.addEventListener("click", event => {
+  if (!event.target?.closest?.(".examples-wrap")) closeExamplesMenu();
+});
+refreshExamplesMenuState();
 renderPnpStatus();
 if (generalPrefs.plugAndPlay !== false) {
   queueMicrotask(() => runPlugAndPlayProbe({ silent:true }));
