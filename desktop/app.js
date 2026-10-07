@@ -12,6 +12,7 @@ import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError } from
 import { renderBackendReport } from "../shared/backend-registry.js";
 import { browserProbeRegistry } from "../shared/agent-registry.js";
 import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
+import { showReleaseNotice } from "../shared/release-notice.js";
 import { NODE_GROUPS, spec as sharedSpec } from "../shared/node-specs.js";
 import { createHistory } from "../shared/history.js";
 import { addBoxPort, ensureSubGraph, wrapNodesInSubpatch } from "../shared/subpatch.js";
@@ -3382,6 +3383,7 @@ $("#routeDestinations").addEventListener("change", () => {
 const badge = document.querySelector(".badge");
 if (badge) badge.textContent = `v${APP_VERSION}`;
 document.title = `${APP_NAME} — ${APP_VERSION}`;
+showReleaseNotice({ version:APP_VERSION, appName:APP_NAME });
 
 ensureRouting(project);
 ensureEdges();
