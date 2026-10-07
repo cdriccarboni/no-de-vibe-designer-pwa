@@ -100,6 +100,65 @@ function readText(slot, fallback = "") {
   return fallback;
 }
 
+function readAudio(slot) {
+  const value = slot?.value !== undefined ? slot.value : slot;
+  return value?.kind === "audio" && value?.stream ? value : null;
+}
+
+function audioStatus(value, fallback = "NO AUDIO") {
+  return value?.stream?.getAudioTracks?.().length ? "READY" : fallback;
+}
+
+function audioInputOptions(node, profile = "interaction") {
+  const p = node.params || {};
+  const broadcast = profile === "broadcast";
+  return {
+    deviceId: p.deviceId || "",
+    echoCancellation: p.echoCancellation === true,
+    noiseSuppression: p.noiseSuppression === true,
+    autoGainControl: p.autoGainControl === true,
+    channelCount: Number(p.channelCount ?? (broadcast ? 2 : 1)),
+    sampleRate: Number(p.sampleRate ?? 48000),
+    latency: Number(p.latency ?? (broadcast ? 0.02 : 0.01)),
+    inputGain: Number(p.inputGain ?? 1),
+    highpassHz: Number(p.highpassHz ?? 20),
+    compressor: p.compressor === true,
+    compressorThreshold: Number(p.compressorThreshold ?? -18),
+    limiter: p.limiter === true,
+    limiterThreshold: Number(p.limiterThreshold ?? -3),
+    monitor: Number(p.monitor ?? 0)
+  };
+}
+
+function combineMediaStream(audioValue, videoValue) {
+  if (typeof MediaStream === "undefined") return null;
+  const tracks = [];
+  const audioTracks = audioValue?.stream?.getAudioTracks?.() || [];
+  tracks.push(...audioTracks);
+  const raw = videoValue?.value !== undefined ? videoValue.value : videoValue;
+  if (raw?.stream?.getVideoTracks) tracks.push(...raw.stream.getVideoTracks());
+  else if (raw?.el?.captureStream) {
+    try { tracks.push(...raw.el.captureStream(30).getVideoTracks()); } catch { /* noop */ }
+  }
+  return tracks.length ? new MediaStream(tracks) : null;
+}
+
+function ownerBroadcastProfile() {
+  try {
+    const raw = globalThis.localStorage?.getItem?.("nvd.radio.owner");
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      token: String(parsed.publishToken || ""),
+      endpoint: String(parsed.publishEndpoint || ""),
+      publicUrl: String(parsed.publicUrl || "")
+    };
+  } catch {
+    return null;
+  }
+}
+
+
 function asyncWarn(result, ctx, label) {
   if (result && typeof result.then === "function") {
     result.catch(e => ctx.warnings?.push(`${label} : ${e?.message || e}`));
@@ -1547,6 +1606,384 @@ export function createNodeProcessors() {
     else if (ctx.subpatchIn) out.set(2, ctx.subpatchIn);
     return out;
   });
+
+  fns.set("audio-in", (node, _inputs, ctx) => {
+    const out = new Map();
+    const audio = ctx.audioEngine;
+    if (!audio) throw new Error("Audio In : moteur audio indisponible");
+    if (node.params?.enabled !== true) {
+      audio.release(node.id);
+      out.set(1, numOut(0));
+      out.set(2, textOut("OFF · activer pour ouvrir l’entrée"));
+      out.set(3, numOut(0));
+      out.set(4, numOut(0));
+      out.set(5, numOut(0));
+      return out;
+    }
+    const existing = audio.nodes.get(node.id);
+    if (!existing || existing.type !== "input") {
+      audio.ensureInput(node.id, audioInputOptions(node, "interaction")).then(() => ctx.requestRender?.()).catch(e => {
+        ctx.errors?.push?.(`Audio In : ${e.message || e}`);
+        ctx.requestRender?.();
+      });
+      out.set(1, numOut(0));
+      out.set(2, textOut("OUVERTURE…"));
+      return out;
+    }
+    const value = audio.audioValue(node.id);
+    if (value) out.set(0, value);
+    out.set(1, numOut(audio.readLevel(node.id)));
+    out.set(2, textOut(audioStatus(value, "ATTENTE")));
+    out.set(3, numOut(audio.readPeak(node.id)));
+    out.set(4, numOut(audio.readFftEnergy(node.id)));
+    out.set(5, numOut(audio.readEnvelope(node.id)));
+    return out;
+  });
+
+  fns.set("radio-live", (node, _inputs, ctx) => {
+    const out = new Map();
+    const audio = ctx.audioEngine;
+    const broadcast = ctx.broadcastEngine;
+    if (!audio || !broadcast) {
+      out.set(1, numOut(0));
+      out.set(2, textOut("MOTEUR RADIO INDISPONIBLE"));
+      out.set(3, boolOut(false));
+      return out;
+    }
+
+    if (node.params?.enabled !== true) {
+      audio.release(node.id);
+      if (broadcast.state(node.id).phase !== "standby") broadcast.stop(node.id).catch(() => {});
+      out.set(1, numOut(0));
+      out.set(2, textOut("OFF · double-clic pour démarrer"));
+      out.set(3, boolOut(false));
+      return out;
+    }
+
+    const existing = audio.nodes.get(node.id);
+    if (!existing || existing.type !== "input") {
+      audio.ensureInput(node.id, audioInputOptions(node, "broadcast")).then(() => ctx.requestRender?.()).catch(e => {
+        ctx.errors?.push?.(`Radio Live : ${e.message || e}`);
+        ctx.requestRender?.();
+      });
+      out.set(1, numOut(0));
+      out.set(2, textOut("OUVERTURE SOURCE…"));
+      out.set(3, boolOut(false));
+      return out;
+    }
+
+    const value = audio.audioValue(node.id);
+    if (value) out.set(0, value);
+    out.set(1, numOut(audio.readLevel(node.id)));
+
+    const requested = node.params?.onAir === true;
+    if (!requested) {
+      if (broadcast.state(node.id).phase !== "standby") broadcast.stop(node.id).catch(() => {});
+      const info = audio.inputInfo(node.id);
+      out.set(2, textOut(info ? `PRÊT · ${info.label}` : "PRÊT"));
+      out.set(3, boolOut(false));
+      return out;
+    }
+
+    const owner = ownerBroadcastProfile();
+    const endpoint = String(node.params?.endpoint || owner?.endpoint || "").trim();
+    const token = String(owner?.token || node.params?.token || "");
+    if (!endpoint || !token) {
+      out.set(2, textOut("ASSOCIER CE MAC · double-clic"));
+      out.set(3, boolOut(false));
+      return out;
+    }
+
+    const state = broadcast.state(node.id);
+    if (state.phase === "standby") {
+      broadcast.startRelay(node.id, value.stream, {
+        endpoint,
+        token,
+        metadata: {
+          station: node.params?.station || "Radio Paillettes",
+          show: node.params?.show || ""
+        },
+        audioBitsPerSecond: Number(node.params?.audioBitsPerSecond ?? 128000),
+        chunkMs: Number(node.params?.chunkMs ?? 250)
+      }).then(() => ctx.requestRender?.()).catch(e => {
+        ctx.warnings?.push?.(`Radio Live : ${e.message || e}`);
+        ctx.requestRender?.();
+      });
+    }
+    const current = broadcast.state(node.id);
+    out.set(2, textOut(current.detail || (current.live ? "ON AIR" : "CONNEXION…")));
+    out.set(3, boolOut(current.live));
+    return out;
+  });
+
+  fns.set("broadcast-in", (node, _inputs, ctx) => {
+    const out = new Map();
+    const audio = ctx.audioEngine;
+    if (!audio) throw new Error("Broadcast In : moteur audio indisponible");
+    if (node.params?.enabled !== true) {
+      audio.release(node.id);
+      out.set(1, numOut(0));
+      out.set(2, textOut("STANDBY"));
+      return out;
+    }
+    const existing = audio.nodes.get(node.id);
+    if (!existing || existing.type !== "input") {
+      audio.ensureInput(node.id, audioInputOptions(node, "broadcast")).then(() => ctx.requestRender?.()).catch(e => {
+        ctx.errors?.push?.(`Broadcast In : ${e.message || e}`);
+        ctx.requestRender?.();
+      });
+      out.set(1, numOut(0));
+      out.set(2, textOut("OUVERTURE ANTENNE…"));
+      return out;
+    }
+    const value = audio.audioValue(node.id);
+    if (value) out.set(0, value);
+    out.set(1, numOut(audio.readLevel(node.id)));
+    const info = audio.inputInfo(node.id);
+    out.set(2, textOut(info ? `READY · ${info.label}` : "READY"));
+    return out;
+  });
+
+  fns.set("stream-studio", (node, inputs, ctx) => {
+    const out = new Map();
+    const broadcast = ctx.broadcastEngine;
+    if (!broadcast) {
+      out.set(3, textOut("BROADCAST ENGINE ABSENT"));
+      out.set(4, boolOut(false));
+      return out;
+    }
+    const audioValue = readAudio(inputs.get(0));
+    const videoValue = inputs.get(1);
+    const requested = inputs.has(2) ? truthyTrigger(inputs.get(2)) : node.params?.onAir === true;
+    if (!requested || node.params?.enabled === false) {
+      if (broadcast.state(node.id).phase !== "standby") broadcast.stop(node.id).catch(() => {});
+      out.set(3, textOut(node.params?.enabled === false ? "OFF" : "STANDBY"));
+      out.set(4, boolOut(false));
+      return out;
+    }
+    const stream = combineMediaStream(audioValue, videoValue);
+    if (!stream?.getAudioTracks?.().length) {
+      out.set(3, textOut("ON AIR ARMÉ · AUDIO REQUIS"));
+      out.set(4, boolOut(false));
+      return out;
+    }
+    const owner = ownerBroadcastProfile();
+    const endpoint = String(node.params?.endpoint || owner?.endpoint || "").trim();
+    if (!endpoint || !owner?.token) {
+      out.set(3, textOut("ASSOCIER CE MAC · double-clic"));
+      out.set(4, boolOut(false));
+      return out;
+    }
+    const state = broadcast.state(node.id);
+    if (state.phase === "standby") {
+      broadcast.startRelay(node.id, stream, {
+        endpoint,
+        token: owner.token,
+        metadata: {
+          station: node.params?.station || "Radio Paillettes",
+          show: node.params?.show || "",
+          media: stream.getVideoTracks().length ? "video" : "audio"
+        },
+        audioBitsPerSecond: Number(node.params?.audioBitsPerSecond ?? 128000),
+        chunkMs: Number(node.params?.chunkMs ?? 250)
+      }).then(() => ctx.requestRender?.()).catch(e => {
+        ctx.warnings?.push?.(`Stream Studio : ${e.message || e}`);
+        ctx.requestRender?.();
+      });
+    }
+    const current = broadcast.state(node.id);
+    out.set(3, textOut(current.detail || (current.live ? "ON AIR" : "CONNEXION…")));
+    out.set(4, boolOut(current.live));
+    return out;
+  });
+
+  fns.set("audio-gain", (node, inputs, ctx) => {
+    const out = new Map();
+    const audio = ctx.audioEngine;
+    if (node.params?.enabled === false) {
+      audio?.release?.(node.id);
+      return new Map([[3, numOut(0)]]);
+    }
+    const input = readAudio(inputs.get(0));
+    const gain = inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.gain ?? 1);
+    if (!audio || !input) return new Map([[3, numOut(0)]]);
+    audio.ensureStreamProcessor(node.id, input, { kind:"gain", gain })
+      .then(() => ctx.requestRender?.())
+      .catch(e => ctx.warnings?.push?.(`Gain audio : ${e.message || e}`));
+    const value = audio.audioValue(node.id);
+    if (value) out.set(2, value);
+    out.set(3, numOut(audio.readLevel(node.id)));
+    return out;
+  });
+
+  fns.set("audio-limiter", (node, inputs, ctx) => {
+    const out = new Map();
+    const audio = ctx.audioEngine;
+    if (node.params?.enabled === false) {
+      audio?.release?.(node.id);
+      return new Map([[3, numOut(0)]]);
+    }
+    const input = readAudio(inputs.get(0));
+    const threshold = inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.threshold ?? -6);
+    if (!audio || !input) return new Map([[3, numOut(0)]]);
+    audio.ensureStreamProcessor(node.id, input, { kind:"limiter", threshold })
+      .then(() => ctx.requestRender?.())
+      .catch(e => ctx.warnings?.push?.(`Limiter audio : ${e.message || e}`));
+    const value = audio.audioValue(node.id);
+    if (value) out.set(2, value);
+    out.set(3, numOut(audio.readLevel(node.id)));
+    return out;
+  });
+
+  fns.set("audio-monitor", (node, inputs, ctx) => {
+    const out = new Map();
+    const audio = ctx.audioEngine;
+    if (node.params?.enabled === false) {
+      audio?.release?.(node.id);
+      return new Map([[3, numOut(0)]]);
+    }
+    const input = readAudio(inputs.get(0));
+    const monitor = inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.monitor ?? 0);
+    if (!audio || !input) return new Map([[3, numOut(0)]]);
+    audio.ensureStreamProcessor(node.id, input, { kind:"monitor", gain:1, monitor })
+      .then(() => ctx.requestRender?.())
+      .catch(e => ctx.warnings?.push?.(`Monitor audio : ${e.message || e}`));
+    const value = audio.audioValue(node.id);
+    if (value) out.set(2, value);
+    out.set(3, numOut(audio.readLevel(node.id)));
+    return out;
+  });
+
+  fns.set("audio-mixer", (node, inputs, ctx) => {
+    const out = new Map();
+    const audio = ctx.audioEngine;
+    if (node.params?.enabled === false) {
+      audio?.release?.(node.id);
+      return new Map([[5, numOut(0)]]);
+    }
+    const a = readAudio(inputs.get(0));
+    const b = readAudio(inputs.get(1));
+    const gainA = inputs.has(2) ? readNum(inputs.get(2)) : Number(node.params?.gainA ?? 1);
+    const gainB = inputs.has(3) ? readNum(inputs.get(3)) : Number(node.params?.gainB ?? 1);
+    if (!audio || (!a && !b)) return new Map([[5, numOut(0)]]);
+    audio.ensureMixer(node.id, a, b, { gainA, gainB })
+      .then(() => ctx.requestRender?.())
+      .catch(e => ctx.warnings?.push?.(`Audio Mixer : ${e.message || e}`));
+    const value = audio.audioValue(node.id);
+    if (value) out.set(4, value);
+    out.set(5, numOut(audio.readLevel(node.id)));
+    return out;
+  });
+
+  fns.set("radio-bus", (node, inputs, ctx) => {
+    const out = new Map();
+    const audio = ctx.audioEngine;
+    if (node.params?.enabled === false) {
+      audio?.release?.(node.id);
+      out.set(3, numOut(0));
+      out.set(4, textOut("OFF"));
+      return out;
+    }
+    const input = readAudio(inputs.get(0));
+    const gain = inputs.has(1) ? readNum(inputs.get(1)) : Number(node.params?.gain ?? 1);
+    if (!audio || !input) {
+      out.set(3, numOut(0));
+      out.set(4, textOut("NO AUDIO"));
+      return out;
+    }
+    audio.ensureStreamProcessor(node.id, input, { kind:"gain", gain })
+      .then(() => ctx.requestRender?.())
+      .catch(e => ctx.warnings?.push?.(`Radio Bus : ${e.message || e}`));
+    const value = audio.audioValue(node.id);
+    if (value) out.set(2, value);
+    out.set(3, numOut(audio.readLevel(node.id)));
+    out.set(4, textOut(value ? "RADIO BUS READY" : "PRÉPARATION…"));
+    return out;
+  });
+
+  fns.set("radio-monitor", (node, inputs) => {
+    if (node.params?.enabled === false) return new Map([[1, numOut(0)], [2, textOut("OFF")]]);
+    const input = readAudio(inputs.get(0));
+    const analyser = input?.analyser;
+    let level = 0;
+    if (analyser) {
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (const sample of buf) {
+        const v = (sample - 128) / 128;
+        sum += v * v;
+      }
+      level = Math.sqrt(sum / Math.max(1, buf.length));
+    }
+    return new Map([[1, numOut(level)], [2, textOut(input ? "MONITOR READY" : "NO AUDIO")]]);
+  });
+
+  fns.set("radio-out", (node, inputs, ctx) => {
+    const out = new Map();
+    const input = readAudio(inputs.get(0));
+    const broadcast = ctx.broadcastEngine;
+    if (!broadcast) {
+      out.set(2, textOut("BROADCAST ENGINE ABSENT"));
+      out.set(3, boolOut(false));
+      return out;
+    }
+    if (node.params?.enabled === false) {
+      if (broadcast.state(node.id).phase !== "standby") broadcast.stop(node.id).catch(() => {});
+      out.set(2, textOut("OFF"));
+      out.set(3, boolOut(false));
+      return out;
+    }
+    const requested = inputs.has(1) ? truthyTrigger(inputs.get(1)) : node.params?.onAir === true;
+    if (!requested) {
+      if (broadcast.state(node.id).phase !== "standby") {
+        broadcast.stop(node.id).then(() => ctx.requestRender?.()).catch(() => {});
+      }
+      out.set(2, textOut("STANDBY"));
+      out.set(3, boolOut(false));
+      return out;
+    }
+    if (!input) {
+      out.set(2, textOut("ON AIR ARMÉ · NO AUDIO"));
+      out.set(3, boolOut(false));
+      return out;
+    }
+    const owner = ownerBroadcastProfile();
+    const endpoint = String(node.params?.endpoint || owner?.endpoint || "").trim();
+    if (!endpoint || (node.params?.transport !== "whip" && !owner?.token)) {
+      out.set(2, textOut("ASSOCIER CE MAC · double-clic"));
+      out.set(3, boolOut(false));
+      return out;
+    }
+    const state = broadcast.state(node.id);
+    if (state.phase === "standby") {
+      const transport = node.params?.transport === "whip" ? "whip" : "relay";
+      const options = {
+        endpoint,
+        token: transport === "relay" ? owner.token : String(node.params?.token || ""),
+        metadata: {
+          station: node.params?.station || "Radio Paillettes",
+          show: node.params?.show || ""
+        }
+      };
+      const start = transport === "whip"
+        ? broadcast.startWhip(node.id, input.stream, { ...options, iceServers: node.params?.iceServers || [] })
+        : broadcast.startRelay(node.id, input.stream, {
+            ...options,
+            audioBitsPerSecond: Number(node.params?.audioBitsPerSecond ?? 128000),
+            chunkMs: Number(node.params?.chunkMs ?? 250)
+          });
+      start.then(() => ctx.requestRender?.()).catch(e => {
+        ctx.warnings?.push?.(`Radio Out : ${e.message || e}`);
+        ctx.requestRender?.();
+      });
+    }
+    const current = broadcast.state(node.id);
+    out.set(2, textOut(current.detail || (current.live ? "ON AIR" : "CONNEXION…")));
+    out.set(3, boolOut(current.live));
+    return out;
+  });
+
 
   fns.set("audio", (node, inputs, ctx) => {
     const out = new Map();
