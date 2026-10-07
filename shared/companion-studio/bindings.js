@@ -17,8 +17,7 @@ export const BINDING_KINDS = Object.freeze({
   serial: "serial",
   video: "video",
   camera: "camera",
-  audioplayer: "audioplayer",
-  broadcast: "broadcast"
+  audioplayer: "audioplayer"
 });
 
 /**
@@ -234,42 +233,6 @@ export function applyCompanionBinding({
       sendMidi(binding.midiOutputId || null, data);
       onLog(`Companion · MIDI ${data.join(" ")}`);
       return makeStudioFeedback({ widgetId: widget.id, value, ok: true, detail: "MIDI", rttMs: Date.now() - t0 });
-    }
-
-    if (kind === "broadcast") {
-      if (!project) throw new Error("Projet hôte absent");
-      const action = binding.action || "toggle";
-      if (action === "input-on" || action === "input-off" || action === "input-toggle") {
-        const input = (project.nodes || []).find((n) => n.id === binding.nodeId && n.type === "audio-in")
-          || (project.nodes || []).find((n) => n.type === "audio-in");
-        if (!input) throw new Error("Audio In introuvable");
-        input.params ||= {};
-        input.params.enabled = action === "input-on"
-          ? true
-          : action === "input-off"
-            ? false
-            : !input.params.enabled;
-        runtime?.render?.();
-        const detail = input.params.enabled ? "AUDIO IN · ON" : "AUDIO IN · OFF";
-        onLog(`Companion · ${detail}`);
-        return makeStudioFeedback({ widgetId: widget.id, value: input.params.enabled, ok: true, detail, rttMs: Date.now() - t0 });
-      }
-      const radio = (project.nodes || []).find((n) => n.id === binding.nodeId && n.type === "radio-out")
-        || (project.nodes || []).find((n) => n.type === "radio-out");
-      if (!radio) throw new Error("Radio Out introuvable");
-      radio.params ||= {};
-      const next = action === "on"
-        ? true
-        : action === "off" || action === "stop"
-          ? false
-          : action === "toggle"
-            ? !radio.params.onAir
-            : !!value;
-      radio.params.onAir = next;
-      runtime?.render?.();
-      const detail = next ? "RADIO · ON AIR ARMÉ" : "RADIO · STANDBY";
-      onLog(`Companion · ${detail}`);
-      return makeStudioFeedback({ widgetId: widget.id, value: next, ok: true, detail, rttMs: Date.now() - t0 });
     }
 
     if (kind === "audioplayer") {

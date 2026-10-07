@@ -6,7 +6,6 @@ export class AudioEngine {
     this.ctx = null;
     this.master = null;
     this.nodes = new Map(); // nodeId -> { osc, gain, analyser, mic, stream, type }
-    this.pending = new Map(); // nodeId -> Promise, avoids duplicate permission/graph creation per frame
     this.level = 0;
   }
 
@@ -45,167 +44,21 @@ export class AudioEngine {
     return this.nodes.get(nodeId);
   }
 
-  async ensureInput(nodeId, {
-    deviceId = "",
-    echoCancellation = false,
-    noiseSuppression = false,
-    autoGainControl = false
-  } = {}) {
-    if (this.pending.has(nodeId)) return this.pending.get(nodeId);
-    const task = (async () => {
-      await this.resume();
-      this.release(nodeId);
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Entrée audio indisponible");
-    const audio = {
-      echoCancellation: !!echoCancellation,
-      noiseSuppression: !!noiseSuppression,
-      autoGainControl: !!autoGainControl
-    };
-    if (deviceId) audio.deviceId = { exact: deviceId };
-    const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
-    const source = this.ctx.createMediaStreamSource(stream);
+  async ensureMic(nodeId) {
+    await this.resume();
+    this.release(nodeId);
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Micro indisponible");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const mic = this.ctx.createMediaStreamSource(stream);
     const analyser = this.ctx.createAnalyser();
     analyser.fftSize = 256;
-    const silent = this.ctx.createGain();
-    silent.gain.value = 0;
-    source.connect(analyser);
-    analyser.connect(silent);
-    silent.connect(this.ctx.destination);
-      this.nodes.set(nodeId, {
-        type: "input",
-        source,
-        mic: source,
-        gain: silent,
-        analyser,
-        stream,
-        ownsStream: true
-      });
-      return this.nodes.get(nodeId);
-    })();
-    this.pending.set(nodeId, task);
-    try {
-      return await task;
-    } finally {
-      if (this.pending.get(nodeId) === task) this.pending.delete(nodeId);
-    }
-  }
-
-  async ensureMic(nodeId, options = {}) {
-    return this.ensureInput(nodeId, options);
-  }
-
-  audioValue(nodeId) {
-    const n = this.nodes.get(nodeId);
-    if (!n?.stream) return null;
-    return {
-      kind: "audio",
-      stream: n.stream,
-      analyser: n.analyser || null,
-      nodeId
-    };
-  }
-
-  async ensureStreamProcessor(nodeId, inputValue, {
-    kind = "gain",
-    gain = 1,
-    threshold = -6,
-    monitor = 0
-  } = {}) {
-    await this.resume();
-    const stream = inputValue?.stream;
-    if (!stream?.getAudioTracks?.().length) throw new Error("Flux audio entrant absent");
-    let n = this.nodes.get(nodeId);
-    if (!n || n.type !== `stream-${kind}` || n.inputStream !== stream) {
-      this.release(nodeId);
-      const source = this.ctx.createMediaStreamSource(stream);
-      const analyser = this.ctx.createAnalyser();
-      analyser.fftSize = 256;
-      const destination = this.ctx.createMediaStreamDestination();
-      let processor;
-      if (kind === "limiter") {
-        processor = this.ctx.createDynamicsCompressor();
-        processor.knee.value = 3;
-        processor.ratio.value = 20;
-        processor.attack.value = 0.003;
-        processor.release.value = 0.12;
-      } else {
-        processor = this.ctx.createGain();
-      }
-      source.connect(processor);
-      processor.connect(analyser);
-      analyser.connect(destination);
-      const monitorGain = this.ctx.createGain();
-      monitorGain.gain.value = 0;
-      processor.connect(monitorGain);
-      monitorGain.connect(this.master);
-      n = {
-        type: `stream-${kind}`,
-        source,
-        processor,
-        analyser,
-        destination,
-        monitorGain,
-        stream: destination.stream,
-        inputStream: stream,
-        ownsStream: true
-      };
-      this.nodes.set(nodeId, n);
-    }
-    if (kind === "limiter" && n.processor?.threshold) {
-      n.processor.threshold.setTargetAtTime(Math.max(-60, Math.min(0, Number(threshold) || -6)), this.ctx.currentTime, 0.01);
-    } else if (n.processor?.gain) {
-      n.processor.gain.setTargetAtTime(Math.max(0, Math.min(4, Number(gain) || 0)), this.ctx.currentTime, 0.01);
-    }
-    if (n.monitorGain?.gain) {
-      n.monitorGain.gain.setTargetAtTime(Math.max(0, Math.min(1, Number(monitor) || 0)), this.ctx.currentTime, 0.01);
-    }
-    return this.audioValue(nodeId);
-  }
-
-  async ensureMixer(nodeId, aValue, bValue, { gainA = 1, gainB = 1 } = {}) {
-    await this.resume();
-    const a = aValue?.stream;
-    const b = bValue?.stream;
-    if (!a?.getAudioTracks?.().length && !b?.getAudioTracks?.().length) throw new Error("Mixer : aucun flux audio entrant");
-    let n = this.nodes.get(nodeId);
-    if (!n || n.type !== "stream-mixer" || n.inputA !== a || n.inputB !== b) {
-      this.release(nodeId);
-      const destination = this.ctx.createMediaStreamDestination();
-      const analyser = this.ctx.createAnalyser();
-      analyser.fftSize = 256;
-      const mix = this.ctx.createGain();
-      mix.gain.value = 1;
-      mix.connect(analyser);
-      analyser.connect(destination);
-      const sources = [null, null];
-      const gains = [null, null];
-      for (const [index, stream, value] of [[0, a, gainA], [1, b, gainB]]) {
-        if (!stream?.getAudioTracks?.().length) continue;
-        const source = this.ctx.createMediaStreamSource(stream);
-        const g = this.ctx.createGain();
-        g.gain.value = Math.max(0, Math.min(4, Number(value) || 0));
-        source.connect(g);
-        g.connect(mix);
-        sources[index] = source;
-        gains[index] = g;
-      }
-      n = {
-        type: "stream-mixer",
-        sources,
-        gains,
-        mix,
-        analyser,
-        destination,
-        stream: destination.stream,
-        inputA: a,
-        inputB: b,
-        ownsStream: true
-      };
-      this.nodes.set(nodeId, n);
-    }
-    if (n.gains[0]) n.gains[0].gain.setTargetAtTime(Math.max(0, Math.min(4, Number(gainA) || 0)), this.ctx.currentTime, 0.01);
-    if (n.gains[1]) n.gains[1].gain.setTargetAtTime(Math.max(0, Math.min(4, Number(gainB) || 0)), this.ctx.currentTime, 0.01);
-    return this.audioValue(nodeId);
+    const g = this.ctx.createGain();
+    g.gain.value = 0.0; // monitoring off by default (évite larsen) — niveau via analyseur
+    mic.connect(analyser);
+    analyser.connect(g);
+    // ne pas connecter au master pour éviter feedback haut-parleur
+    this.nodes.set(nodeId, { type: "mic", mic, gain: g, analyser, stream });
+    return this.nodes.get(nodeId);
   }
 
   setToneParams(nodeId, { freq, gain } = {}) {
@@ -298,19 +151,12 @@ export class AudioEngine {
     try { n.osc?.stop(); } catch { /* */ }
     try { n.osc?.disconnect(); } catch { /* */ }
     try { n.mic?.disconnect(); } catch { /* */ }
-    try { n.source?.disconnect(); } catch { /* */ }
-    try { n.sources?.forEach(source => source.disconnect()); } catch { /* */ }
     try { n.gain?.disconnect(); } catch { /* */ }
-    try { n.gains?.forEach(gain => gain.disconnect()); } catch { /* */ }
-    try { n.processor?.disconnect(); } catch { /* */ }
-    try { n.mix?.disconnect(); } catch { /* */ }
-    try { n.monitorGain?.disconnect(); } catch { /* */ }
-    try { n.destination?.disconnect?.(); } catch { /* */ }
     try { n.filter?.disconnect(); } catch { /* */ }
     try { n.delay?.disconnect(); } catch { /* */ }
     try { n.feedback?.disconnect(); } catch { /* */ }
     try { n.analyser?.disconnect(); } catch { /* */ }
-    if (n.ownsStream && n.stream) n.stream.getTracks().forEach(t => t.stop());
+    if (n.stream) n.stream.getTracks().forEach(t => t.stop());
     this.nodes.delete(nodeId);
   }
 
@@ -326,7 +172,6 @@ export class AudioEngine {
     }
     this.ctx = null;
     this.master = null;
-    this.pending.clear();
     this.level = 0;
   }
 }

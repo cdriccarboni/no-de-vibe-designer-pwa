@@ -3,7 +3,6 @@ import { evaluateGraph, findVideoOutput, validateBeforeRun } from "./graph-engin
 import { createNodeProcessors } from "./node-processors.js";
 import { evaluateSubGraph } from "./subpatch.js";
 import { sharedAudio } from "./audio-engine.js";
-import { sharedBroadcast } from "./broadcast-engine.js";
 import { createMlRuntime } from "./ml-runtime.js";
 import { renderTextPlate } from "./composition.js";
 
@@ -41,7 +40,6 @@ export class Runtime {
     this.lastGraph = { errors: [], warnings: [] };
     this.cameraWanted = false;
     this.audioEngine = sharedAudio;
-    this.broadcastEngine = sharedBroadcast;
     this.honestFlags = new Set();
     this.sensorBus = null;
     this.mediaElements = new Map();
@@ -111,9 +109,6 @@ export class Runtime {
     const ids = new Set((project?.nodes || []).map(n => n.id));
     for (const id of [...this.audioEngine.nodes.keys()]) {
       if (!ids.has(id)) this.audioEngine.release(id);
-    }
-    for (const id of [...this.broadcastEngine.sessions.keys()]) {
-      if (!ids.has(id)) this.broadcastEngine.stop(id).catch(() => {});
     }
     for (const node of previousProject?.nodes || []) {
       if ((node.type === "ml5-hand" || node.type === "ml5-body" || node.type === "brain-map") && !ids.has(node.id)) {
@@ -245,7 +240,6 @@ export class Runtime {
       }
     }
     this.frameScratch.clear();
-    await this.broadcastEngine?.stopAll?.();
     await this.audioEngine?.shutdown();
   }
 
@@ -290,7 +284,6 @@ export class Runtime {
       artnetUdpSend: this.artnetUdpSend,
       controls: this.project.controls || [],
       audioEngine: this.audioEngine,
-      broadcastEngine: this.broadcastEngine,
       mlRuntime: this.mlRuntime,
       requestRender: () => { if (!this.playing && this.project) this.render(); },
       sensorBus: this.sensorBus,
