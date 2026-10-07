@@ -3173,6 +3173,11 @@ document.addEventListener("keydown", e => {
   togglePlay();
 });
 document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && document.body.classList.contains("demo-mode")) {
+    e.preventDefault();
+    exitShowcaseDemo();
+    return;
+  }
   const tag = e.target?.tagName?.toLowerCase?.();
   const typing = tag === "input" || tag === "textarea" || tag === "select" || e.target?.isContentEditable;
   if ((e.key === "Backspace" || e.key === "Delete") && selectedNode && !typing) {
