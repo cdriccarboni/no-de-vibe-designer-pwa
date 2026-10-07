@@ -105,7 +105,17 @@ export function detectRunnableEngines(text = "") {
   const push = id => { if (!engines.includes(id)) engines.push(id); };
   if (/\bglsl\b|\bfragment\b|\bshader\b|\bisf\b/.test(t)) push("glsl");
   if (/\bp5(?:\.js)?\b|\bprocessing\b/.test(t)) push("p5");
-  if (/\bjavascript\b|\bjava script\b|\bsketch\b/.test(t)) push("sketch");
+  if (/\bjavascript\b|\bjava script\b|\bsketch\b|\bnode\.?(?:js)?\b/.test(t)) push("sketch");
+
+  // Artist-first fallback: a visual/generative request must still produce a
+  // runnable local sketch even when the user does not name a programming engine.
+  const visualSubject = /\b(chat|cat|chien|dog|animal|personnage|silhouette|corps|objet|forme|scene|visuel|animation|boucle|loop|pov|point of view)\b/.test(t);
+  const visualAction = /\b(court|courir|run|running|grimpe|grimper|climb|danse|vole|bouge|mouvement|anime|animer|effet|matrix|matrice|neon|pixel|particule|pluie)\b/.test(t);
+  if (!engines.length && visualSubject && visualAction) push("p5");
+  if (/\b(matrix|matrice|digital rain|pluie numerique|pluie digitale)\b/.test(t)) {
+    push("p5");
+    push("glsl");
+  }
   return engines;
 }
 
@@ -118,6 +128,7 @@ function palette(text) {
   const table = [
     [/rouge|red/, [214, 64, 52]],
     [/bleu|blue/, [64, 132, 214]],
+    [/matrix|matrice|digital rain|pluie numerique|pluie digitale/, [54, 232, 96]],
     [/vert|green/, [64, 176, 112]],
     [/violet|purple/, [156, 92, 196]],
     [/or\b|gold|dore/, [214, 176, 84]],
@@ -173,8 +184,40 @@ export function webglFragment(text = "") {
 }
 
 export function drawingScript(text = "") {
+  const t = norm(text);
   const { rgb, waves, circles, mouse } = mood(text);
   const [r, g, b] = rgb;
+
+  if (/\b(chat|cat)\b/.test(t)) {
+    const matrix = /\b(matrix|matrice|digital rain|pluie numerique|pluie digitale)\b/.test(t);
+    const lines = ["background(2,7,4)"];
+    if (matrix) {
+      lines.push("fill(38,220,82,120)");
+      for (const x of [0.08,0.16,0.24,0.32,0.40,0.48,0.56,0.64,0.72,0.80,0.88,0.96]) {
+        lines.push(`line(width*${x},0,width*${x},height)`);
+      }
+      lines.push("fill(90,255,125,100)");
+      lines.push("wave(height*0.28,18,0.055,4.5)");
+      lines.push("wave(height*0.78,24,0.041,3.2)");
+    }
+    // Stylised running cat silhouette, deliberately inside the safe p5 subset.
+    lines.push("fill(205,255,216,235)");
+    lines.push("rect(width*0.34,height*0.48,width*0.28,height*0.16)");
+    lines.push("circle(width*0.67,height*0.49,70)");
+    lines.push("line(width*0.69,height*0.44,width*0.72,height*0.36)");
+    lines.push("line(width*0.65,height*0.44,width*0.62,height*0.36)");
+    lines.push("line(width*0.35,height*0.53,width*0.25,height*0.42)");
+    lines.push("line(width*0.42,height*0.64,width*0.34,height*0.80)");
+    lines.push("line(width*0.49,height*0.64,width*0.55,height*0.80)");
+    lines.push("line(width*0.57,height*0.64,width*0.66,height*0.76)");
+    lines.push("line(width*0.38,height*0.64,width*0.28,height*0.72)");
+    if (/court|courir|run|running/.test(t)) {
+      lines.push("fill(54,232,96,90)");
+      lines.push("wave(height*0.70,16,0.085,7)");
+    }
+    return lines.join("\n");
+  }
+
   const lines = ["background(8,10,14)", `fill(${r},${g},${b},200)`];
   if (circles || mouse || !waves) lines.push(mouse ? "circle(mouseX,mouseY,78)" : "circle(width*0.5,height*0.48,90)");
   if (waves || !circles) lines.push("wave(height*0.58,34,0.02,1.6)");
