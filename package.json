@@ -1,0 +1,1 @@
+{"name":"nvd-339-syntax-check","private":true,"type":"module","scripts":{"start":"node syntax-check.mjs"}}
