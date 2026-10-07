@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.8-multi-unified-rings-brand";
+const CACHE = "nvd-3.3.8-multi-example-wow-20261007";
 const ASSETS = [
   "./src/core/StageSafety.js",
   "./companion/companion.css",
@@ -113,6 +113,7 @@ const ASSETS = [
   "./shared/protocols/sacn.js",
   "./shared/pwa-update.js",
   "./shared/quick-map.js",
+  "./shared/release-notice.js",
   "./shared/remote-camera/camera.js",
   "./shared/remote-camera/capability.js",
   "./shared/remote-camera/local-returns.js",
