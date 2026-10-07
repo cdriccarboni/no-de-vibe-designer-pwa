@@ -71,6 +71,20 @@ function plateau() {
   return validateCompanionDocument(doc);
 }
 
+function radio() {
+  const doc=createUniversalRegieLayout({name:"Radio / Broadcast",profileIds:[],includeCore:true});
+  doc.pages=doc.pages.filter(p=>["show","sound","stage"].includes(p.role));
+  const p=page(doc,"broadcast","Radio");
+  p.icon="●";
+  p.widgets.unshift(
+    button("Audio In","Micro / carte son",{kind:"broadcast",action:"input-toggle"},{type:"toggle",w:2,h:1,color:"#8fa79d"}),
+    button("ON AIR","Radio Out",{kind:"broadcast",action:"toggle"},{type:"toggle",w:2,h:2,color:"#d7b86a"}),
+    button("STOP","Retour STANDBY",{kind:"broadcast",action:"off"},{type:"momentary",w:2,h:1,color:"#c97868"})
+  );
+  doc.meta.presetId="radio";
+  return validateCompanionDocument(doc);
+}
+
 function lecteurs12() {
   const doc=createUniversalRegieLayout({name:"12 Players",profileIds:[],includeCore:false});
   doc.pages=[];
@@ -103,6 +117,7 @@ export const REGIE_PRESETS=Object.freeze([
   {id:"lumiere",name:"Lumière",badge:"lumière",description:"Page lumière compacte avec faders réseau prêts à configurer.",factory:lumiere},
   {id:"video",name:"Vidéo",badge:"vidéo",description:"Transport No-de et page vidéo prête à compléter.",factory:video},
   {id:"plateau",name:"Plateau",badge:"plateau",description:"Commandes plateau, caméra et état réseau.",factory:plateau},
+  {id:"radio",name:"Radio / Broadcast",badge:"radio",description:"Audio In, ON AIR et retour STANDBY pour la régie Radio Paillette.",factory:radio},
   {id:"lecteurs12",name:"12 Players",badge:"audio",description:"Douze lecteurs stéréo répartis sur trois pages compactes.",factory:lecteurs12}
 ]);
 

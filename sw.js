@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.8-multi-example-wow-20261007";
+const CACHE = "nvd-3.3.9-multi-radio-live-20261007";
 const ASSETS = [
   "./src/core/StageSafety.js",
   "./companion/companion.css",
@@ -48,6 +48,7 @@ const ASSETS = [
   "./shared/adapters/websocket-bridge.js",
   "./shared/agent-registry.js",
   "./shared/audio-engine.js",
+  "./shared/broadcast-engine.js",
   "./shared/backend-registry.js",
   "./shared/backend-status.js",
   "./shared/backend-status.json",

@@ -654,16 +654,6 @@ function buildLibrary() {
   if (mode) mode.style.display = expCount ? "flex" : "none";
 }
 
-// NVD_LIBRARY_BOOTSTRAP_GUARD
-// La palette doit exister avant les initialisations secondaires : une erreur
-// ailleurs dans Designer ne doit plus pouvoir laisser la Library vide.
-try {
-  buildLibrary();
-  document.documentElement.dataset.libraryReady = "1";
-} catch (error) {
-  console.error("LIBRARY_BOOTSTRAP", error);
-}
-
 function startEngineDownload(url) {
   if (typeof window.nvdDesktop?.openExternal === "function") {
     window.nvdDesktop.openExternal(url).catch(error => log(`Téléchargement · ${error?.message || error}`));
@@ -998,6 +988,28 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
     x, y,
     params: { enabled: true, duration: 5, opacity: 1, intensity: 1, host: "bridge", address: "/nvd/value", value: 0, fallback: 0, freq: 220, gain: 0.15, mode: "tone" }
   };
+  if (type === "audio-in") Object.assign(n.params, {
+    enabled: false,
+    deviceId: "",
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false
+  });
+  if (type === "audio-mixer") Object.assign(n.params, { gainA: 1, gainB: 1 });
+  if (type === "audio-gain" || type === "radio-bus") n.params.gain = 1;
+  if (type === "audio-limiter") n.params.threshold = -6;
+  if (type === "audio-monitor") n.params.monitor = 0;
+  if (type === "radio-out") Object.assign(n.params, {
+    onAir: false,
+    transport: "relay",
+    endpoint: "wss://radio-relay-production.up.railway.app/publish",
+    token: "rp1_P9vK3mQ7sX2cL8nD5fJ4wR6tB1yH0zA",
+    station: "Radio Paillettes",
+    show: "",
+    audioBitsPerSecond: 128000,
+    chunkMs: 250,
+    iceServers: []
+  });
   if (type === "libpd") n.params.patch = LIBPD_AUDIO_PATCH;
   if (type === "subpatch") ensureSubGraph(n);
   g.nodes.push(n);
@@ -1017,7 +1029,12 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
 
 function drawNode(n) {
   const el = document.createElement("div");
-  el.className = "node" + (isExecutable(n.type) ? " executable" : " unavailable");
+  const familyClass = String(n.type).startsWith("radio-")
+    ? " node-radio"
+    : (String(n.type).startsWith("audio-") || ["audio","libpd","envelope","audiofilter","audiodelay","audiofft","organicaudio","soundmemo"].includes(n.type))
+      ? " node-audio"
+      : "";
+  el.className = "node" + (isExecutable(n.type) ? " executable" : " unavailable") + familyClass;
   el.dataset.id = n.id;
   el.title = nodeReadiness(n.type);
   el.style.left = n.x + "px";
@@ -1252,6 +1269,39 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="field"><label>Fallback CC (0–1)</label><input id="nFb" type="range" min="0" max="1" step=".01" value="${n.params.fallback ?? 0}"></div>`;
     extra += `<p class="hint">Matériel MIDI : à vérifier sur périphérique réel. Test logiciel = bus interne.</p>`;
   }
+  if (n.type === "audio-in") {
+    extra += `<div class="field"><label>Entrée audio</label><select id="nAudioDevice"><option value="">Entrée système par défaut</option></select></div>`;
+    extra += `<div class="field"><label>Annulation écho</label><select id="nAudioEcho"><option value="false">Non</option><option value="true">Oui</option></select></div>`;
+    extra += `<div class="field"><label>Réduction bruit</label><select id="nAudioNoise"><option value="false">Non</option><option value="true">Oui</option></select></div>`;
+    extra += `<div class="field"><label>Gain automatique</label><select id="nAudioAgc"><option value="false">Non</option><option value="true">Oui</option></select></div>`;
+    extra += `<div class="camera-actions"><button id="audioInputStart" type="button">Ouvrir l’entrée</button><button id="audioInputStop" class="stop" type="button">Couper</button></div>`;
+    extra += `<p class="hint">OFF par défaut. L’accès micro/carte son n’est demandé qu’après activation explicite.</p>`;
+  }
+  if (n.type === "audio-mixer") {
+    extra += `<div class="field"><label>Gain A</label><input id="nMixGainA" type="range" min="0" max="2" step=".01" value="${n.params.gainA ?? 1}"></div>`;
+    extra += `<div class="field"><label>Gain B</label><input id="nMixGainB" type="range" min="0" max="2" step=".01" value="${n.params.gainB ?? 1}"></div>`;
+  }
+  if (n.type === "audio-gain" || n.type === "radio-bus") {
+    extra += `<div class="field"><label>Gain</label><input id="nStreamGain" type="range" min="0" max="2" step=".01" value="${n.params.gain ?? 1}"></div>`;
+  }
+  if (n.type === "audio-limiter") {
+    extra += `<div class="field"><label>Seuil limiteur (dB)</label><input id="nLimiterThreshold" type="range" min="-36" max="0" step=".5" value="${n.params.threshold ?? -6}"></div>`;
+  }
+  if (n.type === "audio-monitor") {
+    extra += `<div class="field"><label>Écoute locale</label><input id="nAudioMonitor" type="range" min="0" max="1" step=".01" value="${n.params.monitor ?? 0}"></div>`;
+    extra += `<p class="hint">À 0 par défaut pour éviter tout larsen.</p>`;
+  }
+  if (n.type === "radio-out") {
+    const radioState = runtime.broadcastEngine?.state?.(n.id) || { detail:"STANDBY", live:false };
+    extra += `<div class="field"><label>Transport</label><select id="nRadioTransport"><option value="relay">Radio Paillettes · relais</option><option value="whip">WHIP direct</option></select></div>`;
+    extra += `<div class="field"><label>Endpoint diffusion</label><input id="nRadioEndpoint" value="${htmlSafe(n.params.endpoint || "")}" placeholder="wss://…/publish"></div>`;
+    extra += `<div class="field"><label>Jeton publication</label><input id="nRadioToken" type="password" value="${htmlSafe(n.params.token || "")}" autocomplete="off"></div>`;
+    extra += `<div class="field"><label>Station</label><input id="nRadioStation" value="${htmlSafe(n.params.station || "Radio Paillettes")}"></div>`;
+    extra += `<div class="field"><label>Émission</label><input id="nRadioShow" value="${htmlSafe(n.params.show || "")}"></div>`;
+    extra += `<div class="field"><label>Débit audio</label><select id="nRadioBitrate"><option value="96000">96 kb/s</option><option value="128000">128 kb/s</option><option value="160000">160 kb/s</option><option value="192000">192 kb/s</option></select></div>`;
+    extra += `<div class="camera-actions"><button id="radioOnAirBtn" type="button">● ON AIR</button><button id="radioStandbyBtn" class="stop" type="button">STANDBY</button></div>`;
+    extra += `<p class="hint">État : <b id="radioState">${htmlSafe(radioState.detail || "STANDBY")}</b>. Le flux reste totalement coupé tant que ON AIR n’est pas armé.</p>`;
+  }
   if (n.type === "audio" || n.type === "organicaudio") {
     extra += `<div class="field"><label>Fréquence</label><input id="nFreq" type="number" min="40" max="2000" value="${n.params.freq ?? 220}"></div>`;
     extra += `<div class="field"><label>Gain</label><input id="nGain" type="range" min="0" max="0.5" step=".01" value="${n.params.gain ?? 0.15}"></div>`;
@@ -1384,8 +1434,11 @@ function selectNode(id, { additive = false } = {}) {
   $("#nOpa").oninput = e => { n.params.opacity = +e.target.value; runtime.render(); autosave(); };
   $("#nEnabled").onchange = e => {
     n.params.enabled = e.target.value === "true";
-    if (!n.params.enabled && (n.type === "audio" || n.type === "organicaudio" || n.type === "soundmemo")) {
-      sharedAudio.release(n.id);
+    const audioNode = n.type === "audio" || n.type === "organicaudio" || n.type === "soundmemo" || String(n.type).startsWith("audio-") || n.type === "radio-bus";
+    if (!n.params.enabled && audioNode) sharedAudio.release(n.id);
+    if (!n.params.enabled && n.type === "radio-out") {
+      n.params.onAir = false;
+      runtime.broadcastEngine?.stop?.(n.id).catch?.(() => {});
     }
     if (["camera", "phone-camera-front", "phone-camera-back"].includes(n.type)) runtime.setProject(project);
     else runtime.render();
@@ -1488,6 +1541,76 @@ function selectNode(id, { additive = false } = {}) {
     }
   };
   if ($("#nFb")) $("#nFb").oninput = e => { n.params.fallback = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nAudioDevice")) {
+    $("#nAudioDevice").value = n.params.deviceId || "";
+    $("#nAudioDevice").onchange = e => {
+      n.params.deviceId = e.target.value;
+      if (n.params.enabled) sharedAudio.release(n.id);
+      runtime.render(); autosave(); commitHistory();
+    };
+    navigator.mediaDevices?.enumerateDevices?.().then(devices => {
+      const select = $("#nAudioDevice");
+      if (!select || selectedNode !== n.id) return;
+      const current = n.params.deviceId || "";
+      const inputs = devices.filter(d => d.kind === "audioinput");
+      for (const [index, device] of inputs.entries()) {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.textContent = device.label || `Entrée audio ${index + 1}`;
+        select.appendChild(option);
+      }
+      select.value = current;
+    }).catch(() => {});
+  }
+  for (const [id,key] of [["nAudioEcho","echoCancellation"],["nAudioNoise","noiseSuppression"],["nAudioAgc","autoGainControl"]]) {
+    if ($("#"+id)) {
+      $("#"+id).value = String(n.params[key] === true);
+      $("#"+id).onchange = e => {
+        n.params[key] = e.target.value === "true";
+        if (n.params.enabled) sharedAudio.release(n.id);
+        runtime.render(); autosave(); commitHistory();
+      };
+    }
+  }
+  if ($("#audioInputStart")) $("#audioInputStart").onclick = () => {
+    n.params.enabled = true;
+    $("#nEnabled").value = "true";
+    runtime.render(); autosave(); commitHistory(); log(`Audio In · ouverture demandée · ${n.title}`);
+  };
+  if ($("#audioInputStop")) $("#audioInputStop").onclick = () => {
+    n.params.enabled = false;
+    $("#nEnabled").value = "false";
+    sharedAudio.release(n.id);
+    runtime.render(); autosave(); commitHistory(); log(`Audio In · coupé · ${n.title}`);
+  };
+  if ($("#nMixGainA")) $("#nMixGainA").oninput = e => { n.params.gainA = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nMixGainB")) $("#nMixGainB").oninput = e => { n.params.gainB = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nStreamGain")) $("#nStreamGain").oninput = e => { n.params.gain = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nLimiterThreshold")) $("#nLimiterThreshold").oninput = e => { n.params.threshold = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nAudioMonitor")) $("#nAudioMonitor").oninput = e => { n.params.monitor = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nRadioTransport")) {
+    $("#nRadioTransport").value = n.params.transport || "relay";
+    $("#nRadioTransport").onchange = e => { n.params.transport = e.target.value; autosave(); commitHistory(); };
+  }
+  if ($("#nRadioEndpoint")) $("#nRadioEndpoint").onchange = e => { n.params.endpoint = e.target.value.trim(); autosave(); commitHistory(); };
+  if ($("#nRadioToken")) $("#nRadioToken").onchange = e => { n.params.token = e.target.value; autosave(); commitHistory(); };
+  if ($("#nRadioStation")) $("#nRadioStation").onchange = e => { n.params.station = e.target.value.trim() || "Radio Paillettes"; autosave(); commitHistory(); };
+  if ($("#nRadioBitrate")) {
+    $("#nRadioBitrate").value = String(n.params.audioBitsPerSecond || 128000);
+    $("#nRadioBitrate").onchange = e => { n.params.audioBitsPerSecond = +e.target.value || 128000; autosave(); commitHistory(); };
+  }
+  if ($("#nRadioShow")) $("#nRadioShow").onchange = e => { n.params.show = e.target.value.trim(); autosave(); commitHistory(); };
+  if ($("#radioOnAirBtn")) $("#radioOnAirBtn").onclick = () => {
+    n.params.onAir = true;
+    runtime.render(); autosave(); commitHistory(); log(`Radio Out · ON AIR armé · ${n.title}`);
+    setTimeout(() => { const state=$("#radioState"); if(state) state.textContent=runtime.broadcastEngine?.state?.(n.id)?.detail || "CONNEXION…"; }, 0);
+  };
+  if ($("#radioStandbyBtn")) $("#radioStandbyBtn").onclick = () => {
+    n.params.onAir = false;
+    runtime.broadcastEngine?.stop?.(n.id).finally?.(() => runtime.render());
+    const state=$("#radioState"); if(state) state.textContent="STANDBY";
+    autosave(); commitHistory(); log(`Radio Out · STANDBY · ${n.title}`);
+  };
   if ($("#nFreq")) $("#nFreq").onchange = e => { n.params.freq = +e.target.value; runtime.render(); autosave(); commitHistory(); };
   if ($("#nGain")) $("#nGain").oninput = e => { n.params.gain = +e.target.value; runtime.render(); autosave(); };
   if ($("#nSmooth")) $("#nSmooth").oninput = e => { n.params.amount = +e.target.value; runtime.render(); autosave(); };
