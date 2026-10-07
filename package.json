@@ -1,0 +1,1 @@
+{"name":"nvd-radio-safe-validation","private":true,"type":"module","scripts":{"start":"node validate.mjs"}}
