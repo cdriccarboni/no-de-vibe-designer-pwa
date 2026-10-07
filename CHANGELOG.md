@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.3.8 — 2026-10-06
+
+### Distribution / identité
+- Identité visuelle No[co]de unifiée avec le logo rings sur les surfaces web, Desktop et Android.
+- Installateur public et paquets natifs alignés sur la version 3.3.8.
+- Connexion à l’IA locale Ollama fiabilisée depuis la PWA HTTPS.
+
+### Mise à jour
+- Desktop et Mobile affichent désormais une notification discrète après changement de version, une seule fois par version, avec accès aux nouveautés.
+
 ## 3.2.0 — 2026-10-01
 
 ### Interface
