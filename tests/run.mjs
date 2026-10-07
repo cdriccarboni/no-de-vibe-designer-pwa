@@ -57,6 +57,14 @@ function assert(cond, msg) {
 
 console.log(`\nNo[co]de Vibe Designer ${APP_VERSION} — System Test P00/P01\n`);
 
+console.log("example-wow-overlay");
+const desktopCss = fs.readFileSync(new URL("../desktop/styles.css", import.meta.url), "utf8");
+const desktopJs = fs.readFileSync(new URL("../desktop/app.js", import.meta.url), "utf8");
+assert(/body\.demo-mode #previewPanel/.test(desktopCss), "example enlarges the existing Preview instead of changing demo nodes");
+assert(/nvd-demo-wow-in/.test(desktopCss), "example uses the immersive wow overlay");
+assert(/Escape.*demo-mode|demo-mode.*Escape/s.test(desktopJs), "example can be closed with Escape");
+assert(createDemoProject().nodes.length === 5 && createDemoProject().edges.length === 9, "example graph remains unchanged");
+
 console.log("release-notice");
 assert(shouldShowReleaseNotice({ seenVersion:"3.3.7", currentVersion:APP_VERSION }), "release notice appears after a version change");
 assert(!shouldShowReleaseNotice({ seenVersion:APP_VERSION, currentVersion:APP_VERSION }), "release notice is shown only once per version");
