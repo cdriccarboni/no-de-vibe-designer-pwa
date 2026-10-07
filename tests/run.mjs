@@ -34,6 +34,7 @@ import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } 
 import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { WebSocketBridge } from "../shared/adapters/websocket-bridge.js";
 import { shouldPromptForUpdate, shouldActivateWaitingWorker, shouldReloadAfterUpdate } from "../shared/pwa-update.js";
+import { releaseNoticeStorageKey, shouldShowReleaseNotice } from "../shared/release-notice.js";
 import { SURFACES, getPreferredSurface, setPreferredSurface, surfaceUrl, navigateSurface } from "../shared/surface-switcher.js";
 import { createShowSession, loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow, fireCue, saveShow, restoreShow, askShow, sampleCurve, setKeyframe, applyCurves, showMonitor, CX_NOTE } from "../shared/show-session.js";
 import { activeAgents, nativeBridgeLabel, runShaderAgent, WAVE_PARAMS } from "../shared/shader-agent.js";
@@ -55,6 +56,11 @@ function assert(cond, msg) {
 }
 
 console.log(`\nNo[co]de Vibe Designer ${APP_VERSION} — System Test P00/P01\n`);
+
+console.log("release-notice");
+assert(shouldShowReleaseNotice({ seenVersion:"3.3.7", currentVersion:APP_VERSION }), "release notice appears after a version change");
+assert(!shouldShowReleaseNotice({ seenVersion:APP_VERSION, currentVersion:APP_VERSION }), "release notice is shown only once per version");
+assert(/release-notice\.last-seen\.v1$/.test(releaseNoticeStorageKey("No[co]de Vibe Designer")), "release notice storage key is stable");
 
 // --- ports ---
 console.log("ports");

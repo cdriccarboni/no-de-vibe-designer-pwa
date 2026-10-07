@@ -8,6 +8,7 @@ import { validateEdge } from "../shared/graph-engine.js";
 import { createHistory } from "../shared/history.js";
 import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed } from "../shared/vibe.js";
 import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
+import { showReleaseNotice } from "../shared/release-notice.js";
 import { addBoxPort, ensureSubGraph, wrapNodesInSubpatch } from "../shared/subpatch.js";
 import { planManualSave, saveStatusMessage } from "../shared/save-fallback.js";
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
@@ -70,6 +71,7 @@ runtime.setBridgeSend((packet) => devices.bridge.send(packet));
 $("#appVersion").textContent = `v${APP_VERSION}`;
 $("#versionInfo").textContent = BUILD_LABEL;
 document.title = `${APP_NAME} — ${APP_VERSION}`;
+showReleaseNotice({ version:APP_VERSION, appName:APP_NAME });
 
 function pushAlert(level, text) {
   const msg = String(text || "").trim();
