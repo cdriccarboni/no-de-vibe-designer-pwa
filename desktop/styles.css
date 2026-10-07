@@ -302,3 +302,14 @@ body.show-locked .nh,body.show-locked .port-dot{cursor:not-allowed}
 .install-pref-card h3{font-size:18px;margin:7px 0 8px}.install-pref-card p{max-width:620px;color:var(--muted);line-height:1.55}
 .install-pref-tags{display:flex;flex-wrap:wrap;gap:6px;margin:13px 0}.install-pref-tags span{border:1px solid var(--line2);border-radius:99px;padding:4px 8px;background:var(--bg);color:var(--muted);font-size:9px}
 .install-pref-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 8px}.install-pref-actions a{display:inline-flex;align-items:center;text-decoration:none;padding:8px 10px}.install-pref-actions .primary-link{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 12%,var(--panel2))}
+
+
+/* Voice dictation · optional progressive enhancement for the Vibe prompt */
+.vibe-input-wrap{position:relative;display:flex;flex:1;min-height:0}
+.vibe-input-wrap textarea{flex:1;padding-right:44px}
+.vibe-voice{position:absolute;right:8px;bottom:8px;width:30px;height:30px;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:999px;background:color-mix(in srgb,var(--panel) 88%,#000);color:var(--muted);cursor:pointer;z-index:2}
+.vibe-voice:hover:not(:disabled){color:var(--text);border-color:var(--muted)}
+.vibe-voice:disabled{opacity:.35;cursor:default}
+.vibe-voice svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.vibe-voice.listening{color:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+.vibe-voice-status{min-height:12px;margin-top:-5px;padding:0 4px;color:var(--muted);font-size:9px;line-height:12px}
