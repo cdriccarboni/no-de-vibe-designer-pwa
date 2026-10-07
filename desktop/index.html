@@ -112,7 +112,13 @@
             <span id="vibeImageInfo" class="sub">Image optionnelle</span>
           </div>
           <div class="vibe-scroll">
-            <textarea id="vibeText" placeholder="Ex. : Fais réagir le rideau de fils à la souris">Fais réagir le rideau de fils à la souris et ajoute des ondes lumineuses.</textarea>
+            <div class="vibe-input-wrap">
+              <textarea id="vibeText" placeholder="Ex. : Fais réagir le rideau de fils à la souris">Fais réagir le rideau de fils à la souris et ajoute des ondes lumineuses.</textarea>
+              <button id="vibeVoice" class="vibe-voice" type="button" aria-label="Démarrer la dictée vocale" aria-pressed="false" title="Dicter le prompt">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"></path><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"></path></svg>
+              </button>
+            </div>
+            <div id="vibeVoiceStatus" class="vibe-voice-status" role="status" aria-live="polite"></div>
             <div id="vibePreview" class="vibe-preview hidden"></div>
           </div>
           <div class="vibe-actions">
