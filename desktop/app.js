@@ -2598,6 +2598,80 @@ async function confirmPendingVibe() {
   for (const err of errors) log(`Vibe ERREUR · ${err}`);
 }
 
+let vibeVoiceRecognition = null;
+let vibeVoiceBase = "";
+
+function vibeSpeechRecognitionCtor() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function setVibeVoiceState(listening, message = "") {
+  const button = $("#vibeVoice");
+  const status = $("#vibeVoiceStatus");
+  if (button) {
+    button.classList.toggle("listening", Boolean(listening));
+    button.setAttribute("aria-pressed", listening ? "true" : "false");
+    button.setAttribute("aria-label", listening ? "Arrêter la dictée vocale" : "Démarrer la dictée vocale");
+    button.title = listening ? "Arrêter l’écoute" : "Dicter le prompt";
+  }
+  if (status) status.textContent = message;
+}
+
+function toggleVibeVoice() {
+  if (vibeVoiceRecognition) {
+    vibeVoiceRecognition.stop();
+    return;
+  }
+  const Recognition = vibeSpeechRecognitionCtor();
+  if (!Recognition) {
+    setVibeVoiceState(false, "Dictée vocale indisponible dans ce navigateur.");
+    return;
+  }
+  const field = $("#vibeText");
+  if (!field) return;
+  try {
+    const recognition = new Recognition();
+    vibeVoiceBase = field.value.trimEnd();
+    recognition.lang = "fr-FR";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onstart = () => setVibeVoiceState(true, "Écoute…");
+    recognition.onresult = event => {
+      let heard = "";
+      for (let i = 0; i < event.results.length; i += 1) {
+        heard += `${event.results[i]?.[0]?.transcript || ""} `;
+      }
+      const transcript = heard.trim();
+      field.value = transcript ? `${vibeVoiceBase}${vibeVoiceBase ? " " : ""}${transcript}` : vibeVoiceBase;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    recognition.onerror = event => {
+      const blocked = event.error === "not-allowed" || event.error === "service-not-allowed";
+      vibeVoiceRecognition = null;
+      setVibeVoiceState(false, blocked ? "Autorisation du micro refusée." : "Dictée vocale interrompue.");
+    };
+    recognition.onend = () => {
+      vibeVoiceRecognition = null;
+      setVibeVoiceState(false, "");
+      field.focus({ preventScroll: true });
+    };
+    vibeVoiceRecognition = recognition;
+    recognition.start();
+  } catch {
+    vibeVoiceRecognition = null;
+    setVibeVoiceState(false, "Impossible de démarrer la dictée vocale.");
+  }
+}
+
+const vibeVoiceButton = $("#vibeVoice");
+if (vibeVoiceButton) {
+  if (!vibeSpeechRecognitionCtor()) {
+    vibeVoiceButton.disabled = true;
+    vibeVoiceButton.title = "Dictée vocale indisponible";
+  }
+  vibeVoiceButton.addEventListener("click", toggleVibeVoice);
+}
+
 $("#applyVibe").onclick = applyVibeFromUi;
 $("#vibeText").addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) {
