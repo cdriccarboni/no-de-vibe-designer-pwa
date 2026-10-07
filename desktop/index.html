@@ -25,7 +25,7 @@
   </div>
 </div>
 <div id="demoModeBanner" class="demo-mode-banner hidden" role="status">
-  <div><b>EXEMPLE · WOW INTERACTIF</b><span>Déplace la souris dans le Preview</span></div>
+  <div><b id="demoModeTitle">EXEMPLE · WOW INTERACTIF</b><span id="demoModeHint">Déplace la souris dans le Preview</span></div>
   <button id="demoExitBtn" type="button">EXIT · QUITTER L’EXEMPLE</button>
 </div>
 <dialog id="companionEditorDialog" class="companion-editor-dialog">
@@ -59,7 +59,20 @@
 
   <section class="workspace">
     <aside class="panel library resizable-x">
-      <div class="panel-head">Library <span class="sub">＋ production · ○ expérimental</span><button type="button" id="loadExampleBtn" class="btn">Exemple</button></div>
+      <div class="panel-head">Library <span class="sub">＋ production · ○ expérimental</span>
+        <div class="examples-wrap">
+          <button type="button" id="loadExampleBtn" class="btn examples-trigger" aria-haspopup="menu" aria-expanded="false">Exemples ▾</button>
+          <div id="examplesMenu" class="examples-menu hidden" role="menu" aria-label="Exemples No-de">
+            <button type="button" data-example="wow">WOW interactif · plein écran</button>
+            <button type="button" data-example="remote-ghost">Remote Camera · Ghost</button>
+            <button type="button" data-example="video-magicfx">Vidéo · Magic FX</button>
+            <button type="button" data-example="stage-osc">Régie · Stage / OSC</button>
+            <span class="examples-sep" aria-hidden="true"></span>
+            <button type="button" data-example="blank">Projet vide</button>
+            <button type="button" id="toggleStartupExample" data-example="startup">Exemple au démarrage · ON</button>
+          </div>
+        </div>
+      </div>
       <div class="search"><input id="search" placeholder="Rechercher…"></div>
       <label class="library-mode"><input id="showExperimental" type="checkbox"> Afficher les expérimentaux</label>
       <div id="engineOffers" class="engine-offers" hidden></div>
@@ -192,7 +205,6 @@
     <div class="preferences-head"><b>Préférences</b><button id="preferencesClose" type="button">×</button></div>
     <div class="preferences-tabs">
       <button type="button" data-pref-tab="general" class="active">Général</button>
-      <button type="button" data-pref-tab="install">Installer</button>
       <button type="button" data-pref-tab="appearance">Interface</button>
       <button type="button" data-pref-tab="canvas">Patch Canvas</button>
       <button type="button" data-pref-tab="ai">IA / Vibe</button>
@@ -209,19 +221,6 @@
         <label>Charger l’exemple WOW interactif si projet vide <input id="prefLoadDemo" type="checkbox" checked></label>
         <label>Mode technique <input id="prefTechnicalMode" type="checkbox"></label>
         <div id="backendReport" class="hint"></div>
-      </div>
-      <div data-pref-panel="install" class="hidden">
-        <div class="install-pref-card">
-          <div class="install-pref-kicker">NO[CO]DE · UNIVERSAL</div>
-          <h3>Installer No[co]de sur cette machine</h3>
-          <p>Une seule base de projet, plusieurs enveloppes. La version macOS Universal est prioritaire pour la création et la régie ; Windows, Linux, Android et la PWA restent disponibles depuis la même page.</p>
-          <div class="install-pref-tags"><span>macOS Universal</span><span>DMG + ZIP</span><span>Windows</span><span>Linux</span><span>Android</span><span>Web/PWA</span></div>
-          <div class="install-pref-actions">
-            <a class="smallbtn primary-link" href="../install/#macos">Installer / mettre à jour</a>
-            <a class="smallbtn" href="../install/">Voir toutes les plateformes</a>
-          </div>
-          <p class="hint">Les boutons de téléchargement ne sont activés sur la page Installer que lorsque le fichier correspondant existe réellement dans la release GitHub courante.</p>
-        </div>
       </div>
       <div data-pref-panel="appearance" class="hidden">
         <label>Couleur dominante <input id="accentColor" type="color" value="#d7b86a"></label>
