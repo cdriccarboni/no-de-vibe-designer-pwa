@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --color-nc-bg: #101214;
+  --color-nc-panel: #171a1e;
+  --color-nc-panel-sub: #20242a;
+  --color-nc-panel-hover: #262b32;
+  --color-nc-text: #f2f3f4;
+  --color-nc-muted: #a0a8b0;
+  --color-nc-accent: #d7b86a;
+  --color-nc-accent-hover: #e4ca86;
+  --color-nc-accent-muted: rgba(215, 184, 106, 0.15);
+  --color-nc-border: #303740;
+  --color-nc-border-sub: #262c34;
+}
+
+@layer base {
+  :root {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #101214;
+    color: #f2f3f4;
+  }
+
+  code, pre, kbd, samp, .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+}
+
+/* Custom scrollbars for code editor & logs */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #171a1e;
+}
+::-webkit-scrollbar-thumb {
+  background: #303740;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #414a56;
+}
+
