@@ -658,6 +658,10 @@ function buildLibrary() {
   if (mode) mode.style.display = expCount ? "flex" : "none";
 }
 
+// NVD_LIBRARY_BOOTSTRAP_GUARD: render the node catalogue before secondary
+// startup/engine setup, so an unrelated optional service cannot hide Library.
+if ($("#libraryList")) buildLibrary();
+
 function startEngineDownload(url) {
   if (typeof window.nvdDesktop?.openExternal === "function") {
     window.nvdDesktop.openExternal(url).catch(error => log(`Téléchargement · ${error?.message || error}`));

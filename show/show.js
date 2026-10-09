@@ -6,6 +6,9 @@ import { browserProbeRegistry, selectAgentsForRequest } from "../shared/agent-re
 import { executeWaveShader, nativeBridgeLabel, runShaderAgent } from "../shared/shader-agent.js";
 import { LIVE_TITLE_PRESETS, loadLiveTitleControlAddress, saveLiveTitleControlAddress, publishLiveTitle } from "../shared/live-title-broadcast.js";
 
+import { APP_VERSION, APP_NAME } from "../shared/version.js";
+import { showReleaseNotice } from "../shared/release-notice.js";
+
 const SAVE_KEY = "nvd.show.save";
 let session = loadExampleScene();
 let timer = 0;
@@ -209,3 +212,4 @@ if ($("liveTitleAddress").value) setLiveTitleStatus("Adresse de régie prête ·
 paintLiveTitle();
 paint();
 refreshNative();
+showReleaseNotice({ version: APP_VERSION, appName: APP_NAME });
