@@ -26,6 +26,7 @@ const libraryDesktopApp = fs.readFileSync(new URL("../desktop/app.js", import.me
 assert(/id=["']libraryList["']/.test(libraryDesktopHtml), "Designer mounts the Library list");
 assert(/id=["']search["']/.test(libraryDesktopHtml), "Designer mounts the Library search");
 assert(/data-pref-tab=["']install["']/.test(libraryDesktopHtml), "Designer exposes Installer from Preferences");
+assert(/data-pref-panel=["']install["']/.test(libraryDesktopHtml) && /href=["']\.\.\/install\//.test(libraryDesktopHtml), "Installer tab links to the actual download page");
 const installerHtml = fs.readFileSync(new URL("../install/index.html", import.meta.url), "utf8");
 assert(installerHtml.includes("macOS Universal"), "Installer prioritizes macOS Universal");
 assert(installerHtml.includes("No-de-Vibe-Designer-{v}-macOS-universal.dmg"), "Installer targets Universal DMG");
