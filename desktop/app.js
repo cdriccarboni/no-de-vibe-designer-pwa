@@ -658,6 +658,19 @@ function buildLibrary() {
   if (mode) mode.style.display = expCount ? "flex" : "none";
 }
 
+/* Restore the node Library on first paint, before slow engine and host checks.
+   Never changes the current project: only populates its existing catalogue UI. */
+function bootstrapLibraryBeforeSecondaryEngines() {
+  const root = $("#libraryList");
+  if (!root) return false;
+  if (!root.querySelector(".lib-item")) buildLibrary();
+  return Boolean(root.querySelector(".lib-item"));
+}
+const NVD_LIBRARY_BOOTSTRAP_GUARD = bootstrapLibraryBeforeSecondaryEngines();
+if (!NVD_LIBRARY_BOOTSTRAP_GUARD) {
+  console.warn("No[co]de Library bootstrap: no visible nodes; check Library mount.");
+}
+
 function startEngineDownload(url) {
   if (typeof window.nvdDesktop?.openExternal === "function") {
     window.nvdDesktop.openExternal(url).catch(error => log(`Téléchargement · ${error?.message || error}`));
