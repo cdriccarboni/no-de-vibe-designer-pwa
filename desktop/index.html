@@ -204,6 +204,7 @@
       <button type="button" data-pref-tab="ai">IA / Vibe</button>
       <button type="button" data-pref-tab="io">Moteurs / I/O</button>
       <button type="button" data-pref-tab="backup">Sauvegardes</button>
+      <button type="button" data-pref-tab="install">Installer</button>
       <button type="button" data-pref-tab="manual">Manuel</button>
       <button type="button" data-pref-tab="about">À propos</button>
     </div>
@@ -324,6 +325,13 @@
       <div data-pref-panel="backup" class="hidden">
         <p class="hint">Autosave navigateur (<code>cvd.autosave</code>) + export fichier <code>.cvd.json</code>.</p>
         <button type="button" id="clearAutosave" class="smallbtn danger">Effacer l’autosave locale</button>
+      </div>
+      <div data-pref-panel="install" class="hidden">
+        <p class="hint">No[co]de Vibe Designer · Installer une version adaptée à cet appareil. La version Android Companion sur Google Play dépend de l’accès au programme de test.</p>
+        <div class="preferences-actions">
+          <a class="smallbtn" href="../install/" target="_blank" rel="noopener noreferrer">Ouvrir la page Installer ↗</a>
+          <a class="smallbtn" href="https://github.com/cdriccarboni/no-de-vibe-designer-pwa/releases" target="_blank" rel="noopener noreferrer">Versions de test ↗</a>
+        </div>
       </div>
       <div data-pref-panel="manual" class="hidden">
         <iframe id="manualFrame" class="manual-frame" src="../manuel/index.html" title="Manuel No[co]de Vibe Designer"></iframe>
