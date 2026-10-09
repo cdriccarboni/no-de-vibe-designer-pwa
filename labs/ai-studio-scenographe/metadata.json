@@ -1,0 +1,6 @@
+{
+  "name": "No[co]de — Multilanguage Lab",
+  "description": "Laboratoire technique d'expérimentation de langages créatifs et moteurs open source avant intégration dans No[co]de Vibe Designer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
