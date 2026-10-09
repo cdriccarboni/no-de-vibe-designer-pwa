@@ -137,6 +137,8 @@ const ASSETS = [
   "./shared/session-store.js",
   "./shared/shader-agent.js",
   "./shared/show-elements.js",
+  "./shared/scenic/scenic-adapter.js",
+  "./shared/scenic/scenic-pack.js",
   "./shared/show-importer.js",
   "./shared/show-session.js",
   "./shared/stage/cues.js",

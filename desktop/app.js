@@ -8,6 +8,7 @@ import { validateEdge } from "../shared/graph-engine.js";
 import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed, probeLocalAi } from "../shared/vibe.js";
 import { createCreatorSession } from "../shared/creator-session.js";
 import { instantiateElement, listElements, saveElement } from "../shared/show-elements.js";
+import { installScenicPack, scenicPackElements } from "../shared/scenic/scenic-adapter.js";
 import { cxChatReply } from "../shared/cx-source.js";
 import { directOllamaProbe } from "../shared/local-ai-core.js";
 import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError } from "../shared/local-ai-diagnostic.js";
@@ -1862,6 +1863,12 @@ function renderElementsPane() {
   if (!host) return;
   const elements = listElements(project);
   host.innerHTML = `<div class="elements-actions"><button type="button" id="saveSelectedElement" class="smallbtn">Enregistrer la sélection</button><label><input type="checkbox" id="elementPreviewLoop"> Boucler l’aperçu</label></div>${elements.length ? elements.map(element => `<article class="element-card" draggable="true" tabindex="0" data-element-id="${htmlSafe(element.id)}"><b>${htmlSafe(element.name)}</b><span>${htmlSafe(element.type)}</span><div><button type="button" data-place-element="${htmlSafe(element.id)}">Ajouter</button><button type="button" data-top-element="${htmlSafe(element.id)}">TOP</button></div></article>`).join("") : `<p class="hint">Enregistre un node ou un sous-patch : il restera disponible ici pour toute la conduite.</p>`}`;
+  host.querySelector(".elements-actions")?.insertAdjacentHTML("beforeend", `<button type="button" id="installScenicPack" class="smallbtn" title="Ajoute les ${scenicPackElements().length} éléments du Scénographe (idempotent, n'écrase aucun élément utilisateur)">Pack Scénographe</button>`);
+  $("#installScenicPack")?.addEventListener("click", () => {
+    const stats = installScenicPack(project);
+    commitHistory(); autosave(); renderElementsPane();
+    log(`Pack Scénographe · ${stats.added} ajouté(s), ${stats.updated} mis à jour, ${stats.unchanged} déjà présent(s)`);
+  });
   $("#saveSelectedElement")?.addEventListener("click", saveSelectedElement);
   host.querySelectorAll("[data-place-element]").forEach(button => button.addEventListener("click", () => placeElementInTimeline(button.dataset.placeElement)));
   host.querySelectorAll("[data-top-element]").forEach(button => button.addEventListener("click", () => addElementTop(button.dataset.topElement)));
