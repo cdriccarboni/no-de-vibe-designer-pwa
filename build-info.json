@@ -1,10 +1,10 @@
 {
   "name": "No[co]de Vibe Designer",
-  "version": "3.3.10",
-  "sourceRevision": "1f3a6010adf694e2999e75c225df58be0636dc37",
-  "builtAt": "2026-10-09T11:20:07.797Z",
-  "files": 175,
-  "cacheRevision": "1f3a6010adf6",
+  "version": "3.3.11",
+  "sourceRevision": "50c0070f4a6ed87cb07b110e200fd7da4ced2bc1",
+  "builtAt": "2026-10-09T15:17:54.000Z",
+  "files": 177,
+  "cacheRevision": "50c0070f4a6e",
   "surfaces": [
     "designer",
     "show",

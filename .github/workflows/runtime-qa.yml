@@ -59,3 +59,11 @@ jobs:
           ! test -f mobile.css
       - name: Engine QA
         run: node qa/public-qa.mjs
+      - name: Vendor integrity and Scénographe pack
+        run: |
+          node qa/vendor-integrity-qa.mjs
+          node qa/scenic-pack-qa.mjs
+      - name: Browser E2E (Chrome)
+        run: |
+          npm install --no-save --no-audit --no-fund puppeteer-core
+          CHROME="$(which google-chrome || which chromium-browser || which chromium)" PUPPETEER_PATH="$PWD/node_modules/puppeteer-core" node qa/browser-e2e-scenic.cjs; CHROME="$(which google-chrome || which chromium-browser || which chromium)" PUPPETEER_PATH="$PWD/node_modules/puppeteer-core" node qa/browser-e2e-designer.cjs
