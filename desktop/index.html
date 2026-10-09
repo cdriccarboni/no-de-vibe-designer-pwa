@@ -205,6 +205,7 @@
       <button type="button" data-pref-tab="io">Moteurs / I/O</button>
       <button type="button" data-pref-tab="backup">Sauvegardes</button>
       <button type="button" data-pref-tab="manual">Manuel</button>
+      <button type="button" data-pref-tab="install">Installer</button>
       <button type="button" data-pref-tab="about">À propos</button>
     </div>
     <div class="preferences-body">
@@ -324,6 +325,12 @@
       <div data-pref-panel="backup" class="hidden">
         <p class="hint">Autosave navigateur (<code>cvd.autosave</code>) + export fichier <code>.cvd.json</code>.</p>
         <button type="button" id="clearAutosave" class="smallbtn danger">Effacer l’autosave locale</button>
+      </div>
+      <div data-pref-panel="install" class="hidden">
+        <p class="hint">Installer ou mettre à jour No[co]de Vibe Designer sur macOS, Windows, Linux ou mobile. Le choix des plateformes se fait depuis la page Installer.</p>
+        <div class="preferences-actions">
+          <a class="smallbtn" href="../install/" target="_blank" rel="noopener noreferrer">Ouvrir la page Installer</a>
+        </div>
       </div>
       <div data-pref-panel="manual" class="hidden">
         <iframe id="manualFrame" class="manual-frame" src="../manuel/index.html" title="Manuel No[co]de Vibe Designer"></iframe>
