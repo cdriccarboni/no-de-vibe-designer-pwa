@@ -103,7 +103,7 @@ jobs:
           cat > capacitor.config.json <<'EOF'
           {
             "appId": "fr.acousmatic.nodevibedesigner",
-            "appName": "No[co]de Vibe Designer",
+            "appName": "No[co]de Companion",
             "webDir": "www",
             "bundledWebRuntime": false,
             "server": {
@@ -273,15 +273,6 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-
-      - uses: actions/upload-artifact@v4
-        if: steps.signing.outputs.ready == 'true'
-        with:
-          name: No-de-Vibe-Designer-${{ env.APP_VERSION }}-google-play-aab
-          path: |
-            android/app/build/outputs/bundle/release/No-de-Vibe-Designer-${{ env.APP_VERSION }}-play.aab
-            play-signature-verification.txt
-          if-no-files-found: error
 
       - name: Refresh Android release assets
         if: success()
