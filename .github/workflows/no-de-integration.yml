@@ -1,0 +1,131 @@
+name: AI Studio → No[co]de staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: no-de-ai-studio-staging
+  cancel-in-progress: false
+
+jobs:
+  validate-ai-studio:
+    name: Validate AI Studio source (no publish)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies from lockfile
+        run: bun install --frozen-lockfile
+      - name: TypeScript validation
+        run: bun run lint
+      - name: Vite production build (CI only)
+        run: bun run build
+      - name: Archive isolated build for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: nocode-ai-studio-web-preview
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  stage-in-official-source:
+    name: Stage snapshot in official source (draft PR; never merge)
+    runs-on: ubuntu-latest
+    needs: [validate-ai-studio]
+    env:
+      GH_TOKEN: ${{ secrets.NOCODE_SYNC_TOKEN }}
+      TARGET_REPO: cdriccarboni/no-de-vibe-designer
+      TARGET_BRANCH: integration/ai-studio-snapshot
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check minimal cross-repository permission
+        shell: bash
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Missing Actions secret NOCODE_SYNC_TOKEN in nocode-ai-expert. Source build completed, but staging is NOT connected."
+            exit 1
+          fi
+          gh auth setup-git
+          gh repo view "$TARGET_REPO" --json name >/dev/null
+
+      - name: Prepare strict allowlisted snapshot
+        id: snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          incoming="$RUNNER_TEMP/ai-studio-snapshot"
+          mkdir -p "$incoming"
+          for item in src public electron scripts package.json bun.lock index.html server.ts tsconfig.json vite.config.ts metadata.json PACKAGE_INTEGRATION_01.md SCENIC_LIBRARY_120_CONCEPTS.md SCENOGRAPHIE_VIVANTE_PIRATES_PAILLETTES_V2.md; do
+            if [ -e "$item" ]; then
+              rsync -a \
+                --exclude='.env*' --exclude='node_modules/' \
+                --exclude='dist/' --exclude='build/' --exclude='coverage/' \
+                --exclude='*.pem' --exclude='*.p12' --exclude='*.pfx' \
+                --exclude='*.jks' --exclude='*.keystore' --exclude='*.key' \
+                "$item" "$incoming/"
+            fi
+          done
+          if find "$incoming" -type l | grep -q .; then
+            echo "::error::Snapshot contains symbolic links; refusing import."
+            exit 1
+          fi
+          if find "$incoming" -type f \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.p12' -o -name '*.key' \) | grep -q .; then
+            echo "::error::Snapshot contains a prohibited file."
+            exit 1
+          fi
+          if [ ! -f "$incoming/package.json" ] || [ ! -d "$incoming/src" ]; then
+            echo "::error::Missing expected app files; refusing incomplete snapshot."
+            exit 1
+          fi
+          printf '{"source_repository":"cdriccarboni/nocode-ai-expert","source_commit":"%s","workflow_run":"%s","status":"staged_only_not_integrated_or_published"}\n' \
+            "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$incoming/INTEGRATION_SOURCE.json"
+          echo "snapshot=$incoming" >> "$GITHUB_OUTPUT"
+
+      - name: Update staging branch without rewriting history
+        shell: bash
+        env:
+          INCOMING: ${{ steps.snapshot.outputs.snapshot }}
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/no-de-official"
+          git clone --filter=blob:none "https://github.com/$TARGET_REPO.git" "$target"
+          cd "$target"
+          git fetch --no-tags origin "$TARGET_BRANCH"
+          git checkout -b "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          dest="integrations/google-ai-studio/snapshot"
+          mkdir -p "$dest"
+          # Deletion is restricted to the generated snapshot directory.
+          # Git history and all application code outside this directory remain untouched.
+          rsync -a --delete "$INCOMING/" "$dest/"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- "$dest"
+          if git diff --cached --quiet; then
+            echo "No snapshot changes."
+          else
+            git commit -m "chore(ai-studio): stage candidate from ${GITHUB_SHA:0:12} [skip ci]"
+            git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          fi
+
+      - name: Create or reuse draft PR (never auto-merge)
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing="$(gh pr list --repo "$TARGET_REPO" --state open --head "$TARGET_BRANCH" --base main --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            echo "Staging PR already exists: #$existing"
+            exit 0
+          fi
+          gh pr create --repo "$TARGET_REPO" \
+            --base main --head "$TARGET_BRANCH" --draft \
+            --title "AI Studio — candidate code in isolated staging (NO AUTO MERGE)" \
+            --body "Snapshot imported only into integrations/google-ai-studio/snapshot/. Do not merge blindly: port desired modules into official No[co]de architecture separately, preserve Library/history, run full CI and validate PWA, Android Companion and desktop. No automatic release or deployment."
