@@ -103,7 +103,7 @@ jobs:
           cat > capacitor.config.json <<'EOF'
           {
             "appId": "fr.acousmatic.nodevibedesigner",
-            "appName": "No[co]de Vibe Designer",
+            "appName": "No[co]de Companion",
             "webDir": "www",
             "bundledWebRuntime": false,
             "server": {
