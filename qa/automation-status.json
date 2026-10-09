@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-10-09T15:57:07.926Z",
+  "repos": {
+    "pwa": {
+      "dir": "/Users/cedriccarboni/Projects/Antigravity-NoCode/no-de-vibe-designer-pwa",
+      "branch": "main",
+      "sha": "db46fea0652d66b5033e120f24c7bf848aa55f8f",
+      "remote": "https://github.com/cdriccarboni/no-de-vibe-designer-pwa.git",
+      "available": true
+    },
+    "private": {
+      "dir": "/Users/cedriccarboni/Projects/Antigravity-NoCode/_private_repo/no-de-vibe-designer",
+      "branch": "antigravity/sync-pwa-v3.3.11-and-scenographe",
+      "sha": "c338848f364e71039c556021896f1a01a683aa51",
+      "remote": "https://github.com/cdriccarboni/no-de-vibe-designer.git",
+      "available": true
+    },
+    "lab": {
+      "dir": "/Users/cedriccarboni/Projects/Antigravity-NoCode/_ai-studio/nocode-ai-expert",
+      "branch": "main",
+      "sha": "778e1fa9f1597552e8c2c5a6df432078e9cf738a",
+      "remote": "https://github.com/cdriccarboni/nocode-ai-expert.git",
+      "available": true
+    }
+  },
+  "tests": {
+    "vendorIntegrity": true,
+    "scenicPack": true,
+    "publicQa": true
+  },
+  "provenance": {
+    "version": "3.3.11",
+    "sourceRevision": "50c0070f4a6ed87cb07b110e200fd7da4ced2bc1",
+    "cacheRevision": "50c0070f4a6e",
+    "builtAt": "2026-10-09T15:17:54.000Z",
+    "filesCount": 177
+  }
+}
