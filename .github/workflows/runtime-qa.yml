@@ -66,4 +66,4 @@ jobs:
       - name: Browser E2E (Chrome)
         run: |
           npm install --no-save --no-audit --no-fund puppeteer-core
-          CHROME="$(which google-chrome || which chromium-browser || which chromium)" PUPPETEER_PATH="$PWD/node_modules/puppeteer-core" node qa/browser-e2e-scenic.cjs
+          CHROME="$(which google-chrome || which chromium-browser || which chromium)" PUPPETEER_PATH="$PWD/node_modules/puppeteer-core" node qa/browser-e2e-scenic.cjs; CHROME="$(which google-chrome || which chromium-browser || which chromium)" PUPPETEER_PATH="$PWD/node_modules/puppeteer-core" node qa/browser-e2e-designer.cjs
