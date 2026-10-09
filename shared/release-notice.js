@@ -40,6 +40,8 @@ export function showReleaseNotice({ version = "", appName = "No[co]de Vibe Desig
       #nvd-release-notice button{border:1px solid var(--line,#30363d);border-radius:8px;background:var(--panel2,#171d22);color:inherit;padding:7px 10px;cursor:pointer;font:inherit}
       #nvd-release-notice button.primary{background:var(--accent,#d7b86a);border-color:var(--accent,#d7b86a);color:#14160f;font-weight:700}
       #nvd-release-notice .nvd-release-x{border:0;background:transparent;padding:0 3px;font-size:20px;line-height:1}
+      body:has(.mobile-app) #nvd-release-notice{bottom:max(76px,calc(env(safe-area-inset-bottom) + 66px));width:min(390px,calc(100vw - 20px));right:10px}
+      @media(max-width:600px){#nvd-release-notice{bottom:max(76px,calc(env(safe-area-inset-bottom) + 66px));width:min(390px,calc(100vw - 20px));right:10px}}
     `;
     document.head.appendChild(style);
   }

@@ -1,8 +1,8 @@
 import { NODE_GROUPS } from "./node-specs.js";
 import { isExecutable } from "./ports.js";
-import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError, LOCAL_AI_PROBE_TIMEOUT_MS } from "./local-ai-diagnostic.js";
+import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError, LOCAL_AI_CHAT_TIMEOUT_MS, LOCAL_AI_PROBE_TIMEOUT_MS } from "./local-ai-diagnostic.js";
 
-export { LOCAL_AI_PROBE_TIMEOUT_MS, assessLocalModels, classifyLocalAiFailure };
+export { LOCAL_AI_CHAT_TIMEOUT_MS, LOCAL_AI_PROBE_TIMEOUT_MS, assessLocalModels, classifyLocalAiFailure };
 
 export const LOCAL_AI_DEFAULTS = Object.freeze({
   enabled: true,
@@ -12,6 +12,10 @@ export const LOCAL_AI_DEFAULTS = Object.freeze({
   parallel: true,
   temperature: 0.15,
   maxOps: 64,
+  // A creation gesture must never leave the interface waiting on a model for half a minute.
+  // The deterministic planner takes over after this deadline while the full request limit
+  // remains available for explicit local-AI diagnostics and non-interactive calls.
+  interactiveTimeoutMs: 7000,
   remoteFallback: false
 });
 
@@ -26,6 +30,8 @@ export function normalizeLocalAiConfig(raw = {}) {
     parallel: cfg.localParallel !== false,
     temperature: Math.max(0, Math.min(1, Number(cfg.localTemperature ?? LOCAL_AI_DEFAULTS.temperature))),
     maxOps: Math.max(1, Math.min(128, Number(cfg.localMaxOps ?? LOCAL_AI_DEFAULTS.maxOps) || LOCAL_AI_DEFAULTS.maxOps)),
+    chatTimeoutMs: Math.max(1000, Math.min(120000, Number(cfg.localChatTimeoutMs) || LOCAL_AI_CHAT_TIMEOUT_MS)),
+    interactiveTimeoutMs: Math.max(1000, Math.min(30000, Number(cfg.localInteractiveTimeoutMs) || LOCAL_AI_DEFAULTS.interactiveTimeoutMs)),
     remoteFallback: cfg.remoteFallback === true,
     agents: Array.isArray(cfg.localAgents) ? cfg.localAgents : []
   };
@@ -316,11 +322,14 @@ export async function directOllamaProbe(baseUrl = LOCAL_AI_DEFAULTS.baseUrl, opt
   }
 }
 
-export async function directOllamaChat({ baseUrl, model, system, user, temperature = .15, numPredict = 1800 } = {}) {
+export async function directOllamaChat({ baseUrl, model, system, user, temperature = .15, numPredict = 1800, timeoutMs = LOCAL_AI_CHAT_TIMEOUT_MS, fetchImpl = globalThis.fetch } = {}) {
   if (!isTrustedLocalAiUrl(baseUrl)) throw new Error("Local AI Core exige localhost ou une IP privée du réseau local");
   const target = new URL(String(baseUrl).replace(/\/+$/, ""));
   const loopback = loopbackHost(target.hostname);
   const targetAddressSpace = loopback ? "loopback" : "local";
+  const deadline = Math.max(10, Math.min(120000, Number(timeoutMs) || LOCAL_AI_CHAT_TIMEOUT_MS));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), deadline);
   try {
     const request = new Request(target.origin + "/api/chat", {
       method:"POST",
@@ -333,12 +342,18 @@ export async function directOllamaChat({ baseUrl, model, system, user, temperatu
         format:"json",
         options:{ temperature, num_predict:Math.max(512, Math.min(12000, Number(numPredict) || 1800)) },
         messages:[{ role:"system", content:system }, { role:"user", content:user }]
-      })
+      }),
+      signal:controller.signal
     });
-    const res = await fetch(request);
+    const res = await fetchImpl(request);
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      const failure = classifyLocalAiFailure({ status:res.status, message:("Ollama HTTP " + res.status + " · " + body.slice(0,180)).trim(), endpoint:"chat", model });
+      const failure = classifyLocalAiFailure({
+        status:res.status,
+        message:("Ollama HTTP " + res.status + " · " + body.slice(0, 180)).trim(),
+        endpoint:"chat",
+        model
+      });
       throw throwLocalAiFailure(failure);
     }
     return res.json();
@@ -349,8 +364,12 @@ export async function directOllamaChat({ baseUrl, model, system, user, temperatu
       targetProtocol:target.protocol,
       loopback,
       localTarget:true,
+      chatTimeout:true,
+      timeoutMs:deadline,
       model
     })) || { code:"unreachable", message:"Ollama local inaccessible", responded:false };
     throw throwLocalAiFailure(failure, error);
+  } finally {
+    clearTimeout(timer);
   }
 }

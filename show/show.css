@@ -9,6 +9,7 @@ pre{margin:0;white-space:pre-wrap;background:#171b1f;border-radius:8px;padding:1
 .co{font-size:.62em;vertical-align:.2em}
 .nav a{color:#d7b86a}
 header,.transport,.curve{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.live-title-panel{display:grid;gap:9px;max-width:780px;padding:12px;border:1px solid #3a4249;border-radius:8px;background:#171b1f}.live-title-heading h2{margin:0;color:#d7b86a;font-size:16px}.live-title-heading p,.live-title-hint,#liveTitleStatus{margin:0;color:#9aa3ab}.live-title-heading p{margin-top:3px}.live-title-address{display:grid;gap:5px;font-weight:700}.live-title-address input{width:100%;box-sizing:border-box;font-family:ui-monospace,SFMono-Regular,monospace;font-size:12px}.live-title-actions{display:flex;flex-wrap:wrap;gap:8px}.live-title-actions button[aria-pressed="true"]{border-color:#d7b86a;background:#2c2719;color:#fff3cb}.live-title-actions button:focus-visible{outline:3px solid #d7b86a;outline-offset:2px}.live-title-actions button:disabled{cursor:wait;opacity:.65}@media(max-width:620px){.live-title-actions{display:grid;grid-template-columns:1fr}.live-title-actions button{width:100%}}
 
 #monitor{width:min(100%,680px);height:auto;background:#0b0d10;border-radius:8px}
 #preview{width:min(100%,320px);height:auto;background:#000;border-radius:8px}

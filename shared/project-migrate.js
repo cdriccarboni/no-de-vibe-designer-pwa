@@ -44,7 +44,7 @@ function ensureShape(p) {
   }));
   p.controls ||= [];
   p.channels ||= [];
-  p.resources ||= [];
+  p.resources = Array.isArray(p.resources) ? p.resources : (p.resources ? [p.resources] : []);
   p.devices ||= [];
   p.output ||= { width: 1280, height: 720, fps: 60, background: "#090b0d" };
   p.meta ||= {};

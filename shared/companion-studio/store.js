@@ -6,6 +6,26 @@ import { exportCompanionDocument, parseCompanionFile, validateCompanionDocument,
 
 export const LAYOUT_KEY = "nvd.companion.layout";
 export const LAYOUT_LIST_KEY = "nvd.companion.layouts";
+export const PRESET_KEY = "nvd.companion.presets";
+
+export function saveCompanionPreset(doc, storage = globalThis.localStorage) {
+  const preset = validateCompanionDocument(JSON.parse(JSON.stringify(doc)));
+  preset.meta ||= {};
+  preset.meta.presetId ||= `preset-${Date.now().toString(36)}`;
+  const list = listCompanionPresets(storage).filter(item => item.id !== preset.meta.presetId);
+  list.unshift({ id:preset.meta.presetId, name:preset.name, data:preset });
+  storage?.setItem?.(PRESET_KEY, JSON.stringify(list.slice(0, 24)));
+  return preset;
+}
+
+export function listCompanionPresets(storage = globalThis.localStorage) {
+  try { const list = JSON.parse(storage?.getItem?.(PRESET_KEY) || "[]"); return Array.isArray(list) ? list : []; } catch { return []; }
+}
+
+export function cloneCompanionPreset(id, storage = globalThis.localStorage) {
+  const found = listCompanionPresets(storage).find(item => item.id === id);
+  return found?.data ? validateCompanionDocument(JSON.parse(JSON.stringify(found.data))) : null;
+}
 
 export function saveCompanionLayout(doc, storage = globalThis.localStorage) {
   if (!storage?.setItem) throw new Error("Stockage Companion indisponible");

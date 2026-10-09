@@ -3,9 +3,8 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.8-multi-example-wow-20261007";
+const CACHE = "nvd-3.3.8-multi-f38eed1a54";
 const ASSETS = [
-  "./src/core/StageSafety.js",
   "./companion/companion.css",
   "./companion/companion.js",
   "./companion/index.html",
@@ -36,6 +35,7 @@ const ASSETS = [
   "./mobile/icons/icon-512.png",
   "./mobile/icons/icon-maskable-192.png",
   "./mobile/icons/icon-maskable-512.png",
+  "./mobile/icons/nocode-rings.svg",
   "./mobile/index.html",
   "./mobile/manifest.webmanifest",
   "./mobile/mobile.css",
@@ -59,12 +59,14 @@ const ASSETS = [
   "./shared/companion-studio/protocol.js",
   "./shared/companion-studio/regie-presets.js",
   "./shared/companion-studio/schema.js",
+  "./shared/companion-studio/show-layout.js",
   "./shared/companion-studio/store.js",
   "./shared/companion-studio/transport-ws.js",
   "./shared/companion-studio/transport.js",
   "./shared/companion-studio/widgets.js",
   "./shared/composition.js",
   "./shared/connection-states.js",
+  "./shared/creator-session.js",
   "./shared/cx-source.js",
   "./shared/demos.js",
   "./shared/device-manager.js",
@@ -97,6 +99,7 @@ const ASSETS = [
   "./shared/ir.js",
   "./shared/isf-agent.js",
   "./shared/libpd-runtime.js",
+  "./shared/live-title-broadcast.js",
   "./shared/local-agent-registry.js",
   "./shared/local-ai-core.js",
   "./shared/local-ai-diagnostic.js",
@@ -133,13 +136,13 @@ const ASSETS = [
   "./shared/session-recovery.js",
   "./shared/session-store.js",
   "./shared/shader-agent.js",
+  "./shared/show-elements.js",
   "./shared/show-importer.js",
   "./shared/show-session.js",
   "./shared/stage/cues.js",
   "./shared/subpatch.js",
   "./shared/supernodes-v3.js",
   "./shared/surface-switcher.js",
-  "./shared/update-notice.js",
   "./shared/vendor/libpd/LICENSE.txt",
   "./shared/vendor/libpd/libpd.js",
   "./shared/vendor/libpd/libpd.wasm",
@@ -152,6 +155,27 @@ const ASSETS = [
   "./show/shader-preview.png",
   "./show/show.css",
   "./show/show.js",
+  "./src/audio/SoundBoard.js",
+  "./src/core/AppleFoundationModels.js",
+  "./src/core/AppleVisionBridge.js",
+  "./src/core/AssetBundler.js",
+  "./src/core/AssetBundler.ts",
+  "./src/core/ChromaKeyProcessor.js",
+  "./src/core/CueManager.ts",
+  "./src/core/DAGEngine.ts",
+  "./src/core/DepthUniversal.js",
+  "./src/core/FeedbackEngine.js",
+  "./src/core/IOMatrix.ts",
+  "./src/core/PerformanceMonitor.js",
+  "./src/core/RenderRecorder.js",
+  "./src/core/StageSafety.js",
+  "./src/core/TechSheetGenerator.js",
+  "./src/core/TechSheetGenerator.ts",
+  "./src/core/agents/CppCsAgent.js",
+  "./src/ux/CanvasPan.js",
+  "./src/ux/DancingDraw.js",
+  "./src/ux/LivingData.js",
+  "./src/ux/ReactiveGlitter.js",
   "./studio/index.html",
   "./studio/studio.css",
   "./studio/studio.js"
@@ -191,12 +215,16 @@ self.addEventListener("fetch", (event) => {
         cache.put(req, fresh.clone());
         return fresh;
       } catch {
-        const direct = await cache.match(req);
+        // A navigation can carry a surface/query parameter while the precache
+        // deliberately stores the canonical HTML URL. Match that page first;
+        // otherwise the root router is served at a nested URL and repeats its
+        // relative redirect (for example /desktop/desktop/index.html).
+        const direct = await cache.match(req, { ignoreSearch:true });
         if (direct) return direct;
         const fallbackUrl = new URL(req.url);
         if (fallbackUrl.pathname.endsWith("/")) fallbackUrl.pathname += "index.html";
-        return (await cache.match(fallbackUrl.href))
-          || (await cache.match("./index.html"))
+        return (await cache.match(fallbackUrl.href, { ignoreSearch:true }))
+          || (await cache.match("./index.html", { ignoreSearch:true }))
           || new Response("Hors ligne", { status: 503 });
       }
     })());

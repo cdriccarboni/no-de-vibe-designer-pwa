@@ -13,6 +13,20 @@ export const STUDIO_MODES = Object.freeze({
   PLATEAU: "PLATEAU"
 });
 
+function normalizePhotoController(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const keepBackground = raw.keepBackground === true;
+  const backgroundDataUrl = keepBackground && typeof raw.backgroundDataUrl === "string" && raw.backgroundDataUrl.startsWith("data:image/")
+    ? raw.backgroundDataUrl
+    : null;
+  return {
+    source: "photo",
+    keepBackground,
+    backgroundDataUrl,
+    opacity: Math.max(0, Math.min(.85, Number(raw.opacity) || .35))
+  };
+}
+
 export function newCompanionDocument({ name = "Companion" } = {}) {
   const now = new Date().toISOString();
   return {
@@ -58,6 +72,9 @@ export function validateCompanionDocument(raw) {
     page.cols = Math.max(1, Number(page.cols) || 4);
     page.rows = Math.max(1, Number(page.rows) || 6);
     page.widgets = Array.isArray(page.widgets) ? page.widgets.map(normalizeWidget) : [];
+    const photoController = normalizePhotoController(page.photoController);
+    if (photoController) page.photoController = photoController;
+    else delete page.photoController;
   }
   doc.meta ||= {};
   doc.meta.updated = new Date().toISOString();
@@ -88,7 +105,7 @@ export function normalizeWidget(w = {}) {
     },
     binding: {
       kind: w.binding?.kind || "action",
-      action: w.binding?.action || "ping",
+      action: w.binding?.action ?? "ping",
       channelId: w.binding?.channelId || null,
       nodeId: w.binding?.nodeId || null,
       param: w.binding?.param || null,

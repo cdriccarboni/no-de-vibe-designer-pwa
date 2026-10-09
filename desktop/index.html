@@ -95,7 +95,7 @@
       </div>
 
       <section class="panel vibe floatable" id="vibePanel" data-float-id="vibe" data-min-w="320">
-        <div class="panel-head">Vibe <span class="sub">Entrée : envoyer · Maj+Entrée : nouvelle ligne</span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
+        <div class="panel-head">Créateur <span class="sub">Vibe + CX · entrée : envoyer · Maj+Entrée : nouvelle ligne</span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
         <div class="panel-body vibe-body">
           <div class="vibe-reference">
             <label for="vibeImageFile" class="smallbtn vibe-image-pick">＋ Image</label>
@@ -122,6 +122,11 @@
             <div id="vibePreview" class="vibe-preview hidden"></div>
           </div>
           <div class="vibe-actions">
+            <div id="vibeResult" class="vibe-result hidden" role="status" aria-live="polite">
+              <span id="vibeResultSummary"></span>
+              <button type="button" id="vibeResultConfirm" class="smallbtn">Appliquer</button>
+              <button type="button" id="vibeResultCancel" class="smallbtn">Annuler</button>
+            </div>
             <button id="applyVibe" class="generate" type="button">Envoyer</button>
           </div>
         </div>
@@ -162,7 +167,8 @@
       <div class="panel-head">
         <div class="pane-tabs" role="tablist">
           <button type="button" class="pane-tab active" data-right-pane="inspector" role="tab" aria-selected="true">Inspecteur</button>
-          <button type="button" class="pane-tab" data-right-pane="cx" role="tab" aria-selected="false">CX Chat</button>
+          <button type="button" class="pane-tab" data-right-pane="elements" role="tab" aria-selected="false">Éléments</button>
+          <button type="button" class="pane-tab" data-right-pane="cx" role="tab" aria-selected="false">Historique CX</button>
         </div>
         <span id="inspectorType" class="sub">Aucun</span>
         <div class="tools"><button type="button" class="iconbtn collapse" title="Réduire">−</button></div>
@@ -170,6 +176,7 @@
       <div id="inspectorBody" class="panel-body inspector-body">
         <p>Sélectionne un node.</p>
       </div>
+      <div id="elementsPane" class="panel-body elements-pane pane-hidden" role="tabpanel" hidden></div>
       <div id="cxChatPane" class="panel-body cx-chat pane-hidden" role="tabpanel" hidden>
         <div id="cxChatLog" class="cx-chat-log" role="log" aria-live="polite"></div>
         <form id="cxChatForm" class="cx-chat-form">
@@ -192,7 +199,6 @@
     <div class="preferences-head"><b>Préférences</b><button id="preferencesClose" type="button">×</button></div>
     <div class="preferences-tabs">
       <button type="button" data-pref-tab="general" class="active">Général</button>
-      <button type="button" data-pref-tab="install">Installer</button>
       <button type="button" data-pref-tab="appearance">Interface</button>
       <button type="button" data-pref-tab="canvas">Patch Canvas</button>
       <button type="button" data-pref-tab="ai">IA / Vibe</button>
@@ -209,19 +215,6 @@
         <label>Charger l’exemple WOW interactif si projet vide <input id="prefLoadDemo" type="checkbox" checked></label>
         <label>Mode technique <input id="prefTechnicalMode" type="checkbox"></label>
         <div id="backendReport" class="hint"></div>
-      </div>
-      <div data-pref-panel="install" class="hidden">
-        <div class="install-pref-card">
-          <div class="install-pref-kicker">NO[CO]DE · UNIVERSAL</div>
-          <h3>Installer No[co]de sur cette machine</h3>
-          <p>Une seule base de projet, plusieurs enveloppes. La version macOS Universal est prioritaire pour la création et la régie ; Windows, Linux, Android et la PWA restent disponibles depuis la même page.</p>
-          <div class="install-pref-tags"><span>macOS Universal</span><span>DMG + ZIP</span><span>Windows</span><span>Linux</span><span>Android</span><span>Web/PWA</span></div>
-          <div class="install-pref-actions">
-            <a class="smallbtn primary-link" href="../install/#macos">Installer / mettre à jour</a>
-            <a class="smallbtn" href="../install/">Voir toutes les plateformes</a>
-          </div>
-          <p class="hint">Les boutons de téléchargement ne sont activés sur la page Installer que lorsque le fichier correspondant existe réellement dans la release GitHub courante.</p>
-        </div>
       </div>
       <div data-pref-panel="appearance" class="hidden">
         <label>Couleur dominante <input id="accentColor" type="color" value="#d7b86a"></label>

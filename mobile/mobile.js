@@ -7,6 +7,7 @@ import { portDirection, portLabels, isExecutable } from "../shared/ports.js";
 import { validateEdge } from "../shared/graph-engine.js";
 import { createHistory } from "../shared/history.js";
 import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed } from "../shared/vibe.js";
+import { createCreatorSession } from "../shared/creator-session.js";
 import { APP_NAME, APP_VERSION, BUILD_LABEL } from "../shared/version.js";
 import { showReleaseNotice } from "../shared/release-notice.js";
 import { addBoxPort, ensureSubGraph, wrapNodesInSubpatch } from "../shared/subpatch.js";
@@ -38,6 +39,7 @@ let wireDraft = null;
 let armed = null;
 let inspectorFor = null;
 let pendingVibe = null;
+const creatorSession = createCreatorSession({ storage:localStorage, key:"nvd.creator.mobile.v1" });
 let imageVibeState = { analysis:null, previewUrl:"" };
 let syncedRevision = 0;
 let pendingRemote = null;
@@ -901,6 +903,10 @@ $("#vibeImageClear")?.addEventListener("click", () => {
   if ($("#vibeImageFile")) $("#vibeImageFile").value = "";
 });
 
+const restoredCreatorDraft = creatorSession.loadDraft();
+if (restoredCreatorDraft && $("#vibeInput")) $("#vibeInput").value = restoredCreatorDraft;
+$("#vibeInput")?.addEventListener("input", event => creatorSession.saveDraft(event.currentTarget.value));
+
 async function previewVibe() {
   const text = $("#vibeInput").value.trim();
   if (!text && !imageVibeState.analysis) {
@@ -909,6 +915,7 @@ async function previewVibe() {
   }
   $("#applyVibeBtn").disabled = true;
   try {
+    creatorSession.saveDraft(text);
     const target = $("#vibeImageTarget")?.value || "auto";
     const promptText = imageVibeState.analysis ? imageVibePrompt(text, imageVibeState.analysis, target) : text;
     let result = await runVibe(promptText, project);
@@ -923,11 +930,12 @@ async function previewVibe() {
     }
     if (!result.ops?.length) {
       pendingVibe = null;
+      creatorSession.clearProposal();
       $("#vibePreview").classList.add("hidden");
       pushAlert("error", "Vibe · aucune opération générée");
       return;
     }
-    pendingVibe = result;
+    pendingVibe = creatorSession.setProposal({ ...result, source:"vibe" });
     const box = $("#vibePreview");
     box.classList.remove("hidden");
     box.innerHTML = `<b>Aperçu · ${result.engine}</b><p class="hint">${result.note || ""}</p><pre></pre>
@@ -936,6 +944,7 @@ async function previewVibe() {
     $("#vibeConfirm").onclick = confirmVibe;
     $("#vibeCancel").onclick = () => {
       pendingVibe = null;
+      creatorSession.clearProposal();
       box.classList.add("hidden");
       pushAlert("ok", "Vibe · aperçu annulé (aucune modification)");
     };
@@ -947,9 +956,10 @@ async function previewVibe() {
 }
 
 function confirmVibe() {
-  if (!pendingVibe?.ops?.length) return;
+  const proposal = creatorSession.getProposal() || pendingVibe;
+  if (!proposal?.ops?.length) return;
   const before = project.nodes.length;
-  const { applied, errors } = applyVibeOps(project, pendingVibe.ops, {
+  const { applied, errors } = applyVibeOps(project, proposal.ops, {
     addNode: (type, x, y) => {
       const prev = graphPath;
       graphPath = [];
@@ -967,6 +977,7 @@ function confirmVibe() {
     nodeById: (id) => project.nodes.find((n) => n.id === id)
   });
   pendingVibe = null;
+  creatorSession.clearProposal();
   $("#vibePreview").classList.add("hidden");
   graphPath = [];
   refresh();
@@ -1310,7 +1321,7 @@ function openQuickMapTool() {
   apply(false);
 }
 
-$("[data-tool]").forEach((b) => {
+$$("[data-tool]").forEach((b) => {
   b.onclick = async () => {
     const tool = b.dataset.tool;
     if (tool === "quick-map") return openQuickMapTool();

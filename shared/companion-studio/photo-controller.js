@@ -52,6 +52,39 @@ export function detectControllerRegions(imageData, width, height, { cols = 4, ro
   return selected.sort((a,b) => a.row - b.row || a.col - b.col);
 }
 
+/**
+ * Turn detected zones into an editable, intentionally unbound Companion page.
+ * A photo is only stored in the local document when the user explicitly keeps it.
+ */
+export function buildPhotoControllerRecord(regions = [], { keepBackground = false, backgroundDataUrl = null, opacity = .35 } = {}) {
+  const keepsLocalBackground = keepBackground === true && typeof backgroundDataUrl === "string" && backgroundDataUrl.startsWith("data:image/");
+  return {
+    widgets: (Array.isArray(regions) ? regions : []).map((region, index) => ({
+      type: "button",
+      presentation: {
+        label: `B${index + 1}`,
+        secondary: "",
+        x: Number(region.col) || 0,
+        y: Number(region.row) || 0,
+        w: Math.max(1, Number(region.w) || 1),
+        h: Math.max(1, Number(region.h) || 1),
+        color: region.color || "#d7b86a",
+        textColor: "#ffffff",
+        fontFamily: "inherit",
+        fontSize: 15,
+        layer: index
+      },
+      binding: { kind:"unassigned", action:"" }
+    })),
+    photoController: {
+      source: "photo",
+      keepBackground: keepBackground === true,
+      backgroundDataUrl: keepsLocalBackground ? backgroundDataUrl : null,
+      opacity: clamp(Number(opacity) || .35, 0, .85)
+    }
+  };
+}
+
 export async function imageFileToControllerTemplate(file, { maxSide = 640 } = {}) {
   if (!file) throw new Error("Photo absente");
   const url = URL.createObjectURL(file);
@@ -67,5 +100,7 @@ export async function imageFileToControllerTemplate(file, { maxSide = 640 } = {}
   const ctx = canvas.getContext("2d", { willReadFrequently:true });
   ctx.drawImage(img, 0, 0, width, height);
   const pixels = ctx.getImageData(0, 0, width, height);
-  return { url, width, height, regions:detectControllerRegions(pixels, width, height) };
+  let backgroundDataUrl = null;
+  try { backgroundDataUrl = canvas.toDataURL("image/jpeg", .75); } catch { /* background remains a session preview only */ }
+  return { url, backgroundDataUrl, width, height, regions:detectControllerRegions(pixels, width, height) };
 }

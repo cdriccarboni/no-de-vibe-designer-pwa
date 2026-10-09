@@ -1,18 +1,51 @@
-import { installUpdateNotice } from "../shared/update-notice.js";
 import {
   loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow,
   fireCue, saveShow, restoreShow, askShow, setKeyframe, timelineRows, showMonitor, CX_NOTE, CX_BRIDGE_URL
 } from "../shared/show-session.js";
 import { browserProbeRegistry, selectAgentsForRequest } from "../shared/agent-registry.js";
 import { executeWaveShader, nativeBridgeLabel, runShaderAgent } from "../shared/shader-agent.js";
-
-installUpdateNotice();
+import { LIVE_TITLE_PRESETS, loadLiveTitleControlAddress, saveLiveTitleControlAddress, publishLiveTitle } from "../shared/live-title-broadcast.js";
 
 const SAVE_KEY = "nvd.show.save";
 let session = loadExampleScene();
 let timer = 0;
+let liveTitleId = null;
+let liveTitlePublishing = false;
 
 const $ = id => document.getElementById(id);
+
+function paintLiveTitle() {
+  document.querySelectorAll("[data-live-title]").forEach(button => {
+    button.setAttribute("aria-pressed", String(button.dataset.liveTitle === liveTitleId));
+    button.disabled = liveTitlePublishing;
+  });
+}
+
+function setLiveTitleStatus(message) { $("liveTitleStatus").textContent = message; }
+
+function rememberLiveTitleAddress({ announce = true } = {}) {
+  const result = saveLiveTitleControlAddress($("liveTitleAddress").value);
+  if (announce) setLiveTitleStatus(result.ok ? "Adresse de régie mémorisée sur cet appareil." : result.message);
+  return result;
+}
+
+async function publishSelectedLiveTitle(titleId) {
+  const preset = LIVE_TITLE_PRESETS.find(item => item.id === titleId);
+  if (!preset || liveTitlePublishing) return;
+  const remembered = rememberLiveTitleAddress({ announce:false });
+  if (!remembered.ok) return setLiveTitleStatus(remembered.message);
+  liveTitlePublishing = true;
+  paintLiveTitle();
+  setLiveTitleStatus(`Diffusion de ${preset.label}…`);
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 6000);
+  let result;
+  try { result = await publishLiveTitle({ controlAddress:remembered.controlAddress, titleId, signal:controller.signal }); }
+  finally { window.clearTimeout(timeout); liveTitlePublishing = false; }
+  if (result?.ok) { liveTitleId = titleId; setLiveTitleStatus(`Diffusé · ${preset.label}`); }
+  else setLiveTitleStatus(result?.message || "Diffusion impossible : vérifie la connexion Internet.");
+  paintLiveTitle();
+}
 
 function paint() {
   $("sceneName").textContent = session.sceneName || "Scène";
@@ -158,6 +191,9 @@ $("addKey").onclick = () => {
   paint();
 };
 
+$("liveTitleAddress").addEventListener("change", () => { rememberLiveTitleAddress(); });
+document.querySelectorAll("[data-live-title]").forEach(button => button.addEventListener("click", () => { void publishSelectedLiveTitle(button.dataset.liveTitle); }));
+
 timer = setInterval(() => {
   const before = session.time;
   tickShow(session, 0.1);
@@ -168,5 +204,8 @@ const saved = localStorage.getItem(SAVE_KEY);
 if (saved) {
   try { session = restoreShow(saved); loadScene(session); } catch { session = loadExampleScene(); }
 }
+$("liveTitleAddress").value = loadLiveTitleControlAddress();
+if ($("liveTitleAddress").value) setLiveTitleStatus("Adresse de régie prête · en attente d’un top.");
+paintLiveTitle();
 paint();
 refreshNative();

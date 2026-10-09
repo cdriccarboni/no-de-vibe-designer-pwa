@@ -1,6 +1,6 @@
 import { installSurfaceSwitcher } from "../shared/surface-switcher.js";
 import { STUDIO_MODES, normalizeWidget, validateCompanionDocument } from "../shared/companion-studio/schema.js";
-import { ensureCompanionLayout, saveCompanionLayout } from "../shared/companion-studio/store.js";
+import { ensureCompanionLayout, saveCompanionLayout, saveCompanionPreset, listCompanionPresets, cloneCompanionPreset } from "../shared/companion-studio/store.js";
 import { createWsCompanionTransport } from "../shared/companion-studio/transport-ws.js";
 import { STUDIO_MSG, makeStudioAction, makeStudioLayout } from "../shared/companion-studio/protocol.js";
 import { findWidget } from "../shared/companion-studio/bindings.js";
@@ -8,7 +8,7 @@ import { loadRememberedHost } from "../shared/discovery/host-card.js";
 import { CONSOLE_PROFILES, PROTOCOL_FAMILIES } from "../shared/companion-studio/console-profiles.js";
 import { mergeRegieProfiles } from "../shared/companion-studio/layout-generator.js";
 import { REGIE_PRESETS, createRegiePreset } from "../shared/companion-studio/regie-presets.js";
-import { imageFileToControllerTemplate } from "../shared/companion-studio/photo-controller.js";
+import { imageFileToControllerTemplate, buildPhotoControllerRecord } from "../shared/companion-studio/photo-controller.js";
 
 const $ = (id) => document.getElementById(id);
 const logEl = $("log");
@@ -345,6 +345,38 @@ function renderRegiePresets() {
   });
 }
 
+function renderCustomPresets() {
+  const box = $("customPresets");
+  if (!box) return;
+  const presets = listCompanionPresets();
+  if (!presets.length) {
+    box.innerHTML = `<p class="hint">Aucun preset enregistré. Crée un contrôleur, puis utilise « Sauver en preset ».</p>`;
+    return;
+  }
+  box.innerHTML = presets.map(preset => `
+    <button type="button" class="preset-card" data-custom-preset="${escapeHtml(preset.id)}">
+      <span><b>${escapeHtml(preset.name || "Companion")}</b><small>LOCAL</small></span>
+      <em>${escapeHtml(`${preset.data?.pages?.length || 0} page(s) · ${preset.data?.pages?.reduce((total, page) => total + (page.widgets?.length || 0), 0) || 0} widget(s)`)}</em>
+    </button>`).join("");
+  box.querySelectorAll("[data-custom-preset]").forEach(button => {
+    button.onclick = () => installCustomPreset(button.dataset.customPreset);
+  });
+}
+
+function installCustomPreset(id) {
+  const preset = cloneCompanionPreset(id);
+  if (!preset) return log("Preset introuvable sur cet appareil");
+  doc = preset;
+  pageIndex = 0;
+  selectedId = currentPage()?.widgets?.[0]?.id || null;
+  saveCompanionLayout(doc);
+  syncLayoutToHost();
+  renderPageNav();
+  renderGrid();
+  log(`Preset chargé · ${doc.name}`);
+  $("regieDialog")?.close();
+}
+
 function installRegiePreset(id) {
   doc = createRegiePreset(id);
   pageIndex = 0;
@@ -376,6 +408,7 @@ function renderRegieProfiles() {
 
 function openRegieDialog() {
   renderRegiePresets();
+  renderCustomPresets();
   renderRegieProfiles();
   $("regieDialog").showModal();
 }
@@ -426,15 +459,19 @@ function contrastText(hex = "#777777") {
 }
 
 function applyPhotoTemplateToGrid() {
-  const opacity = Math.max(0, Math.min(.85, Number($("photoControllerOpacity")?.value) || .35));
-  if (!photoTemplate?.url) {
+  const saved = currentPage()?.photoController;
+  const image = photoTemplate?.url || saved?.backgroundDataUrl || "";
+  const opacity = photoTemplate
+    ? Math.max(0, Math.min(.85, Number($("photoControllerOpacity")?.value) || .35))
+    : Math.max(0, Math.min(.85, Number(saved?.opacity) || .35));
+  if (!image) {
     grid.style.backgroundImage = "";
     grid.style.backgroundSize = "";
     grid.style.backgroundPosition = "";
     return;
   }
   const veil = Math.max(.05, 1 - opacity);
-  grid.style.backgroundImage = `linear-gradient(rgba(11,13,16,${veil}),rgba(11,13,16,${veil})),url("${photoTemplate.url}")`;
+  grid.style.backgroundImage = `linear-gradient(rgba(11,13,16,${veil}),rgba(11,13,16,${veil})),url("${image}")`;
   grid.style.backgroundSize = "cover";
   grid.style.backgroundPosition = "center";
 }
@@ -458,12 +495,22 @@ $("photoControllerOpacity")?.addEventListener("input", applyPhotoTemplateToGrid)
 $("photoControllerClear")?.addEventListener("click", () => {
   if (photoTemplate?.url) URL.revokeObjectURL(photoTemplate.url);
   photoTemplate = null;
+  const page = currentPage();
+  if (page?.photoController?.backgroundDataUrl) {
+    page.photoController.keepBackground = false;
+    page.photoController.backgroundDataUrl = null;
+    saveCompanionLayout(doc);
+    syncLayoutToHost();
+  }
   applyPhotoTemplateToGrid();
-  $("photoControllerStatus").textContent = "Aucune photo chargée.";
+  $("photoControllerStatus").textContent = "Aucune photo chargée ni conservée.";
 });
 
 $("photoControllerGenerate")?.addEventListener("click", () => {
+  if (mode !== STUDIO_MODES.EDITION) return log("Photo → Controller · passe en mode Édition pour modifier ce layout");
   if (!photoTemplate?.regions?.length) return log("Photo → Controller · choisis d’abord une photo");
+  const destination = $("photoControllerDestination")?.value || "show";
+  const keepBackground = $("photoControllerKeepBackground")?.checked === true;
   const targetPage = (currentPage()?.widgets?.length || 0) === 0
     ? currentPage()
     : (() => {
@@ -474,31 +521,31 @@ $("photoControllerGenerate")?.addEventListener("click", () => {
       })();
   targetPage.cols = 4;
   targetPage.rows = 6;
-  targetPage.widgets = photoTemplate.regions.map((region, index) => normalizeWidget({
-    type:"button",
-    presentation:{
-      label:`B${index + 1}`,
-      secondary:"",
-      x:region.col,
-      y:region.row,
-      w:region.w || 1,
-      h:region.h || 1,
-      color:region.color || "#d7b86a",
-      textColor:contrastText(region.color),
-      fontFamily:"inherit",
-      fontSize:15,
-      layer:index
-    },
-    binding:{ kind:"action", action:"ping" }
+  const photoRecord = buildPhotoControllerRecord(photoTemplate.regions, {
+    keepBackground,
+    backgroundDataUrl:photoTemplate.backgroundDataUrl,
+    opacity:Number($("photoControllerOpacity")?.value)
+  });
+  targetPage.widgets = photoRecord.widgets.map(widget => normalizeWidget({
+    ...widget,
+    presentation:{ ...widget.presentation, textColor:contrastText(widget.presentation.color) }
   }));
+  targetPage.photoController = photoRecord.photoController;
   selectedId = targetPage.widgets[0]?.id || null;
-  saveCompanionLayout(doc);
-  syncLayoutToHost();
+  if (destination === "preset" || destination === "both") {
+    doc = saveCompanionPreset(doc);
+    renderCustomPresets();
+  }
+  if (destination === "show" || destination === "both") {
+    saveCompanionLayout(doc);
+    syncLayoutToHost();
+  }
   renderPageNav();
   renderGrid();
   applyPhotoTemplateToGrid();
-  $("photoControllerStatus").textContent = `Contrôleur créé · ${targetPage.widgets.length} layers · personnalise puis passe en Test/Plateau`;
-  log(`Photo → Controller · ${targetPage.widgets.length} layer(s) créés`);
+  const savedAs = destination === "both" ? "spectacle + preset" : destination === "preset" ? "preset local" : "spectacle";
+  $("photoControllerStatus").textContent = `Contrôleur créé · ${targetPage.widgets.length} zones · ${savedAs} · personnalise puis passe en Test/Plateau`;
+  log(`Photo → Controller · ${targetPage.widgets.length} zone(s) créées · ${savedAs}`);
 });
 
 $("edApply").onclick = () => {
@@ -557,6 +604,14 @@ $("btnSave").onclick = () => {
   saveCompanionLayout(doc);
   syncLayoutToHost();
   log(`Layout sauvé + synchronisé · ${doc.name}`);
+};
+
+$("btnSavePreset").onclick = () => {
+  doc = saveCompanionPreset(doc);
+  saveCompanionLayout(doc);
+  syncLayoutToHost();
+  renderCustomPresets();
+  log(`Preset sauvé · ${doc.name}`);
 };
 
 $("btnConnect").onclick = async () => {

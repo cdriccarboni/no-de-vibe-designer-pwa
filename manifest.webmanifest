@@ -1,7 +1,7 @@
 {
   "id": "./",
   "name": "No[co]de Vibe Designer",
-  "short_name": "No[co]de",
+  "short_name": "No[co]de Vibe Designer",
   "description": "VIBE · PATCH · STAGE — Designer, Mobile, Régie, Plateau et Remote Camera",
   "lang": "fr",
   "start_url": "./",
@@ -9,13 +9,31 @@
   "display": "standalone",
   "orientation": "any",
   "background_color": "#101214",
-  "theme_color": "#101214",
+  "theme_color": "#0f1113",
   "icons": [
     {
-      "src": "./icons/nocode-rings.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

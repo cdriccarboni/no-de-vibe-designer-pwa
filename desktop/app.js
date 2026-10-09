@@ -6,6 +6,8 @@ import { DeviceManager } from "../shared/device-manager.js";
 import { portDirection, portLabels, portDataType, isExecutable } from "../shared/ports.js";
 import { validateEdge } from "../shared/graph-engine.js";
 import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed, probeLocalAi } from "../shared/vibe.js";
+import { createCreatorSession } from "../shared/creator-session.js";
+import { instantiateElement, listElements, saveElement } from "../shared/show-elements.js";
 import { cxChatReply } from "../shared/cx-source.js";
 import { directOllamaProbe } from "../shared/local-ai-core.js";
 import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError } from "../shared/local-ai-diagnostic.js";
@@ -46,6 +48,7 @@ import { createRemoteGhostDemo, createVideoMagicFxDemo, createStageOscDemo } fro
 import { STUDIO_MSG } from "../shared/companion-studio/protocol.js";
 import { applyCompanionBinding, findWidget } from "../shared/companion-studio/bindings.js";
 import { loadCompanionLayout, ensureCompanionLayout, saveCompanionLayout } from "../shared/companion-studio/store.js";
+import { getShowCompanionLayout, setShowCompanionLayout } from "../shared/companion-studio/show-layout.js";
 import { validateCompanionDocument } from "../shared/companion-studio/schema.js";
 import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref } from "../shared/companion-studio/detect.js";
 import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT } from "../shared/graphics/sketch-engine.js";
@@ -86,6 +89,7 @@ let panDrag = null;
 /** Pile de navigation sous-patch : [{ id, title }] */
 let graphPath = [];
 let pendingVibe = null;
+const creatorSession = createCreatorSession({ storage:localStorage, key:"nvd.creator.desktop.v1" });
 let imageVibeState = { analysis:null, previewUrl:"" };
 let agentAutoScanAttempted = false;
 let rcSession = null;
@@ -194,9 +198,9 @@ const devices = new DeviceManager(e => {
 
 function readGeneralPrefsNow() {
   try {
-    return { restoreAutosave:true, loadDemo:true, plugAndPlay:true, technicalMode:false, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") };
+    return { restoreAutosave:true, loadDemo:false, plugAndPlay:true, technicalMode:false, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") };
   } catch {
-    return { restoreAutosave:true, loadDemo:true, plugAndPlay:true, technicalMode:false };
+    return { restoreAutosave:true, loadDemo:false, plugAndPlay:true, technicalMode:false };
   }
 }
 
@@ -224,7 +228,7 @@ function writeGeneralPrefsFromUi() {
   const next = {
     ...previous,
     restoreAutosave: $("#prefRestoreAutosave")?.checked !== false,
-    loadDemo: $("#prefLoadDemo")?.checked !== false,
+    loadDemo: $("#prefLoadDemo")?.checked === true,
     plugAndPlay: $("#prefPlugAndPlay")?.checked !== false,
     technicalMode: $("#prefTechnicalMode")?.checked === true
   };
@@ -652,16 +656,6 @@ function buildLibrary() {
   const expCount = LIB.flatMap(([, items]) => items).filter(([, t]) => !isLibraryExecutable(t)).length;
   const mode = document.querySelector(".library-mode");
   if (mode) mode.style.display = expCount ? "flex" : "none";
-}
-
-// NVD_LIBRARY_BOOTSTRAP_GUARD
-// La palette doit exister avant les initialisations secondaires : une erreur
-// ailleurs dans Designer ne doit plus pouvoir laisser la Library vide.
-try {
-  buildLibrary();
-  document.documentElement.dataset.libraryReady = "1";
-} catch (error) {
-  console.error("LIBRARY_BOOTSTRAP", error);
 }
 
 function startEngineDownload(url) {
@@ -1788,14 +1782,80 @@ function drawPoint(p, i) {
   d.textContent = i;
   $("#previewOverlay").appendChild(d);
 }
-function addClip(track, start, duration, label, kind = "effect") {
+function addClip(track, start, duration, label, kind = "effect", extra = {}) {
   clipSeq++;
   const layer = (project.layers || [])[track] || (project.layers || []).find(l => l.type === kind) || (project.layers || [])[0];
-  const c = { id: `c${clipSeq}`, track, layerId: layer?.id || null, start, duration, label, kind };
+  const c = { id: `c${clipSeq}`, track, layerId: layer?.id || null, start, duration, label, kind, ...extra };
   project.timeline.push(c);
   drawClip(c);
   autosave();
   return c;
+}
+
+function selectedElementTrack() {
+  const index = (project.layers || []).findIndex(layer => layer.id === selectedTimelineLayerId);
+  return index >= 0 ? index : 0;
+}
+
+function placeElementInTimeline(elementId, track = selectedElementTrack(), clientX = null, row = null) {
+  let instance;
+  try { instance = instantiateElement(project, elementId, { track }); }
+  catch (error) { log(`Élément · ${error.message || error}`); return null; }
+  const target = row?.querySelector(".timeline-track") || document.querySelector(`.timeline-track[data-track="${track}"]`);
+  if (Number.isFinite(clientX) && target) {
+    const rect = target.getBoundingClientRect();
+    instance.start = Math.max(0, Math.min(59, (clientX - rect.left) / Math.max(1, rect.width) * 60));
+  }
+  const layer = (project.layers || [])[track];
+  const clip = addClip(track, instance.start, instance.duration, instance.label, layer?.type || instance.type || "effect", instance);
+  commitHistory();
+  autosave();
+  renderElementsPane();
+  log(`Élément · ${instance.label} ajouté à la Timeline`);
+  return clip;
+}
+
+function saveSelectedElement() {
+  const node = (project.nodes || []).find(item => item.id === selectedNode);
+  if (!node) { log("Élément · sélectionne un node ou un sous-patch d’abord"); return null; }
+  const prior = listElements(project).find(item => item.snapshot?.node?.id === node.id);
+  const element = saveElement(project, {
+    id: prior?.id,
+    name: node.title || node.type,
+    type: node.type,
+    snapshot:{ node:JSON.parse(JSON.stringify(node)) }
+  });
+  commitHistory();
+  autosave();
+  renderElementsPane();
+  log(`Élément · ${element.name} enregistré`);
+  return element;
+}
+
+function addElementTop(elementId) {
+  const clip = placeElementInTimeline(elementId);
+  if (!clip) return null;
+  const cueTrack = Math.max(0, (project.layers || []).findIndex(layer => layer.type === "cue"));
+  const cue = addClip(cueTrack, clip.start, 0.1, `TOP · ${clip.label}`, "cue", {
+    actions:[{ type:"element-instance", elementId:clip.elementId, instanceId:clip.id }]
+  });
+  autosave();
+  log(`TOP · ${clip.label} prêt`);
+  return cue;
+}
+
+function renderElementsPane() {
+  const host = $("#elementsPane");
+  if (!host) return;
+  const elements = listElements(project);
+  host.innerHTML = `<div class="elements-actions"><button type="button" id="saveSelectedElement" class="smallbtn">Enregistrer la sélection</button><label><input type="checkbox" id="elementPreviewLoop"> Boucler l’aperçu</label></div>${elements.length ? elements.map(element => `<article class="element-card" draggable="true" tabindex="0" data-element-id="${htmlSafe(element.id)}"><b>${htmlSafe(element.name)}</b><span>${htmlSafe(element.type)}</span><div><button type="button" data-place-element="${htmlSafe(element.id)}">Ajouter</button><button type="button" data-top-element="${htmlSafe(element.id)}">TOP</button></div></article>`).join("") : `<p class="hint">Enregistre un node ou un sous-patch : il restera disponible ici pour toute la conduite.</p>`}`;
+  $("#saveSelectedElement")?.addEventListener("click", saveSelectedElement);
+  host.querySelectorAll("[data-place-element]").forEach(button => button.addEventListener("click", () => placeElementInTimeline(button.dataset.placeElement)));
+  host.querySelectorAll("[data-top-element]").forEach(button => button.addEventListener("click", () => addElementTop(button.dataset.topElement)));
+  host.querySelectorAll(".element-card").forEach(card => {
+    card.addEventListener("dragstart", event => { event.dataTransfer.setData("application/x-nvd-element", card.dataset.elementId); event.dataTransfer.effectAllowed = "copy"; });
+    card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); placeElementInTimeline(card.dataset.elementId); } });
+  });
 }
 function drawClip(c) {
   const el = document.createElement("div");
@@ -1853,6 +1913,7 @@ function redraw() {
     }
     runtime.setProject(project);
   }
+  renderElementsPane();
   updateGraphBreadcrumb();
   requestAnimationFrame(renderWires);
 }
@@ -1967,6 +2028,16 @@ function installTimelineLayerEvents() {
     resize = { index, startY:event.clientY, start:Number(project.layers[index].height) || 30 };
     event.preventDefault();
     event.stopPropagation();
+  });
+  host.addEventListener("dragover", event => {
+    if (event.dataTransfer?.types?.includes("application/x-nvd-element")) event.preventDefault();
+  });
+  host.addEventListener("drop", event => {
+    const row = event.target.closest(".timeline-layer-row");
+    const elementId = event.dataTransfer?.getData("application/x-nvd-element");
+    if (!row || !elementId) return;
+    event.preventDefault();
+    placeElementInTimeline(elementId, Number(row.dataset.track), event.clientX, row);
   });
   window.addEventListener("mousemove", event => {
     if (!resize) return;
@@ -2502,27 +2573,34 @@ function showVibePreview(result, logPrefix) {
   if (!result?.ops?.length) {
     log(`${logPrefix} · aucune opération générée (pas de réussite simulée)`);
     pendingVibe = null;
+    creatorSession.clearProposal();
     $("#vibePreview")?.classList.add("hidden");
+    $("#vibeResult")?.classList.add("hidden");
     return result;
   }
-  pendingVibe = result;
+  pendingVibe = creatorSession.setProposal({ ...result, source:logPrefix });
   const box = $("#vibePreview");
   if (box) {
     box.classList.remove("hidden");
     box.innerHTML = `<div class="vibe-preview-head"><b>Aperçu Vibe</b> · ${htmlSafe(result.engine || "")} · ${result.ops.length} op(s)</div>
-      <pre class="vibe-preview-ops">${result.ops.map(o => htmlSafe(JSON.stringify(o))).join("\n")}</pre>
-      <div class="vibe-preview-actions">
-        <button type="button" id="vibeConfirm" class="smallbtn">Appliquer</button>
-        <button type="button" id="vibeCancel" class="smallbtn">Annuler</button>
-      </div>`;
-    $("#vibeConfirm").onclick = () => confirmPendingVibe();
-    $("#vibeCancel").onclick = () => {
-      pendingVibe = null;
-      box.classList.add("hidden");
-      log(`${logPrefix} · aperçu annulé (aucune modification)`);
-    };
+      <pre class="vibe-preview-ops">${result.ops.map(o => htmlSafe(JSON.stringify(o))).join("\n")}</pre>`;
+  }
+  const resultBar = $("#vibeResult");
+  if (resultBar) {
+    resultBar.classList.remove("hidden");
+    $("#vibeResultSummary").textContent = `${result.ops.length} action${result.ops.length > 1 ? "s" : ""} prête${result.ops.length > 1 ? "s" : ""}`;
+    $("#vibeResultConfirm").onclick = () => confirmPendingVibe();
+    $("#vibeResultCancel").onclick = () => cancelPendingVibe(logPrefix);
   }
   return result;
+}
+
+function cancelPendingVibe(logPrefix = "Vibe") {
+  pendingVibe = null;
+  creatorSession.clearProposal();
+  $("#vibePreview")?.classList.add("hidden");
+  $("#vibeResult")?.classList.add("hidden");
+  log(`${logPrefix} · aperçu annulé (aucune modification)`);
 }
 
 async function proposeVibe(rawText, { logPrefix = "Vibe", image = null } = {}) {
@@ -2557,6 +2635,7 @@ async function applyVibeFromUi() {
   $("#applyVibe").disabled = true;
   try {
     const text = $("#vibeText").value.trim();
+    creatorSession.saveDraft(text);
     const target = $("#vibeImageTarget")?.value || "auto";
     await proposeVibe(text, {
       logPrefix: "Vibe",
@@ -2570,10 +2649,11 @@ async function applyVibeFromUi() {
 }
 
 async function confirmPendingVibe() {
-  if (!pendingVibe?.ops?.length) return;
+  const proposal = creatorSession.getProposal() || pendingVibe;
+  if (!proposal?.ops?.length) return;
   if (refuseCanvasEdit("application Vibe")) return;
   commitHistory();
-  const { applied, errors } = applyVibeOps(project, pendingVibe.ops, {
+  const { applied, errors } = applyVibeOps(project, proposal.ops, {
     addNode: (type, x, y) => {
       // force root graph for vibe
       const prev = graphPath;
@@ -2587,6 +2667,8 @@ async function confirmPendingVibe() {
     log
   });
   pendingVibe = null;
+  creatorSession.clearProposal();
+  $("#vibeResult")?.classList.add("hidden");
   $("#vibePreview")?.classList.add("hidden");
   graphPath = [];
   redraw();
@@ -2683,11 +2765,15 @@ $("#vibeText").addEventListener("keydown", e => {
 function showRightPane(id) {
   const inspector = $("#inspectorBody");
   const chat = $("#cxChatPane");
-  if (!inspector || !chat) return;
-  const cx = id === "cx";
-  inspector.classList.toggle("pane-hidden", cx);
-  chat.classList.toggle("pane-hidden", !cx);
-  chat.hidden = !cx;
+  const elements = $("#elementsPane");
+  if (!inspector || !chat || !elements) return;
+  inspector.classList.toggle("pane-hidden", id !== "inspector");
+  inspector.hidden = id !== "inspector";
+  elements.classList.toggle("pane-hidden", id !== "elements");
+  elements.hidden = id !== "elements";
+  chat.classList.toggle("pane-hidden", id !== "cx");
+  chat.hidden = id !== "cx";
+  if (id === "elements") renderElementsPane();
   qall("[data-right-pane]").forEach(btn => {
     const on = btn.dataset.rightPane === id;
     btn.classList.toggle("active", on);
@@ -2766,6 +2852,8 @@ async function sendCxChat() {
   const text = input?.value.trim() || "";
   if (!text) return;
   appendCxMessage("user", text);
+  creatorSession.saveDraft(text);
+  if ($("#vibeText")) $("#vibeText").value = text;
   if (input) input.value = "";
   const send = $("#cxChatSend");
   if (send) send.disabled = true;
@@ -2783,19 +2871,7 @@ async function sendCxChat() {
       unavailable: unavailableHosts
     }));
     appendCxDownloadActions(unavailableHosts);
-    if (result?.ops?.length) {
-      const row = document.createElement("div");
-      row.className = "cx-msg assistant";
-      row.innerHTML = `<div class="cx-confirm"><button type="button" data-cx-confirm>Appliquer au patch</button><button type="button" data-cx-cancel>Annuler</button></div>`;
-      row.querySelector("[data-cx-confirm]").onclick = () => confirmPendingVibe();
-      row.querySelector("[data-cx-cancel]").onclick = () => {
-        pendingVibe = null;
-        $("#vibePreview")?.classList.add("hidden");
-        appendCxMessage("assistant", "Aperçu annulé. Aucune modification.");
-        row.remove();
-      };
-      $("#cxChatLog")?.append(row);
-    }
+    if (result?.ops?.length) appendCxMessage("assistant", "Aperçu prêt dans le Créateur : applique ou annule une seule fois depuis le même panneau.");
   } catch (e) {
     status?.remove();
     appendCxMessage("assistant", `Échec · ${e.message || e}`);
@@ -2813,6 +2889,11 @@ $("#cxChatInput")?.addEventListener("keydown", e => {
     sendCxChat();
   }
 });
+
+const restoredCreatorDraft = creatorSession.loadDraft();
+if (restoredCreatorDraft && $("#vibeText")) $("#vibeText").value = restoredCreatorDraft;
+$("#vibeText")?.addEventListener("input", event => creatorSession.saveDraft(event.currentTarget.value));
+$("#cxChatInput")?.addEventListener("input", event => creatorSession.saveDraft(event.currentTarget.value));
 
 function runtimeFacts() {
   return {
@@ -3030,7 +3111,7 @@ function openPreferences(tab = "general") {
     const g = JSON.parse(localStorage.getItem("nvd.general") || "{}");
     if ($("#prefRestoreAutosave")) $("#prefRestoreAutosave").checked = g.restoreAutosave !== false;
     if ($("#prefPlugAndPlay")) $("#prefPlugAndPlay").checked = g.plugAndPlay !== false;
-    if ($("#prefLoadDemo")) $("#prefLoadDemo").checked = g.loadDemo !== false;
+    if ($("#prefLoadDemo")) $("#prefLoadDemo").checked = g.loadDemo === true;
     if ($("#prefTechnicalMode")) $("#prefTechnicalMode").checked = g.technicalMode === true;
     paintBackendReport();
   } catch { /* */ }
@@ -3480,7 +3561,7 @@ updateRouteButtons();
 buildLibrary();
 void refreshEngineOffers();
 
-let generalPrefs = { restoreAutosave: true, loadDemo: true, plugAndPlay: true };
+let generalPrefs = { restoreAutosave: true, loadDemo: false, plugAndPlay: true };
 try { generalPrefs = { ...generalPrefs, ...JSON.parse(localStorage.getItem("nvd.general") || "{}") }; } catch { /* */ }
 
 let recoveredFromCrash = false;
@@ -3509,7 +3590,7 @@ try {
   if (session.lastProjectName) log(`Session · dernier projet « ${session.lastProjectName} »`);
   if (session.remoteCamera?.room) log(`Session · Remote Camera connu ${session.remoteCamera.room} · ${session.remoteCamera.lastStatus || LINK_STATES.KNOWN}`);
 } catch { /* */ }
-if (project.nodes.length === 0 && generalPrefs.loadDemo !== false) {
+if (project.nodes.length === 0 && generalPrefs.loadDemo === true) {
   try { demoReturnProject = JSON.parse(JSON.stringify(project)); } catch { demoReturnProject = newProject(); }
   project = createDemoProject();
   setDemoBanner(true);
@@ -3534,7 +3615,7 @@ let remoteRevision = 0;
 let remoteSession = null;
 let applyingRemote = false;
 let companionLayout = null;
-try { companionLayout = loadCompanionLayout() || ensureCompanionLayout(); } catch { companionLayout = null; }
+try { companionLayout = getShowCompanionLayout(project, loadCompanionLayout() || ensureCompanionLayout()); } catch { companionLayout = null; }
 let companionMonitorTimer = null;
 let companionMonitorClientId = "";
 let companionMonitorPeer = null;
@@ -3553,6 +3634,7 @@ function hideCompanionDetect() {
 }
 
 function sendCompanionLayout(clientId = "") {
+  try { companionLayout = getShowCompanionLayout(project, companionLayout || loadCompanionLayout() || ensureCompanionLayout()); } catch { /* no valid layout to send */ }
   if (!remoteSession?.online || !companionLayout) return false;
   remoteSession.send({
     type: STUDIO_MSG.LAYOUT,
@@ -3705,6 +3787,7 @@ function handleCompanionStudioMessage(msg) {
     try {
       companionLayout = validateCompanionDocument(msg.layout);
       saveCompanionLayout(companionLayout);
+      setShowCompanionLayout(project, companionLayout);
       remoteSession?.send?.({
         type: STUDIO_MSG.LAYOUT_ACK,
         clientId: msg.clientId,

@@ -41,6 +41,7 @@
         <button type="button" id="btnConnect">Connecter</button>
         <button type="button" id="btnDisconnect" class="ghost">Déconnecter</button>
         <button type="button" id="btnSave" class="ghost">Enregistrer</button>
+        <button type="button" id="btnSavePreset" class="ghost">Sauver en preset</button>
         <button type="button" id="btnRegie" class="ghost">Régie universelle</button>
         <button type="button" id="btnRequestMonitor" class="ghost">Retour vidéo</button>
       </div>
@@ -61,6 +62,16 @@
       <label class="photo-pick">Prendre une photo<input id="photoControllerInput" type="file" accept="image/*" capture="environment" /></label>
       <button type="button" id="photoControllerGenerate">Créer le contrôleur</button>
       <button type="button" id="photoControllerClear" class="ghost">Retirer l’image</button>
+    </div>
+    <div class="photo-options">
+      <label>Sauvegarder dans
+        <select id="photoControllerDestination">
+          <option value="show">Ce spectacle</option>
+          <option value="preset">Un preset local</option>
+          <option value="both">Le spectacle et un preset</option>
+        </select>
+      </label>
+      <label class="photo-keep"><input id="photoControllerKeepBackground" type="checkbox" /> Garder la photo comme fond local</label>
     </div>
     <label class="photo-opacity">Opacité de l’image <input id="photoControllerOpacity" type="range" min="0" max="0.85" step="0.05" value="0.35" /></label>
     <p id="photoControllerStatus" class="hint">Aucune photo chargée.</p>
@@ -140,6 +151,12 @@
           <div><b>Presets</b><span>Layouts prêts à personnaliser</span></div>
         </div>
         <div id="regiePresets" class="preset-grid"></div>
+      </section>
+      <section class="preset-zone">
+        <div class="preset-zone-head">
+          <div><b>Mes presets</b><span>Contrôleurs sauvegardés sur cet appareil</span></div>
+        </div>
+        <div id="customPresets" class="preset-grid"></div>
       </section>
       <div id="profileList" class="profile-list"></div>
       <p class="hint">Les profils marqués « à adapter » génèrent des commandes éditables : aucune compatibilité non vérifiée n’est simulée.</p>

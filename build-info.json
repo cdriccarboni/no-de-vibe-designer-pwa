@@ -1,9 +1,10 @@
 {
   "name": "No[co]de Vibe Designer",
   "version": "3.3.8",
-  "builtAt": "2026-10-07T06:02:00.000Z",
-  "files": 148,
-  "cacheRevision": "example-wow-20261007",
+  "sourceRevision": "0ddc518b9641b966886ded13b5b97204226495c4",
+  "builtAt": "2026-10-09T04:39:10.494Z",
+  "files": 174,
+  "cacheRevision": "f38eed1a54",
   "surfaces": [
     "designer",
     "show",
@@ -11,6 +12,5 @@
     "regie",
     "plateau",
     "camera"
-  ],
-  "sourceCommit": "b8b9431eca39eca73093f3da143b3611f3d1f77f"
+  ]
 }

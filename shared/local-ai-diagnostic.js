@@ -5,6 +5,7 @@
  */
 
 export const LOCAL_AI_PROBE_TIMEOUT_MS = 2500;
+export const LOCAL_AI_CHAT_TIMEOUT_MS = 30000;
 
 const MODEL_MISSING = "model_missing";
 
@@ -66,10 +67,17 @@ export function classifyLocalAiFailure(facts = {}) {
   if (facts.binaryPresent === false && (aborted || fetchFailed)) {
     return { code: "not_installed", message: "Ollama n'est pas installé", responded: false };
   }
-  const timedOut = aborted && facts.probeTimeout === true;
+  const timedOut = aborted && (facts.probeTimeout === true || facts.chatTimeout === true);
+  if (timedOut) {
+    const seconds = Math.max(0.1, Number(facts.timeoutMs || (facts.probeTimeout ? LOCAL_AI_PROBE_TIMEOUT_MS : LOCAL_AI_CHAT_TIMEOUT_MS)) / 1000);
+    return {
+      code: "timeout",
+      message: `Ollama inaccessible : aucune réponse avant ${seconds % 1 ? seconds.toFixed(1) : seconds} s`,
+      responded: false
+    };
+  }
   let detail = "Ollama inaccessible";
-  if (timedOut) detail = "Ollama inaccessible : aucune réponse avant 2,5 s";
-  else if (message && !/^Ollama inaccessible/.test(message)) detail = `Ollama inaccessible : ${message}`;
+  if (message && !/^Ollama inaccessible/.test(message)) detail = `Ollama inaccessible : ${message}`;
   else if (message) detail = message;
   return { code: "unreachable", message: detail, responded: false };
 }

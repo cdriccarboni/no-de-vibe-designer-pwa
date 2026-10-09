@@ -109,11 +109,39 @@ function localAgentTaskForText(text = "") {
   return "patch";
 }
 
+function withLocalAiDeadline(task, timeoutMs) {
+  const deadline = Math.max(1000, Math.min(120000, Number(timeoutMs) || 30000));
+  let timer;
+  const expiration = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(`Réponse IA trop lente : aucune réponse avant ${deadline / 1000} s`);
+      error.name = "TimeoutError";
+      error.code = "LOCAL_AI_TIMEOUT";
+      reject(error);
+    }, deadline);
+  });
+  return Promise.race([task, expiration]).finally(() => clearTimeout(timer));
+}
+
 async function callLocalAi(text, project, cfg) {
   const local = normalizeLocalAiConfig(cfg);
   if (!local.enabled) return { ok:false, unavailable:true, error:"Local AI Core désactivé" };
 
-  const probe = await probeLocalAi(cfg);
+  // Vibe is an interactive authoring surface: an unavailable or slow model must
+  // yield promptly to the local planner instead of trapping the user on "analyse…".
+  let probe;
+  try {
+    probe = await withLocalAiDeadline(probeLocalAi(cfg), local.interactiveTimeoutMs);
+  } catch (e) {
+    const timedOut = e?.code === "LOCAL_AI_TIMEOUT" || e?.name === "TimeoutError";
+    return {
+      ok:false,
+      unavailable:!timedOut,
+      timedOut,
+      responded:false,
+      error: timedOut ? `Réponse IA trop lente pour le mode instantané (${local.interactiveTimeoutMs / 1000} s)` : `Local AI Core injoignable : ${e?.message || e}`
+    };
+  }
   if (!probe.ok) return { ok:false, unavailable:true, responded:false, error:probe.error || "Ollama local indisponible" };
 
   const agentTask = localAgentTaskForText(text);
@@ -131,23 +159,27 @@ async function callLocalAi(text, project, cfg) {
   const ask = async target => {
     const model = target.model;
     const baseUrl = target.baseUrl || local.baseUrl;
-    const raw = typeof globalThis?.nvdDesktop?.localAiChat === "function"
-      ? await globalThis.nvdDesktop.localAiChat({
+    const timeoutMs = Math.min(local.chatTimeoutMs, local.interactiveTimeoutMs);
+    const request = typeof globalThis?.nvdDesktop?.localAiChat === "function"
+      ? globalThis.nvdDesktop.localAiChat({
           baseUrl,
           model,
           temperature:local.temperature,
           system:prompt.system,
           user:prompt.user,
-          numPredict:isfMode ? 8000 : 1800
+          numPredict:isfMode ? 8000 : 1800,
+          timeoutMs
         })
-      : await directOllamaChat({
+      : directOllamaChat({
           baseUrl,
           model,
           temperature:local.temperature,
           system:prompt.system,
           user:prompt.user,
-          numPredict:isfMode ? 8000 : 1800
+          numPredict:isfMode ? 8000 : 1800,
+          timeoutMs
         });
+    const raw = await withLocalAiDeadline(request, timeoutMs);
     const parsed = sanitizeLocalAiResponse(raw, { maxOps:local.maxOps });
     if (!parsed.ok) throw new Error(parsed.error || "Réponse locale inexploitable");
     return { model, baseUrl, role:target.role, ...parsed };
@@ -188,7 +220,14 @@ async function callLocalAi(text, project, cfg) {
     };
   } catch (e) {
     const message = e?.failure?.message || e?.message || String(e);
-    return { ok:false, unavailable:true, responded:false, error: e?.failure ? message : "Local AI Core injoignable : " + message };
+    const timedOut = e?.code === "LOCAL_AI_TIMEOUT" || e?.name === "TimeoutError" || /aucune réponse avant/i.test(message);
+    return {
+      ok:false,
+      unavailable:!timedOut,
+      timedOut,
+      responded:false,
+      error:timedOut ? `Réponse IA trop lente pour le mode instantané (${local.interactiveTimeoutMs / 1000} s)` : (e?.failure ? message : "Local AI Core injoignable : " + message)
+    };
   }
 }
 async function callRemoteAi(text, project, cfg) {
@@ -349,15 +388,19 @@ export async function runVibe(text, project, { forceLocal = false } = {}) {
     }
 
     const rules = localVibeParse(text, project);
+    const delayed = localAi.timedOut === true;
     return finalizeVibeResult(augmentRunnableSources(text, {
       ok: rules.ops.length > 0,
       engine: "local-planner-fallback",
       ops: rules.ops,
       summary: rules.note,
       planner: rules.diagnostics,
-      aiError: localAi.error,
-      note: `IA locale indisponible — ${localAi.error} · repli Planner déterministe`,
-      aiUnavailable: true
+      ...(delayed ? {} : { aiError:localAi.error }),
+      note: delayed
+        ? `IA locale trop lente pour le mode instantané · patch créé par le Planner déterministe`
+        : `IA locale indisponible — ${localAi.error} · repli Planner déterministe`,
+      aiUnavailable: !delayed,
+      aiDelayed: delayed
     }), project, "local-planner-fallback");
   }
 

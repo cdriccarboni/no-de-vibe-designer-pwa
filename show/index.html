@@ -42,6 +42,22 @@
     <button id="save" type="button">Enregistrer</button>
     <button id="restore" type="button">Restaurer</button>
   </div>
+  <section class="live-title-panel" aria-labelledby="liveTitleHeading">
+    <div class="live-title-heading">
+      <h2 id="liveTitleHeading">Titre public en direct</h2>
+      <p>Le site public déjà ouvert change sans rechargement ni changement d’adresse.</p>
+    </div>
+    <label class="live-title-address" for="liveTitleAddress">Adresse privée de régie
+      <input id="liveTitleAddress" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://…/api/radio-paillettes-live#clé">
+    </label>
+    <p class="live-title-hint">Internet requis · cette adresse reste sur cet appareil et n’est jamais ajoutée au projet.</p>
+    <div class="live-title-actions" aria-label="Titre public à diffuser">
+      <button type="button" data-live-title="radio" aria-pressed="false">Radio Paillettes</button>
+      <button type="button" data-live-title="pirates" aria-pressed="false">Pirates Paillettes</button>
+      <button type="button" data-live-title="radio-pirate" aria-pressed="false">Radio Pirate Paillettes</button>
+    </div>
+    <p id="liveTitleStatus" role="status" aria-live="polite">Adresse privée de régie requise.</p>
+  </section>
   <canvas id="preview" width="320" height="180" aria-label="Aperçu shader"></canvas>
   <canvas id="monitor" width="680" height="240" aria-label="Moniteur Show"></canvas>
   <pre id="timeline"></pre>

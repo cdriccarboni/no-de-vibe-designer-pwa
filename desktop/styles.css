@@ -158,6 +158,7 @@ body.gradient-strong{--gradient-alpha:.78}
 .vibe-preview.hidden{display:none}
 .vibe-preview-ops{max-height:120px;overflow:auto;font:11px ui-monospace,Menlo,monospace;color:var(--muted);white-space:pre-wrap}
 .vibe-preview-actions{display:flex;gap:8px;margin-top:8px}
+.elements-pane{display:grid;align-content:start;gap:8px;overflow:auto}.elements-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}.elements-actions label{font-size:10px;color:var(--muted)}.element-card{display:grid;grid-template-columns:1fr auto;gap:4px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel2);cursor:grab}.element-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.element-card span{font-size:10px;color:var(--muted)}.element-card>div{grid-column:1/-1;display:flex;gap:6px}.element-card button{font-size:10px}
 
 
 /* macOS — laisser visibles les trois contrôles natifs dans la topbar intégrée */
@@ -260,7 +261,11 @@ body[data-workspace="plateau"] .center{grid-template-rows:minmax(0,1fr) var(--ti
 .panel.vibe>.panel-body,.panel.timeline>.panel-body{flex:1;min-height:0}
 .vibe-body{display:flex;flex-direction:column;gap:8px;height:auto;min-height:0;overflow:hidden;padding:8px}
 .vibe-scroll{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
-.vibe-actions{flex:none;display:flex;justify-content:flex-end;background:var(--bg);border-top:1px solid var(--line);margin:0 -8px -8px;padding:7px 8px}
+.vibe-actions{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border-top:1px solid var(--line);margin:0 -8px -8px;padding:7px 8px}
+.vibe-result{display:flex;align-items:center;gap:7px;min-width:0;font-size:10px;color:var(--muted)}
+.vibe-result span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vibe-result .smallbtn:first-of-type{background:var(--accent);border-color:var(--accent);color:#14160f;font-weight:700}
+.vibe-result.hidden{display:none}
 .vibe textarea{min-height:72px;flex:1}
 .generate{align-self:auto;padding:7px 14px;background:var(--accent);color:#14160f;border-color:var(--accent);font-weight:700}
 .timeline-shell{height:auto;flex:1;min-height:0}
@@ -268,6 +273,30 @@ body[data-workspace="plateau"] .center{grid-template-rows:minmax(0,1fr) var(--ti
 .panel.preview.is-floating .preview-body{height:auto;flex:1}
 @media(max-height:760px){
   .center{grid-template-rows:minmax(120px,1fr) var(--vibe-row,minmax(132px,24vh)) var(--timeline-row,minmax(128px,26vh))}
+}
+
+/* Le Designer reste utilisable dans une fenêtre étroite et sur téléphone :
+   aucun panneau ne doit obliger l'utilisateur à faire défiler toute la page
+   horizontalement pour atteindre Envoyer ou Appliquer. */
+@media(max-width:760px){
+  #app{grid-template-rows:50px minmax(0,1fr) 100px;min-width:0}
+  .topbar{gap:6px;padding:0 8px;overflow-x:auto;scrollbar-width:none}
+  .topbar::-webkit-scrollbar{display:none}
+  .brand span,.badge,.themes a[href$="show/"]{display:none}
+  .workspace{grid-template-columns:minmax(0,1fr);gap:6px;padding:6px;overflow:hidden}
+  .library{display:none}
+  .center{grid-template-rows:minmax(250px,1fr) minmax(168px,22vh) minmax(160px,25vh);gap:6px;min-width:0}
+  .upper{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(118px,1fr) minmax(118px,1fr);gap:6px;overflow:hidden}
+  .patch,.preview{min-width:0;min-height:0}
+  .patch-space{min-width:0;min-height:0}
+  .preview-body canvas{min-height:80px}
+  .panel-head{padding:0 8px}
+  .panel-head .sub{max-width:42vw}
+  .vibe-actions{flex-wrap:wrap}
+  .vibe-result{flex:1 1 100%}
+  .vibe-result span{flex:1}
+  .terminal{margin:0 6px 6px;min-height:78px;grid-template-rows:28px 1fr 30px}
+  #nvd-release-notice{width:calc(100vw - 16px)!important;max-width:390px}
 }
 
 .show-lock-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:750;letter-spacing:.04em;border:1px solid var(--accent);border-radius:99px;padding:3px 8px;color:#1a160c;background:var(--accent)}
@@ -294,14 +323,6 @@ body.show-locked .nh,body.show-locked .port-dot{cursor:not-allowed}
 .cx-chat-form{display:grid;gap:6px}
 .cx-chat-form textarea{min-height:68px;resize:vertical;background:var(--bg);color:inherit;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit}
 .cx-confirm{display:flex;gap:6px;margin-top:6px}
-
-/* Installer / update surface */
-.install-pref-card{position:relative;overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--line));border-radius:12px;padding:16px;background:linear-gradient(145deg,color-mix(in srgb,var(--panel2) 92%,var(--accent) 8%),var(--panel));box-shadow:var(--shadow)}
-.install-pref-card::after{content:"";position:absolute;right:-70px;top:-80px;width:190px;height:190px;border:1px solid color-mix(in srgb,var(--accent2) 30%,transparent);border-radius:50%;box-shadow:0 0 0 28px color-mix(in srgb,var(--accent2) 5%,transparent),0 0 0 58px color-mix(in srgb,var(--accent) 4%,transparent);pointer-events:none}
-.install-pref-kicker{font-size:9px;letter-spacing:.18em;color:var(--accent);font-weight:800}
-.install-pref-card h3{font-size:18px;margin:7px 0 8px}.install-pref-card p{max-width:620px;color:var(--muted);line-height:1.55}
-.install-pref-tags{display:flex;flex-wrap:wrap;gap:6px;margin:13px 0}.install-pref-tags span{border:1px solid var(--line2);border-radius:99px;padding:4px 8px;background:var(--bg);color:var(--muted);font-size:9px}
-.install-pref-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 8px}.install-pref-actions a{display:inline-flex;align-items:center;text-decoration:none;padding:8px 10px}.install-pref-actions .primary-link{border-color:var(--accent);color:var(--text);background:color-mix(in srgb,var(--accent) 12%,var(--panel2))}
 
 
 /* Voice dictation · optional progressive enhancement for the Vibe prompt */

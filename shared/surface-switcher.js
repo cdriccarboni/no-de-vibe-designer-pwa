@@ -1,4 +1,3 @@
-import { installUpdateNotice } from "./update-notice.js";
 /**
  * No-de Surface Switcher
  * Une même machine peut devenir Designer, interface mobile, régie tablette,
@@ -112,7 +111,6 @@ export function installSurfaceSwitcher({current="designer",label="Interface"}={}
   document.addEventListener("click",(e)=>{if(!wrap.contains(e.target))close();});
   document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   document.body.appendChild(wrap);
-  queueMicrotask(()=>installUpdateNotice());
 }
 
 
@@ -120,6 +118,7 @@ export function installSurfaceSwitcher({current="designer",label="Interface"}={}
 export function getSurfaceList() {
   return [
     ...SURFACES.map(s => ({ id:s.id, label:s.label, url:"/" + s.path })),
+    { id:"show", label:"Show", url:"/show/index.html?surface=show" },
     { id:"auto", label:"Auto", url:"/index.html?auto=1" }
   ];
 }

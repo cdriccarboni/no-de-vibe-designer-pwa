@@ -23,7 +23,7 @@ const INTENTS = [
   ["metaballs", ["metaballs","metaball","sdf organique"]],
   ["sand", ["interactive sand","sable interactif","sable numerique","sable numérique"]],
   ["swarm", ["swarm","boids","essaim","nuée","nuee"]],
-  ["ripple", ["ripple","ondes","champ d ondes","ondes interactives"]],
+  ["ripple", ["ripple","ondes","champ d ondes","ondes interactives","point lumineux","lumiere interactive","lumière interactive"]],
   ["dream", ["dream","reve","rêve","visuel onirique"]],
   ["p5", ["p5","processing"]],
   ["sketch", ["sketch","dessin generatif","dessin génératif"]],
@@ -44,7 +44,7 @@ const INTENTS = [
   ["storm", ["storm","orage","tempete","tempête"]],
   ["bending", ["bending","deformation","déformation","distorsion"]],
   ["transmute", ["transmute","transmutation","mutation couleur"]],
-  ["shader", ["shader","glsl","ondul"]],
+  ["shader", ["shader","glsl","ondul","lumiere","lumière","lumineux","lumineuse"]],
   ["mapping", ["mapping","projection mapping"]],
   ["videoreturn", ["retour video","retour vidéo","monitor video","monitor vidéo"]],
   ["midi", ["midi"]],
@@ -147,8 +147,21 @@ function phraseIndex(t, phrases) {
   let best = Infinity;
   for (const p of phrases) {
     const n = normalizeVibeText(p);
-    const i = t.indexOf(n);
-    if (i >= 0 && i < best) best = i;
+    let offset = 0;
+    while (offset <= t.length - n.length) {
+      const i = t.indexOf(n, offset);
+      if (i < 0) break;
+      const before = t[i - 1] || "";
+      // Intent words must not match inside another word: "ombre" is not
+      // requested by "nombre". We deliberately accept a word ending after a
+      // recognized stem ("ondul" → "onduler").
+      const startsInsideWord = /[a-z0-9]/.test(before) && /^[a-z0-9]/.test(n);
+      if (!startsInsideWord) {
+        if (i < best) best = i;
+        break;
+      }
+      offset = i + 1;
+    }
   }
   return best;
 }
@@ -293,6 +306,8 @@ export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
 
   // Common controller intentions.
   const shaderTarget = has("shader") ? "shader" : null;
+  if (/\b(souris|mouse|curseur|pointeur)\b/.test(t)) add("pointer", 70, 360);
+  if (has("pointer") && has("ripple")) connect("pointer", "ripple", "number");
   if (has("midi") && shaderTarget && /midi.*(shader|intens)|shader.*midi/.test(t)) connect("midi","shader","number");
   if (has("gyro") && requestedFx.length) connect("gyro", requestedFx[0], "number");
   if (has("automation") && requestedFx.length) connect("automation", requestedFx[0], "number");

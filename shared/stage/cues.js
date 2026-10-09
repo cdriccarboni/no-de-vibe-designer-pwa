@@ -49,7 +49,9 @@ function normalizeAction(action = {}) {
     universe: action.universe ?? 0,
     host: action.host || null,
     port: action.port ?? null,
-    target: action.target || null
+    target: action.target || null,
+    elementId: action.elementId || null,
+    instanceId: action.instanceId || null
   };
 }
 
@@ -429,6 +431,14 @@ export function applyCue(project, cue, { panic = false, layout = null } = {}) {
       effects.push({ type: "midi", value: action.value, target: action.target || null });
     } else if (action.type === "ascii") {
       effects.push({ type: "ascii", value: String(action.value ?? ""), target: action.target || null });
+    } else if (action.type === "element-instance") {
+      const instance = (next.timeline || []).find(item => item?.id === action.instanceId && item?.elementId === action.elementId);
+      if (!instance) effects.push({ type: "error", error: `Instance d’Élément ${action.instanceId || action.elementId || "inconnue"} introuvable pour le cue` });
+      else {
+        next.meta ||= {};
+        next.meta.activeElementInstanceId = instance.id;
+        effects.push({ type:"element-instance", instanceId:instance.id, elementId:instance.elementId, snapshot:instance.snapshot || {} });
+      }
     }
   }
 
