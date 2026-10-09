@@ -137,9 +137,9 @@ details{position:relative;z-index:1;border-top:1px solid var(--line);margin-top:
 (async()=>{
   const releaseBase="https://github.com/cdriccarboni/no-de-vibe-designer-pwa/releases";
   const apiBase="https://api.github.com/repos/cdriccarboni/no-de-vibe-designer-pwa/releases/tags/";
-  let info={version:"3.3.7",files:"?",cacheRevision:"—"};
+  let info={version:"3.3.11",files:"?",cacheRevision:"—"};
   try{info=await fetch("../build-info.json",{cache:"no-store"}).then(r=>r.json())}catch{}
-  const version=info.version||"3.3.7", tag="v"+version;
+  const version=info.version||"3.3.11", tag="v"+version;
   const ua=(navigator.userAgent||"").toLowerCase();
   const platform=(navigator.userAgentData?.platform||navigator.platform||"").toLowerCase();
   let detected="web", label="Web / PWA";
