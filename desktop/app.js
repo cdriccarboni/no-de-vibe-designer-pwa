@@ -699,7 +699,13 @@ function buildLibrary() {
         const ok = isLibraryExecutable(t);
         const unstable = ["depthmask","opticalflow","ndi-out","remote-camera","phone-camera-back","phone-camera-front"].includes(t);
         const mark = (!ok || unstable) ? " · EXPÉRIMENTAL" : "";
-        return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${nodeReadiness(t)}"><span>${n}${mark}</span><span>${ok ? "＋" : "○"}</span></div>`;
+        return `<div class="lib-item ${ok ? "executable" : "unavailable"}" draggable="true" data-add="${t}" data-node-label="${htmlSafe(n)}" title="${nodeReadiness(t)}">
+          <span>${n}${mark}</span>
+          <span class="lib-item-side">
+            <button type="button" class="lib-timeline-btn" data-add-to-timeline="${t}" title="Ajouter directement à la Timeline">＋ Timeline</button>
+            <span class="lib-add-icon">${ok ? "＋" : "○"}</span>
+          </span>
+        </div>`;
       }).join("")}</div>
     </div>`;
   }).join("");
@@ -712,7 +718,27 @@ function buildLibrary() {
       buildLibrary();
     };
   });
-  qall("[data-add]").forEach(x => x.onclick = () => addNode(x.dataset.add));
+  qall("#libraryList [data-add]").forEach(x => {
+    x.onclick = (e) => {
+      if (e.target.closest(".lib-timeline-btn")) return;
+      addNode(x.dataset.add);
+    };
+    x.addEventListener("dragstart", event => {
+      const type = x.dataset.add;
+      const label = x.dataset.nodeLabel || type;
+      event.dataTransfer.setData("application/x-nvd-node-type", type);
+      event.dataTransfer.setData("text/plain", label);
+      event.dataTransfer.effectAllowed = "copy";
+    });
+  });
+  qall("[data-add-to-timeline]").forEach(btn => {
+    btn.onclick = event => {
+      event.stopPropagation();
+      const type = btn.dataset.addToTimeline;
+      const n = addNode(type);
+      if (n) addNodeToTimeline(n);
+    };
+  });
   if (q) qall(".lib-item").forEach(x => {
     x.style.display = x.textContent.toLowerCase().includes(q) ? "flex" : "none";
   });
@@ -1130,7 +1156,7 @@ function drawNode(n) {
   const ports = portLabels(n.type, n) || spec(n.type)[1];
   el.className += selection.has(n.id) ? " sel" : "";
   const onAirNode = ["radio-live","radio-out","stream-studio"].includes(n.type);
-  el.innerHTML = `<div class="nh">${n.title}${isExecutable(n.type) ? "" : " · ○"}${onAirNode ? `<span class="node-on-air ${n.params?.onAir ? "live" : ""}">${n.params?.onAir ? "ON AIR" : "STANDBY"}</span>` : ""}</div><div class="nb">${ports.map((p, i) => {
+  el.innerHTML = `<div class="nh"><span class="nh-title">${n.title}${isExecutable(n.type) ? "" : " · ○"}</span><span class="nh-tools"><span class="node-timeline-drag" draggable="true" title="Glisser ce node vers la Timeline">⏱</span>${onAirNode ? `<span class="node-on-air ${n.params?.onAir ? "live" : ""}">${n.params?.onAir ? "ON AIR" : "STANDBY"}</span>` : ""}</span></div><div class="nb">${ports.map((p, i) => {
     const dir = portDirection(n.type, i, ports.length, n);
     return `<div class="port port-${dir}">${dir === "in" ? `<span class="port-dot input" data-node="${n.id}" data-port-index="${i}" data-dir="in" title="Entrée ${p}"></span>` : ""}<span class="port-label">${p}</span>${dir === "out" ? `<span class="port-dot output" data-node="${n.id}" data-port-index="${i}" data-dir="out" title="Sortie ${p}"></span>` : ""}</div>`;
   }).join("")}</div>`;
@@ -1150,6 +1176,15 @@ function drawNode(n) {
   };
   attachPortInteractions(el);
   makeDraggable(el, n);
+  const dragHandle = el.querySelector(".node-timeline-drag");
+  if (dragHandle) {
+    dragHandle.addEventListener("dragstart", event => {
+      event.stopPropagation();
+      event.dataTransfer.setData("application/x-nvd-canvas-node", n.id);
+      event.dataTransfer.setData("text/plain", n.title || n.type);
+      event.dataTransfer.effectAllowed = "copy";
+    });
+  }
   requestAnimationFrame(renderWires);
 }
 
@@ -1539,9 +1574,15 @@ function selectNode(id, { additive = false } = {}) {
     <div class="field"><label>Opacité</label><input id="nOpa" type="range" min="0" max="1" step=".01" value="${n.params.opacity}"></div>
     <div class="field"><label>Actif</label><select id="nEnabled"><option value="true">Oui</option><option value="false">Non</option></select></div>
     ${extra}
-    <button id="toolBtn" class="smallbtn">${n.type === "subpatch" ? "Ouvrir sous-patch ↗" : "Ouvrir outil ↗"}</button>
-    <button id="dupNodeBtn" class="smallbtn">Dupliquer</button>
-    <button id="delNodeBtn" class="smallbtn danger">Supprimer</button>`;
+    <div class="inspector-node-timeline-action">
+      <button id="addNodeToTimelineBtn" class="smallbtn primary" type="button">🎬 ＋ Programmer dans la Timeline</button>
+    </div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
+      <button id="toolBtn" class="smallbtn">${n.type === "subpatch" ? "Ouvrir sous-patch ↗" : "Ouvrir outil ↗"}</button>
+      <button id="saveAsElementBtn" class="smallbtn" type="button" title="Enregistrer ce node comme patch réutilisable">📦 Enregistrer Patch</button>
+      <button id="dupNodeBtn" class="smallbtn">Dupliquer</button>
+      <button id="delNodeBtn" class="smallbtn danger">Supprimer</button>
+    </div>`;
   $("#nEnabled").value = String(n.params.enabled);
   $("#nTitle").onchange = e => {
     n.title = e.target.value.trim() || spec(n.type)[0];
@@ -2042,6 +2083,11 @@ function selectNode(id, { additive = false } = {}) {
     else if (!isExecutable(n.type)) log(`Outil · ${n.title} indisponible (pas de moteur)`);
     else log(`Outil · ${n.title} — paramètres dans l'inspecteur`);
   };
+  $("#addNodeToTimelineBtn").onclick = () => addNodeToTimeline(n);
+  $("#saveAsElementBtn").onclick = () => {
+    saveSelectedElement();
+    renderScenicLibrary();
+  };
   $("#dupNodeBtn").onclick = () => duplicateNode(n.id);
   $("#delNodeBtn").onclick = () => deleteNode(n.id);
 }
@@ -2204,6 +2250,291 @@ function renderElementsPane() {
     card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); placeElementInTimeline(card.dataset.elementId); } });
   });
 }
+
+let currentScenicFilter = "all";
+
+function addNodeToTimeline(node, track = selectedElementTrack(), clientX = null, row = null) {
+  if (!node) return null;
+  const target = row?.querySelector(".timeline-track") || document.querySelector(`.timeline-track[data-track="${track}"]`);
+  let start = 0;
+  if (Number.isFinite(clientX) && target) {
+    const rect = target.getBoundingClientRect();
+    start = Math.max(0, Math.min(59, (clientX - rect.left) / Math.max(1, rect.width) * 60));
+  } else {
+    start = Math.max(0, Math.min(59, runtime.time || 0));
+  }
+  const duration = Math.max(0.5, Number(node.params?.duration) || 5);
+  const layer = (project.layers || [])[track];
+  const clip = addClip(track, start, duration, node.title || node.type, layer?.type || "effect", {
+    nodeId: node.id,
+    nodeType: node.type
+  });
+  commitHistory();
+  autosave();
+  log(`Timeline · « ${node.title || node.type} » programmé sur la piste ${track + 1} (${start.toFixed(1)}s)`);
+  return clip;
+}
+
+function placeScenicInTimeline(elementId, track = selectedElementTrack(), clientX = null, row = null) {
+  let el = listElements(project).find(e => e.id === elementId);
+  if (!el) {
+    const raw = scenicPackElements().find(e => e.id === elementId);
+    if (raw) el = saveElement(project, raw);
+  }
+  if (!el) {
+    log(`Élément · ${elementId} introuvable`);
+    return null;
+  }
+  const clip = placeElementInTimeline(el.id, track, clientX, row);
+  renderScenicLibrary();
+  return clip;
+}
+
+function placeScenicInCanvas(elementId) {
+  let el = listElements(project).find(e => e.id === elementId);
+  if (!el) {
+    const raw = scenicPackElements().find(e => e.id === elementId);
+    if (raw) el = saveElement(project, raw);
+  }
+  if (!el) return null;
+  
+  const g = activeGraph();
+  if (refuseCanvasEdit("ajout de patch")) return null;
+  
+  if (el.snapshot?.node) {
+    const cloned = JSON.parse(JSON.stringify(el.snapshot.node));
+    const seq = (g.nodes.reduce((m, n) => Math.max(m, parseInt(String(n.id).replace(/\D/g, "")) || 0), 0) + 1);
+    cloned.id = `n${seq}`;
+    cloned.x = Math.max(40, (-view.x + 280) / view.scale);
+    cloned.y = Math.max(40, (-view.y + 160) / view.scale);
+    g.nodes.push(cloned);
+    if (isRootGraph()) project.nodes = g.nodes;
+    drawNode(cloned);
+    selectNode(cloned.id);
+    redraw();
+    commitHistory();
+    autosave();
+    log(`Canvas · Patch « ${cloned.title || el.name} » ajouté au canevas`);
+    return cloned;
+  }
+
+  const cat = (el.snapshot?.category || "").toLowerCase();
+  let nodeType = "generator";
+  if (cat.includes("bruitage") || cat.includes("audio") || cat.includes("son")) nodeType = "audio";
+  else if (cat.includes("ombre") || cat.includes("personnage")) nodeType = "livingshadow";
+  else if (cat.includes("créature") || cat.includes("creature") || cat.includes("lumière")) nodeType = "whale";
+  else if (cat.includes("shader") || cat.includes("effet")) nodeType = "shader";
+  else if (el.snapshot?.source === "local-file") {
+    nodeType = el.snapshot.mimeType?.startsWith("video/") ? "videofile" : el.snapshot.mimeType?.startsWith("audio/") ? "audio" : "image";
+  }
+
+  const n = addNode(nodeType);
+  if (n) {
+    n.title = el.name;
+    if (el.snapshot) {
+      Object.assign(n.params, el.snapshot);
+      if (el.snapshot.mediaUrl) n.params.src = el.snapshot.mediaUrl;
+    }
+    const head = document.querySelector(`.node[data-id="${n.id}"] .nh`);
+    if (head) head.textContent = n.title;
+    redraw();
+    commitHistory();
+    autosave();
+    log(`Canvas · Élément « ${el.name} » ajouté au canevas`);
+  }
+  return n;
+}
+
+function handleDroppedMediaFiles(files, targetTrack = selectedElementTrack(), clientX = null, row = null) {
+  if (!files || !files.length) return;
+  project.layers ||= [];
+  
+  for (const file of Array.from(files)) {
+    const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v|mkv)$/i.test(file.name);
+    const isAudio = file.type.startsWith("audio/") || /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(file.name);
+    const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name);
+    const mediaType = isVideo ? "video" : isAudio ? "audio" : isImage ? "image" : "media";
+    
+    const objectUrl = URL.createObjectURL(file);
+    
+    let track = targetTrack;
+    if (track == null || !project.layers[track]) {
+      const preferredKind = isVideo ? "video" : "effect";
+      let idx = project.layers.findIndex(l => l.type === preferredKind);
+      if (idx < 0) {
+        addTimelineLayer(preferredKind);
+        idx = project.layers.length - 1;
+      }
+      track = idx;
+    }
+    
+    let start = 0;
+    const target = row?.querySelector(".timeline-track") || document.querySelector(`.timeline-track[data-track="${track}"]`);
+    if (Number.isFinite(clientX) && target) {
+      const rect = target.getBoundingClientRect();
+      start = Math.max(0, Math.min(59, (clientX - rect.left) / Math.max(1, rect.width) * 60));
+    } else {
+      start = Math.max(0, Math.min(59, runtime.time || 0));
+    }
+
+    const duration = isVideo ? 12 : isAudio ? 10 : 8;
+
+    const nodeType = isVideo ? "videofile" : isAudio ? "audio" : isImage ? "image" : "videofile";
+    const n = addNode(nodeType);
+    if (n) {
+      n.title = file.name;
+      n.params.src = objectUrl;
+      n.params.srcName = file.name;
+      n.params.duration = duration;
+      const head = document.querySelector(`.node[data-id="${n.id}"] .nh`);
+      if (head) head.textContent = n.title;
+    }
+
+    const element = saveElement(project, {
+      id: `media-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      name: file.name,
+      type: `media:${mediaType}`,
+      tags: ["media", mediaType, "local"],
+      snapshot: {
+        source: "local-file",
+        fileName: file.name,
+        mediaUrl: objectUrl,
+        mimeType: file.type,
+        fileSize: file.size,
+        defaultDuration: duration,
+        nodeId: n?.id
+      }
+    });
+
+    addClip(track, start, duration, file.name, isVideo ? "video" : "effect", {
+      elementId: element.id,
+      nodeId: n?.id,
+      mediaUrl: objectUrl,
+      fileName: file.name
+    });
+
+    log(`Timeline · Média « ${file.name} » ajouté (piste ${track + 1}, ${start.toFixed(1)}s)`);
+  }
+
+  commitHistory();
+  autosave();
+  redraw();
+  renderScenicLibrary();
+}
+
+function renderScenicLibrary() {
+  const host = $("#scenicList");
+  if (!host) return;
+  const q = $("#search")?.value?.trim?.().toLowerCase?.() || "";
+  
+  const scenicList = scenicPackElements();
+  const userList = listElements(project);
+  
+  const map = new Map();
+  for (const elem of scenicList) map.set(elem.id, elem);
+  for (const elem of userList) map.set(elem.id, elem);
+  const allElements = Array.from(map.values());
+  
+  const badge = $("#scenicTabCount");
+  if (badge) badge.textContent = String(allElements.length);
+
+  const filtered = allElements.filter(item => {
+    const snap = item.snapshot || {};
+    const cat = (snap.category || "").toLowerCase();
+    const type = (item.type || "").toLowerCase();
+    const isLocal = snap.source === "local-file" || type.startsWith("media:");
+    
+    if (currentScenicFilter === "shadows") {
+      if (!cat.includes("ombre") && !cat.includes("personnage") && !type.includes("shadow")) return false;
+    } else if (currentScenicFilter === "creatures") {
+      if (!cat.includes("créature") && !cat.includes("creature") && !cat.includes("lumière") && !cat.includes("lumiere") && !type.includes("creature")) return false;
+    } else if (currentScenicFilter === "foley") {
+      if (!cat.includes("bruitage") && !cat.includes("objet") && !cat.includes("son") && !type.includes("foley") && !type.includes("audio")) return false;
+    } else if (currentScenicFilter === "fx") {
+      if (!cat.includes("effet") && !cat.includes("shader") && !cat.includes("matière") && !cat.includes("matiere") && !cat.includes("bloc") && !cat.includes("environnement")) return false;
+    } else if (currentScenicFilter === "files") {
+      if (!isLocal && !snap.node) return false;
+    }
+    
+    if (q) {
+      const text = `${item.name} ${snap.characterTitle || ""} ${snap.description || ""} ${snap.category || ""} ${item.type || ""}`.toLowerCase();
+      if (!text.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if (!filtered.length) {
+    host.innerHTML = `<p class="hint" style="padding:16px 10px;text-align:center;line-height:1.5">Aucun média ou patch trouvé.<br><small>Importe un fichier média avec <b>＋ Fichier Média</b> ou sélectionne <b>Tous</b>.</small></p>`;
+    return;
+  }
+
+  host.innerHTML = filtered.map(item => {
+    const snap = item.snapshot || {};
+    const isLocal = snap.source === "local-file" || String(item.type).startsWith("media:");
+    const isUserPatch = Boolean(snap.node);
+    const color = snap.color || (isLocal ? "#38bdf8" : isUserPatch ? "#a855f7" : "#d7b86a");
+    const categoryLabel = isLocal ? "Fichier Média" : isUserPatch ? "Mon Patch" : (snap.category || "Scénographe").split("&")[0].trim();
+    const duration = snap.defaultDuration || (snap.duration || (isLocal ? 10 : 12));
+    const desc = snap.characterTitle || snap.description || (isLocal ? `Fichier : ${snap.fileName || item.name}` : "Élément scénique prêt à l'emploi");
+    
+    return `<article class="scenic-card" draggable="true" data-scenic-id="${htmlSafe(item.id)}" data-scenic-name="${htmlSafe(item.name)}">
+      <div class="scenic-card-header">
+        <span class="scenic-badge" style="--badge-color: ${htmlSafe(color)}">${htmlSafe(categoryLabel)}</span>
+        <span class="scenic-duration">⏱ ${duration}s</span>
+      </div>
+      <div class="scenic-card-title">${htmlSafe(item.name)}</div>
+      <div class="scenic-card-desc">${htmlSafe(desc)}</div>
+      <div class="scenic-card-actions">
+        <button type="button" class="smallbtn primary scenic-btn-timeline" data-scenic-timeline="${htmlSafe(item.id)}" title="Placer sur la Timeline à la tête de lecture">＋ Timeline</button>
+        <button type="button" class="smallbtn scenic-btn-canvas" data-scenic-canvas="${htmlSafe(item.id)}" title="Insérer sur le Patch Canvas">＋ Canvas</button>
+      </div>
+    </article>`;
+  }).join("");
+
+  host.querySelectorAll(".scenic-card").forEach(card => {
+    card.addEventListener("dragstart", event => {
+      event.dataTransfer.setData("application/x-nvd-scenic-id", card.dataset.scenicId);
+      event.dataTransfer.setData("application/x-nvd-element", card.dataset.scenicId);
+      event.dataTransfer.setData("text/plain", card.dataset.scenicName);
+      event.dataTransfer.effectAllowed = "copy";
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+  });
+
+  host.querySelectorAll("[data-scenic-timeline]").forEach(btn => {
+    btn.onclick = event => {
+      event.stopPropagation();
+      placeScenicInTimeline(btn.dataset.scenicTimeline);
+    };
+  });
+  host.querySelectorAll("[data-scenic-canvas]").forEach(btn => {
+    btn.onclick = event => {
+      event.stopPropagation();
+      placeScenicInCanvas(btn.dataset.scenicCanvas);
+    };
+  });
+}
+
+function showLibraryPane(id) {
+  const nodesMode = $("#libraryNodesMode");
+  const scenicBar = $("#libraryScenicBar");
+  const nodesList = $("#libraryList");
+  const scenicList = $("#scenicList");
+  if (!nodesList || !scenicList) return;
+  const isScenic = id === "scenic";
+  if (nodesMode) nodesMode.classList.toggle("hidden", isScenic);
+  if (scenicBar) scenicBar.classList.toggle("hidden", !isScenic);
+  nodesList.classList.toggle("hidden", isScenic);
+  scenicList.classList.toggle("hidden", !isScenic);
+  if (isScenic) renderScenicLibrary();
+  else buildLibrary();
+  qall("[data-lib-tab]").forEach(btn => {
+    const on = btn.dataset.libTab === id;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+}
 function drawClip(c) {
   const el = document.createElement("div");
   el.className = `clip ${c.kind}`;
@@ -2261,6 +2592,7 @@ function redraw() {
     runtime.setProject(project);
   }
   renderElementsPane();
+  renderScenicLibrary();
   updateGraphBreadcrumb();
   requestAnimationFrame(renderWires);
 }
@@ -2325,7 +2657,7 @@ function renderTimelineLayers() {
     const selected = selectedTimelineLayerId === layer.id ? " selected" : "";
     return `<div class="timeline-layer-row${selected}" data-layer-id="${htmlSafe(layer.id)}" data-track="${index}" style="--layer-height:${height}px" role="row">
       <div class="timeline-track-label" role="gridcell"><span class="layer-type-dot layer-${htmlSafe(meta.kind)}"></span><span class="layer-name">${htmlSafe(layer.name || meta.label)}</span><span class="layer-index">${index + 1}</span></div>
-      <div class="timeline-track" data-track="${index}" role="gridcell"></div>
+      <div class="timeline-track" data-track="${index}" role="gridcell"><span class="timeline-drop-hint">Glisser un média ou un patch ici</span></div>
       <div class="timeline-route" role="gridcell"><button class="route-btn" data-track-route="${index}">Principal</button></div>
       <div class="layer-row-resize" title="Redimensionner le layer"></div>
     </div>`;
@@ -2377,14 +2709,72 @@ function installTimelineLayerEvents() {
     event.stopPropagation();
   });
   host.addEventListener("dragover", event => {
-    if (event.dataTransfer?.types?.includes("application/x-nvd-element")) event.preventDefault();
+    const types = event.dataTransfer?.types || [];
+    const isSupported = types.includes("application/x-nvd-element")
+      || types.includes("application/x-nvd-scenic-id")
+      || types.includes("application/x-nvd-node-type")
+      || types.includes("application/x-nvd-canvas-node")
+      || types.includes("Files");
+
+    if (isSupported) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      const row = event.target.closest(".timeline-layer-row");
+      qall(".timeline-layer-row.drag-over").forEach(r => { if (r !== row) r.classList.remove("drag-over"); });
+      if (row) row.classList.add("drag-over");
+    }
+  });
+  host.addEventListener("dragleave", event => {
+    const row = event.target.closest(".timeline-layer-row");
+    if (row && !row.contains(event.relatedTarget)) {
+      row.classList.remove("drag-over");
+    }
   });
   host.addEventListener("drop", event => {
+    qall(".timeline-layer-row.drag-over").forEach(r => r.classList.remove("drag-over"));
     const row = event.target.closest(".timeline-layer-row");
+    const track = row ? Number(row.dataset.track) : selectedElementTrack();
+    
+    // 1. Files from Finder
+    if (event.dataTransfer?.files?.length) {
+      event.preventDefault();
+      handleDroppedMediaFiles(event.dataTransfer.files, track, event.clientX, row);
+      return;
+    }
+    
+    // 2. Scenic element
+    const scenicId = event.dataTransfer?.getData("application/x-nvd-scenic-id");
+    if (scenicId) {
+      event.preventDefault();
+      placeScenicInTimeline(scenicId, track, event.clientX, row);
+      return;
+    }
+    
+    // 3. Official element
     const elementId = event.dataTransfer?.getData("application/x-nvd-element");
-    if (!row || !elementId) return;
-    event.preventDefault();
-    placeElementInTimeline(elementId, Number(row.dataset.track), event.clientX, row);
+    if (elementId) {
+      event.preventDefault();
+      placeElementInTimeline(elementId, track, event.clientX, row);
+      return;
+    }
+    
+    // 4. Node type from library
+    const nodeType = event.dataTransfer?.getData("application/x-nvd-node-type");
+    if (nodeType) {
+      event.preventDefault();
+      const n = addNode(nodeType);
+      if (n) addNodeToTimeline(n, track, event.clientX, row);
+      return;
+    }
+    
+    // 5. Node dragged from canvas
+    const canvasNodeId = event.dataTransfer?.getData("application/x-nvd-canvas-node");
+    if (canvasNodeId) {
+      event.preventDefault();
+      const n = nodeById(canvasNodeId);
+      if (n) addNodeToTimeline(n, track, event.clientX, row);
+      return;
+    }
   });
   window.addEventListener("mousemove", event => {
     if (!resize) return;
@@ -3807,7 +4197,27 @@ qall(".collapse").forEach(b => b.onclick = () => {
   if (panel?.classList.contains("floatable")) floatPanels.toggleCollapse(panel);
   else panel?.classList.toggle("collapsed");
 });
-$("#search").oninput = () => buildLibrary();
+$("#search").oninput = () => {
+  const activeTab = document.querySelector("[data-lib-tab].active")?.dataset.libTab || "nodes";
+  if (activeTab === "scenic") renderScenicLibrary();
+  else buildLibrary();
+};
+qall("[data-lib-tab]").forEach(btn => btn.addEventListener("click", () => showLibraryPane(btn.dataset.libTab)));
+qall("[data-scenic-filter]").forEach(chip => chip.addEventListener("click", () => {
+  currentScenicFilter = chip.dataset.scenicFilter;
+  qall("[data-scenic-filter]").forEach(c => c.classList.toggle("active", c === chip));
+  renderScenicLibrary();
+}));
+$("#scenicMediaFileInput")?.addEventListener("change", event => {
+  if (event.target.files?.length) {
+    handleDroppedMediaFiles(event.target.files, selectedElementTrack());
+    event.target.value = "";
+  }
+});
+$("#libSaveSelectionBtn")?.addEventListener("click", () => {
+  saveSelectedElement();
+  renderScenicLibrary();
+});
 const experimentalToggle = $("#showExperimental");
 if (experimentalToggle) {
   experimentalToggle.checked = showExperimental;
