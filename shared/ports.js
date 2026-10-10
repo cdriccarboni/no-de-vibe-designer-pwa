@@ -337,7 +337,8 @@ export const EXECUTABLE_PORTS = {
   composite: [
     { name: "base", dir: "in", data: "video" },
     { name: "overlay", dir: "in", data: "video" },
-    { name: "out", dir: "out", data: "video" }
+    { name: "out", dir: "out", data: "video" },
+    { name: "mix", dir: "in", data: "number" }
   ],
   shadow: [
     { name: "video", dir: "in", data: "video" },
@@ -424,6 +425,76 @@ export const EXECUTABLE_PORTS = {
     { name: "seed", dir: "in", data: "number" },
     { name: "intensity", dir: "in", data: "number" },
     { name: "out", dir: "out", data: "video" }
+  ],
+  "audio-in": [
+    { name: "audio", dir: "out", data: "audio" },
+    { name: "level", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "peak", dir: "out", data: "number" },
+    { name: "FFT", dir: "out", data: "number" },
+    { name: "envelope", dir: "out", data: "number" }
+  ],
+  "radio-live": [
+    { name: "audio", dir: "out", data: "audio" },
+    { name: "level", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "live", dir: "out", data: "boolean" }
+  ],
+  "broadcast-in": [
+    { name: "audio", dir: "out", data: "audio" },
+    { name: "level", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  "stream-studio": [
+    { name: "audio", dir: "in", data: "audio" },
+    { name: "video", dir: "in", data: "video" },
+    { name: "on air", dir: "in", data: "boolean" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "live", dir: "out", data: "boolean" }
+  ],
+  "audio-mixer": [
+    { name: "a", dir: "in", data: "audio" },
+    { name: "b", dir: "in", data: "audio" },
+    { name: "gain A", dir: "in", data: "number" },
+    { name: "gain B", dir: "in", data: "number" },
+    { name: "audio", dir: "out", data: "audio" },
+    { name: "level", dir: "out", data: "number" }
+  ],
+  "audio-gain": [
+    { name: "audio", dir: "in", data: "audio" },
+    { name: "gain", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "audio" },
+    { name: "level", dir: "out", data: "number" }
+  ],
+  "audio-limiter": [
+    { name: "audio", dir: "in", data: "audio" },
+    { name: "threshold", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "audio" },
+    { name: "level", dir: "out", data: "number" }
+  ],
+  "audio-monitor": [
+    { name: "audio", dir: "in", data: "audio" },
+    { name: "monitor", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "audio" },
+    { name: "level", dir: "out", data: "number" }
+  ],
+  "radio-bus": [
+    { name: "audio", dir: "in", data: "audio" },
+    { name: "gain", dir: "in", data: "number" },
+    { name: "out", dir: "out", data: "audio" },
+    { name: "level", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" }
+  ],
+  "radio-out": [
+    { name: "audio", dir: "in", data: "audio" },
+    { name: "on air", dir: "in", data: "boolean" },
+    { name: "status", dir: "out", data: "text" },
+    { name: "live", dir: "out", data: "boolean" }
+  ],
+  "radio-monitor": [
+    { name: "audio", dir: "in", data: "audio" },
+    { name: "level", dir: "out", data: "number" },
+    { name: "status", dir: "out", data: "text" }
   ],
   audio: [
     { name: "in", dir: "in", data: "number" },

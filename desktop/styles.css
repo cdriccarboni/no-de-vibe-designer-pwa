@@ -158,6 +158,19 @@ body.gradient-strong{--gradient-alpha:.78}
 .vibe-preview.hidden{display:none}
 .vibe-preview-ops{max-height:120px;overflow:auto;font:11px ui-monospace,Menlo,monospace;color:var(--muted);white-space:pre-wrap}
 .vibe-preview-actions{display:flex;gap:8px;margin-top:8px}
+.vibe-coverage{margin:8px 0;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);font-size:11px;line-height:1.4}
+.vibe-coverage-ok{border-color:#10b981;background:rgba(16,185,129,0.08)}
+.vibe-coverage-warn{border-color:#f59e0b;background:rgba(245,158,11,0.08)}
+.vibe-coverage-info{border-color:var(--accent);background:rgba(59,130,246,0.08)}
+.vibe-coverage-err{border-color:#ef4444;background:rgba(239,68,68,0.08)}
+.vibe-coverage-badge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px}
+.vibe-coverage-ok .vibe-coverage-badge{background:#10b981;color:#fff}
+.vibe-coverage-warn .vibe-coverage-badge{background:#f59e0b;color:#000}
+.vibe-coverage-info .vibe-coverage-badge{background:var(--accent);color:#fff}
+.vibe-coverage-err .vibe-coverage-badge{background:#ef4444;color:#fff}
+.vibe-coverage-title{font-weight:600;margin-top:6px;margin-bottom:2px;font-size:10px;text-transform:uppercase;color:var(--muted)}
+.vibe-coverage ul{margin:2px 0 4px 16px;padding:0}
+.vibe-coverage li{margin-bottom:2px}
 .elements-pane{display:grid;align-content:start;gap:8px;overflow:auto}.elements-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}.elements-actions label{font-size:10px;color:var(--muted)}.element-card{display:grid;grid-template-columns:1fr auto;gap:4px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel2);cursor:grab}.element-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.element-card span{font-size:10px;color:var(--muted)}.element-card>div{grid-column:1/-1;display:flex;gap:6px}.element-card button{font-size:10px}
 
 
@@ -334,3 +347,32 @@ body.show-locked .nh,body.show-locked .port-dot{cursor:not-allowed}
 .vibe-voice svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .vibe-voice.listening{color:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
 .vibe-voice-status{min-height:12px;margin-top:-5px;padding:0 4px;color:var(--muted);font-size:9px;line-height:12px}
+
+/* Audio / Broadcast · réglages opérateur */
+.node-audio{border-color:color-mix(in srgb,#67a8c8 48%,var(--line2));}
+.node-radio,.node-broadcast{border-color:color-mix(in srgb,#ff476f 55%,var(--line2));}
+.node-radio .nh,.node-broadcast .nh{padding-right:62px;position:relative}
+.node-on-air{position:absolute;right:6px;top:5px;padding:3px 6px;border:1px solid #51404a;border-radius:5px;background:#171116;color:#8e7d86;font:900 7px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em}
+.node-on-air.live{border-color:#ff4564;background:#b5102d;color:#fff;box-shadow:0 0 18px #ff244c55}
+.inspector.node-settings-focus{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 72%,transparent),0 12px 38px #0007;transition:box-shadow .18s ease}
+.audio-settings-card,.radio-live-card{margin:8px 0 12px;padding:9px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--panel2) 86%,#000)}
+.audio-settings-head,.radio-live-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+.audio-settings-head b,.radio-live-head b{font:900 10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em}
+.audio-settings-head span,.radio-live-head span{font-size:9px;color:var(--muted)}
+.audio-toggle-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.audio-toggle-grid label{display:grid;gap:4px;color:var(--muted);font-size:9px}
+.audio-toggle-grid select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px}
+.radio-live-card{border-color:#57303e;background:linear-gradient(180deg,#191015,#0e0b0e)}
+.radio-live-card.armed{border-color:#a93049;box-shadow:inset 0 0 24px #9f17301a}
+.radio-live-head b{color:#ff6f8a}.radio-live-head span{max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.radio-pair{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin:8px 0 10px}
+.radio-pair input{min-width:0;background:#0a080b;border:1px solid #563847;border-radius:7px;padding:8px}
+.radio-pair button,.radio-owner-ok button,.radio-public-actions button{border:1px solid #563847;border-radius:7px;background:#1b1117;color:#e7d8df;padding:7px 8px;cursor:pointer;font-size:9px}
+.radio-owner-ok{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 10px;padding:7px 8px;border:1px solid #345845;border-radius:7px;background:#0f1a14;color:#98d0ae;font-size:9px}
+.radio-air-actions{display:grid;grid-template-columns:1.35fr .8fr;gap:7px;margin:11px 0 7px}
+.radio-air-actions button{min-height:44px;border-radius:8px;font:950 11px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;cursor:pointer}
+.radio-on-air-btn{border:1px solid #ff4b66;background:#b40d2b;color:#fff;box-shadow:0 8px 26px #a6002444}
+.radio-on-air-btn:hover{filter:brightness(1.1)}
+.radio-standby-btn{border:1px solid #4a3b43;background:#171217;color:#b8aab1}
+.radio-public-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+@media(max-width:520px){.audio-toggle-grid,.radio-pair,.radio-air-actions,.radio-public-actions{grid-template-columns:1fr}}

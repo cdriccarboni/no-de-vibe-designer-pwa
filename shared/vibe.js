@@ -363,8 +363,20 @@ function finalizeVibeResult(result, project, source = result?.engine || "unknown
     ...(secured.security?.rewrites || []),
     ...(secured.security?.dropped || []).map(x => `Refusé : ${x}`)
   ];
+  const dropped = (secured.security?.dropped || []).length;
+  let coverage = result?.coverage || null;
+  if (!coverage) {
+    // Réponses d'IA (locale/distante) : jamais présentées comme « complètes » sans vérification.
+    coverage = secured.ops.length
+      ? { status:"ai", recipe:null, label:"Généré par l'IA", fulfilled:[], missing:[], notes:["Proposition de l'IA : à vérifier avant d'appliquer."] }
+      : { status:"none", recipe:null, label:"Aucune opération", fulfilled:[], missing:[], notes:[] };
+  }
+  if (dropped && coverage.status === "complete") {
+    coverage = { ...coverage, status:"partial", missing:[...(coverage.missing || []), { need:`${dropped} opération(s) refusée(s) par le Safety Engine`, reason:(secured.security.dropped || []).join(" ; "), alternative:"Reformuler ou armer manuellement." }] };
+  }
   return {
     ...result,
+    coverage,
     ok: secured.ops.length > 0,
     ops: secured.ops,
     security: secured.security,
@@ -393,6 +405,7 @@ export async function runVibe(text, project, { forceLocal = false } = {}) {
       ok: rules.ops.length > 0,
       engine: "local-planner-fallback",
       ops: rules.ops,
+      coverage: rules.coverage,
       summary: rules.note,
       planner: rules.diagnostics,
       ...(delayed ? {} : { aiError:localAi.error }),
@@ -414,6 +427,7 @@ export async function runVibe(text, project, { forceLocal = false } = {}) {
     ok: local.ops.length > 0,
     engine: "local-planner",
     ops: local.ops,
+    coverage: local.coverage,
     summary: local.note,
     planner: local.diagnostics,
     note: "Planner local déterministe.",

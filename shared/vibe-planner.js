@@ -1,5 +1,6 @@
 import { isExecutable, portLabels, portMeta, typesCompatible } from "./ports.js";
 import { mergeRunnableSources } from "./cx-source.js";
+import { planFromRecipe } from "./vibe-recipes.js";
 
 export function normalizeVibeText(text) {
   return String(text || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -245,7 +246,18 @@ function livingShadowScenePlan(rawText, t) {
 export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
   const t = normalizeVibeText(text);
   const scenePlan = livingShadowScenePlan(text, t);
-  if (scenePlan) return scenePlan;
+  if (scenePlan) return { ...scenePlan, coverage:{ status:"complete", recipe:"scene-language", label:"Scène comprise", fulfilled:[scenePlan.note], missing:[], notes:scenePlan.diagnostics?.notes || [] } };
+  // Recettes : intention créative complète (chaîne câblée) plutôt qu'un nœud isolé par mot-clé.
+  const recipePlan = planFromRecipe(text, project);
+  if (recipePlan) {
+    return {
+      engine:"local-planner",
+      ops:recipePlan.ops,
+      note:recipePlan.note,
+      coverage:recipePlan.coverage,
+      diagnostics:{ recipe:recipePlan.coverage.recipe, notes:recipePlan.coverage.notes }
+    };
+  }
   const ops = [];
   const notes = [];
   const existing = new Set((project.nodes || []).map(n => n.type));
@@ -385,8 +397,24 @@ export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
 
   const merged = mergeRunnableSources(text, ops);
   const opsOut = merged.ops.filter(op => !(op.op === "addNode" && existing.has(op.type)));
+  const addedNodes = opsOut.filter(o => o.op === "addNode").length;
+  const edgesPlanned = opsOut.filter(o => o.op === "connect").length;
   return {
     engine:"local-planner",
+    coverage: opsOut.length ? {
+      status:"partial",
+      recipe:null,
+      label:"Interprétation par mots-clés",
+      fulfilled:requested.map(x => x.type),
+      missing:[{
+        need:"Intention complète non garantie",
+        reason: edgesPlanned
+          ? `Le planner a reconnu des mots-clés (${addedNodes} nœud(s), ${edgesPlanned} liaison(s)) sans comprendre l'intention globale.`
+          : `Le planner a seulement ajouté ${addedNodes} nœud(s) isolé(s), sans câblage.`,
+        alternative:"Préciser le prompt (source → traitement → sortie) ou utiliser l'IA locale."
+      }],
+      notes:[]
+    } : { status:"none", recipe:null, label:"Aucune intention reconnue", fulfilled:[], missing:[{ need:"Intention non reconnue", reason:"Aucun nœud exécutable ne correspond au prompt.", alternative:"Reformuler en citant des sources, effets ou sorties du catalogue." }], notes:[] },
     ops:opsOut,
     note:[
       merged.ops.length ? "Planner local déterministe · intentions + câblage typé." : "Planner local : aucune intention reconnue.",

@@ -1,17 +1,17 @@
 {
-  "timestamp": "2026-10-09T15:57:07.926Z",
+  "timestamp": "2026-10-10T04:11:05.757Z",
   "repos": {
     "pwa": {
       "dir": "/Users/cedriccarboni/Projects/Antigravity-NoCode/no-de-vibe-designer-pwa",
-      "branch": "main",
-      "sha": "db46fea0652d66b5033e120f24c7bf848aa55f8f",
+      "branch": "antigravity/audit-repair-20261010",
+      "sha": "2976c07c563dc9ea444e2d5cc1462e408d402ab3",
       "remote": "https://github.com/cdriccarboni/no-de-vibe-designer-pwa.git",
       "available": true
     },
     "private": {
       "dir": "/Users/cedriccarboni/Projects/Antigravity-NoCode/_private_repo/no-de-vibe-designer",
       "branch": "antigravity/sync-pwa-v3.3.11-and-scenographe",
-      "sha": "c338848f364e71039c556021896f1a01a683aa51",
+      "sha": "309532160ba75a91defcdd82ec196a3687ada6a7",
       "remote": "https://github.com/cdriccarboni/no-de-vibe-designer.git",
       "available": true
     },

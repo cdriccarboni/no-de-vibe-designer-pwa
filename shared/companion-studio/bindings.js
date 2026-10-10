@@ -17,7 +17,8 @@ export const BINDING_KINDS = Object.freeze({
   serial: "serial",
   video: "video",
   camera: "camera",
-  audioplayer: "audioplayer"
+  audioplayer: "audioplayer",
+  broadcast: "broadcast"
 });
 
 /**
@@ -233,6 +234,48 @@ export function applyCompanionBinding({
       sendMidi(binding.midiOutputId || null, data);
       onLog(`Companion · MIDI ${data.join(" ")}`);
       return makeStudioFeedback({ widgetId: widget.id, value, ok: true, detail: "MIDI", rttMs: Date.now() - t0 });
+    }
+
+    if (kind === "broadcast") {
+      if (!project) throw new Error("Projet hôte absent");
+      const action = binding.action || "toggle";
+      if (action === "input-on" || action === "input-off" || action === "input-toggle") {
+        const input = (project.nodes || []).find((n) => n.id === binding.nodeId && ["audio-in","broadcast-in","radio-live"].includes(n.type))
+          || (project.nodes || []).find((n) => ["radio-live","broadcast-in","audio-in"].includes(n.type));
+        if (!input) throw new Error("Entrée audio Broadcast introuvable");
+        input.params ||= {};
+        input.params.enabled = action === "input-on"
+          ? true
+          : action === "input-off"
+            ? false
+            : !input.params.enabled;
+        if (!input.params.enabled && input.type === "radio-live") {
+          input.params.onAir = false;
+          runtime?.broadcastEngine?.stop?.(input.id).catch?.(() => {});
+        }
+        runtime?.render?.();
+        const detail = input.params.enabled ? "AUDIO IN · ON" : "AUDIO IN · OFF";
+        onLog(`Companion · ${detail}`);
+        return makeStudioFeedback({ widgetId: widget.id, value: input.params.enabled, ok: true, detail, rttMs: Date.now() - t0 });
+      }
+      const radio = (project.nodes || []).find((n) => n.id === binding.nodeId && ["radio-live","radio-out","stream-studio"].includes(n.type))
+        || (project.nodes || []).find((n) => ["radio-live","radio-out","stream-studio"].includes(n.type));
+      if (!radio) throw new Error("Radio Paillettes Live / Radio Out introuvable");
+      radio.params ||= {};
+      const next = action === "on"
+        ? true
+        : action === "off" || action === "stop"
+          ? false
+          : action === "toggle"
+            ? !radio.params.onAir
+            : !!value;
+      if (radio.type === "radio-live" && next) radio.params.enabled = true;
+      radio.params.onAir = next;
+      if (!next) runtime?.broadcastEngine?.stop?.(radio.id).catch?.(() => {});
+      runtime?.render?.();
+      const detail = next ? "RADIO PAILLETTES · ON AIR ARMÉ" : "RADIO PAILLETTES · STANDBY";
+      onLog(`Companion · ${detail}`);
+      return makeStudioFeedback({ widgetId: widget.id, value: next, ok: true, detail, rttMs: Date.now() - t0 });
     }
 
     if (kind === "audioplayer") {

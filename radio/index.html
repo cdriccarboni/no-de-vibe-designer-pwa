@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>No[co]de · Radio Paillettes Live</title>
+  <link rel="icon" type="image/svg+xml" href="../icons/icon.svg" />
+  <style>
+    :root {
+      --bg: #090b0d;
+      --card: #12161b;
+      --border: #1f2933;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --accent: #3b82f6;
+      --onair: #ef4444;
+      --standby: #4b5563;
+      --green: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .player-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 480px;
+      padding: 24px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .brand {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .on-air-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      background: var(--standby);
+      color: #fff;
+      transition: all 0.3s ease;
+    }
+    .on-air-badge.live {
+      background: var(--onair);
+      box-shadow: 0 0 16px rgba(239, 68, 68, 0.6);
+      animation: pulse 2s infinite;
+    }
+    .on-air-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #fff;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.05); }
+    }
+    .title-block {
+      text-align: center;
+      margin: 16px 0 24px;
+    }
+    .title-block h1 {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+    .title-block .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .now-playing {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-family: ui-monospace, Menlo, monospace;
+      color: var(--accent);
+      margin-top: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .visualizer {
+      width: 100%;
+      height: 64px;
+      background: #06080a;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 24px;
+      display: block;
+    }
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+    }
+    .play-btn {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      transition: transform 0.15s, background 0.2s;
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+    }
+    .play-btn:hover { transform: scale(1.06); }
+    .play-btn:active { transform: scale(0.96); }
+    .play-btn.playing {
+      background: var(--green);
+      box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    }
+    .volume-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .volume-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+    }
+    .settings-row {
+      width: 100%;
+      margin-top: 12px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .settings-row select, .settings-row input {
+      background: #090b0d;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    .status-text {
+      font-size: 11px;
+      text-align: center;
+      color: var(--muted);
+      margin-top: 12px;
+    }
+    .footer-link {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 12px;
+    }
+    .footer-link a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="player-card">
+    <div class="topbar">
+      <span class="brand">No[co]de · Broadcast</span>
+      <div id="onAirBadge" class="on-air-badge">
+        <span class="on-air-dot"></span>
+        <span id="onAirText">STANDBY</span>
+      </div>
+    </div>
+
+    <div class="title-block">
+      <h1 id="stationName">Radio Paillettes</h1>
+      <div class="subtitle">Diffusion spectacle vivant · Écoute directe</div>
+      <div id="nowTitle" class="now-playing">En attente de diffusion…</div>
+    </div>
+
+    <canvas id="vizCanvas" class="visualizer" width="432" height="64"></canvas>
+
+    <div class="controls">
+      <button id="playBtn" class="play-btn" aria-label="Écouter le direct">▶</button>
+      
+      <div class="volume-row">
+        <span>Volume</span>
+        <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.85" />
+        <span id="volumeValue">85%</span>
+      </div>
+    </div>
+
+    <div class="status-text" id="statusMessage">Connecté au relais</div>
+
+    <div class="settings-row">
+      <label for="relaySelect">Source de diffusion :</label>
+      <select id="relaySelect">
+        <option value="https://radio-relay-production.up.railway.app">Relais Railway (Production)</option>
+        <option value="http://localhost:3000">Relais Local (No[co]de Studio Port 3000)</option>
+        <option value="custom">URL personnalisée…</option>
+      </select>
+      <input type="text" id="customRelayUrl" style="display:none;" placeholder="https://votre-relais.example.com" />
+    </div>
+  </div>
+
+  <div class="footer-link">
+    <a href="../desktop/index.html">← Retour au Designer No[co]de</a>
+  </div>
+
+  <audio id="audioEl" preload="none"></audio>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const audio = $("audioEl");
+    const playBtn = $("playBtn");
+    const onAirBadge = $("onAirBadge");
+    const onAirText = $("onAirText");
+    const stationName = $("stationName");
+    const nowTitle = $("nowTitle");
+    const statusMsg = $("statusMessage");
+    const volumeSlider = $("volumeSlider");
+    const volumeValue = $("volumeValue");
+    const relaySelect = $("relaySelect");
+    const customRelay = $("customRelayUrl");
+    const canvas = $("vizCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let isPlaying = false;
+    let pollInterval = null;
+    let animId = null;
+
+    function getBaseUrl() {
+      if (relaySelect.value === "custom") {
+        return customRelay.value.trim().replace(/\/+$/, "");
+      }
+      return relaySelect.value;
+    }
+
+    function getStreamUrl() {
+      const base = getBaseUrl();
+      if (base.includes("railway.app")) {
+        return `${base}/listen?t=${Date.now()}`;
+      }
+      return `${base}/api/radio/stream/radio-paillettes?t=${Date.now()}`;
+    }
+
+    function getStatusUrl() {
+      const base = getBaseUrl();
+      if (base.includes("railway.app")) {
+        return `${base}/status`;
+      }
+      return `${base}/api/radio/status/radio-paillettes`;
+    }
+
+    async function checkStatus() {
+      try {
+        const res = await fetch(getStatusUrl(), { cache: "no-store" });
+        if (!res.ok) throw new Error("Statut indisponible");
+        const data = await res.json();
+        const live = Boolean(data.onAir || data.isLive || data.isTesting);
+        onAirBadge.classList.toggle("live", live);
+        onAirText.textContent = live ? "ON AIR" : "STANDBY";
+        if (data.station || data.name) {
+          stationName.textContent = data.station || data.name;
+        }
+        if (data.nowTitle) {
+          nowTitle.textContent = data.nowTitle;
+        } else if (live) {
+          nowTitle.textContent = "Diffusion en cours…";
+        } else {
+          nowTitle.textContent = "En attente de diffusion…";
+        }
+        const count = data.listeners ?? data.listenersCount ?? 0;
+        statusMsg.textContent = `${live ? "ON AIR" : "STANDBY"} · ${count} auditeur(s) connecté(s)`;
+      } catch (e) {
+        onAirBadge.classList.remove("live");
+        onAirText.textContent = "HORS LIGNE";
+        statusMsg.textContent = "Relais injoignable ou en attente";
+      }
+    }
+
+    function startVisualizer() {
+      let t = 0;
+      function loop() {
+        ctx.fillStyle = "#06080a";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const bars = 32;
+        const barWidth = canvas.width / bars;
+        t += 0.1;
+        for (let i = 0; i < bars; i++) {
+          const h = isPlaying
+            ? Math.max(4, Math.sin(t + i * 0.4) * 24 + Math.cos(t * 0.8 + i) * 16 + 28)
+            : 4;
+          ctx.fillStyle = isPlaying ? "#3b82f6" : "#1f2933";
+          ctx.fillRect(i * barWidth + 2, canvas.height - h, barWidth - 4, h);
+        }
+        animId = requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    function togglePlay() {
+      if (isPlaying) {
+        audio.pause();
+        audio.src = "";
+        isPlaying = false;
+        playBtn.textContent = "▶";
+        playBtn.classList.remove("playing");
+      } else {
+        const url = getStreamUrl();
+        audio.src = url;
+        audio.volume = parseFloat(volumeSlider.value);
+        audio.play().then(() => {
+          isPlaying = true;
+          playBtn.textContent = "⏸";
+          playBtn.classList.add("playing");
+          statusMsg.textContent = "Lecture en direct active";
+        }).catch(err => {
+          console.warn("Erreur lecture:", err);
+          statusMsg.textContent = "Flux en attente de direct (recommencez quand ON AIR)";
+          isPlaying = false;
+          playBtn.textContent = "▶";
+          playBtn.classList.remove("playing");
+        });
+      }
+    }
+
+    playBtn.addEventListener("click", togglePlay);
+
+    volumeSlider.addEventListener("input", e => {
+      const val = parseFloat(e.target.value);
+      audio.volume = val;
+      volumeValue.textContent = `${Math.round(val * 100)}%`;
+    });
+
+    relaySelect.addEventListener("change", () => {
+      customRelay.style.display = relaySelect.value === "custom" ? "block" : "none";
+      if (isPlaying) togglePlay(); // stop
+      checkStatus();
+    });
+
+    customRelay.addEventListener("change", () => {
+      if (isPlaying) togglePlay();
+      checkStatus();
+    });
+
+    // Initialisation
+    checkStatus();
+    pollInterval = setInterval(checkStatus, 3000);
+    startVisualizer();
+  </script>
+</body>
+</html>
