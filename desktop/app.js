@@ -700,11 +700,7 @@ function buildLibrary() {
         const unstable = ["depthmask","opticalflow","ndi-out","remote-camera","phone-camera-back","phone-camera-front"].includes(t);
         const mark = (!ok || unstable) ? " · EXPÉRIMENTAL" : "";
         return `<div class="lib-item ${ok ? "executable" : "unavailable"}" draggable="true" data-add="${t}" data-node-label="${htmlSafe(n)}" title="${nodeReadiness(t)}">
-          <span>${n}${mark}</span>
-          <span class="lib-item-side">
-            <button type="button" class="lib-timeline-btn" data-add-to-timeline="${t}" title="Ajouter directement à la Timeline">＋ Timeline</button>
-            <span class="lib-add-icon">${ok ? "＋" : "○"}</span>
-          </span>
+          <span>${n}${mark}</span><span>${ok ? "＋" : "○"}</span>
         </div>`;
       }).join("")}</div>
     </div>`;
@@ -719,10 +715,7 @@ function buildLibrary() {
     };
   });
   qall("#libraryList [data-add]").forEach(x => {
-    x.onclick = (e) => {
-      if (e.target.closest(".lib-timeline-btn")) return;
-      addNode(x.dataset.add);
-    };
+    x.onclick = () => addNode(x.dataset.add);
     x.addEventListener("dragstart", event => {
       const type = x.dataset.add;
       const label = x.dataset.nodeLabel || type;
@@ -730,14 +723,6 @@ function buildLibrary() {
       event.dataTransfer.setData("text/plain", label);
       event.dataTransfer.effectAllowed = "copy";
     });
-  });
-  qall("[data-add-to-timeline]").forEach(btn => {
-    btn.onclick = event => {
-      event.stopPropagation();
-      const type = btn.dataset.addToTimeline;
-      const n = addNode(type);
-      if (n) addNodeToTimeline(n);
-    };
   });
   if (q) qall(".lib-item").forEach(x => {
     x.style.display = x.textContent.toLowerCase().includes(q) ? "flex" : "none";
@@ -1156,7 +1141,7 @@ function drawNode(n) {
   const ports = portLabels(n.type, n) || spec(n.type)[1];
   el.className += selection.has(n.id) ? " sel" : "";
   const onAirNode = ["radio-live","radio-out","stream-studio"].includes(n.type);
-  el.innerHTML = `<div class="nh"><span class="nh-title">${n.title}${isExecutable(n.type) ? "" : " · ○"}</span><span class="nh-tools"><span class="node-timeline-drag" draggable="true" title="Glisser ce node vers la Timeline">⏱</span>${onAirNode ? `<span class="node-on-air ${n.params?.onAir ? "live" : ""}">${n.params?.onAir ? "ON AIR" : "STANDBY"}</span>` : ""}</span></div><div class="nb">${ports.map((p, i) => {
+  el.innerHTML = `<div class="nh"><span class="nh-title">${n.title}${isExecutable(n.type) ? "" : " · ○"}</span>${onAirNode ? `<span class="node-on-air ${n.params?.onAir ? "live" : ""}">${n.params?.onAir ? "ON AIR" : "STANDBY"}</span>` : ""}</div><div class="nb">${ports.map((p, i) => {
     const dir = portDirection(n.type, i, ports.length, n);
     return `<div class="port port-${dir}">${dir === "in" ? `<span class="port-dot input" data-node="${n.id}" data-port-index="${i}" data-dir="in" title="Entrée ${p}"></span>` : ""}<span class="port-label">${p}</span>${dir === "out" ? `<span class="port-dot output" data-node="${n.id}" data-port-index="${i}" data-dir="out" title="Sortie ${p}"></span>` : ""}</div>`;
   }).join("")}</div>`;
@@ -1176,15 +1161,6 @@ function drawNode(n) {
   };
   attachPortInteractions(el);
   makeDraggable(el, n);
-  const dragHandle = el.querySelector(".node-timeline-drag");
-  if (dragHandle) {
-    dragHandle.addEventListener("dragstart", event => {
-      event.stopPropagation();
-      event.dataTransfer.setData("application/x-nvd-canvas-node", n.id);
-      event.dataTransfer.setData("text/plain", n.title || n.type);
-      event.dataTransfer.effectAllowed = "copy";
-    });
-  }
   requestAnimationFrame(renderWires);
 }
 
@@ -1574,14 +1550,12 @@ function selectNode(id, { additive = false } = {}) {
     <div class="field"><label>Opacité</label><input id="nOpa" type="range" min="0" max="1" step=".01" value="${n.params.opacity}"></div>
     <div class="field"><label>Actif</label><select id="nEnabled"><option value="true">Oui</option><option value="false">Non</option></select></div>
     ${extra}
-    <div class="inspector-node-timeline-action">
-      <button id="addNodeToTimelineBtn" class="smallbtn primary" type="button">🎬 ＋ Programmer dans la Timeline</button>
-    </div>
-    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
+    <div class="inspector-actions" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;">
+      <button id="addNodeToTimelineBtn" class="smallbtn primary" type="button" title="Ajouter ce node à la Timeline à la tête de lecture">＋ Timeline</button>
+      <button id="saveAsElementBtn" class="smallbtn" type="button" title="Enregistrer ce node dans les Éléments &amp; Patchs">Enregistrer Élément</button>
       <button id="toolBtn" class="smallbtn">${n.type === "subpatch" ? "Ouvrir sous-patch ↗" : "Ouvrir outil ↗"}</button>
-      <button id="saveAsElementBtn" class="smallbtn" type="button" title="Enregistrer ce node comme patch réutilisable">📦 Enregistrer Patch</button>
       <button id="dupNodeBtn" class="smallbtn">Dupliquer</button>
-      <button id="delNodeBtn" class="smallbtn danger">Supprimer</button>
+      <button id="delNodeBtn" class="smallbtn danger" style="grid-column:span 2;">Supprimer</button>
     </div>`;
   $("#nEnabled").value = String(n.params.enabled);
   $("#nTitle").onchange = e => {
@@ -2086,7 +2060,8 @@ function selectNode(id, { additive = false } = {}) {
   $("#addNodeToTimelineBtn").onclick = () => addNodeToTimeline(n);
   $("#saveAsElementBtn").onclick = () => {
     saveSelectedElement();
-    renderScenicLibrary();
+    renderElementsPane();
+    showRightPane("elements");
   };
   $("#dupNodeBtn").onclick = () => duplicateNode(n.id);
   $("#delNodeBtn").onclick = () => deleteNode(n.id);
@@ -2231,23 +2206,158 @@ function addElementTop(elementId) {
   return cue;
 }
 
+let currentElementsFilter = "all";
+let elementsSearchQuery = "";
+
 function renderElementsPane() {
   const host = $("#elementsPane");
   if (!host) return;
   const elements = listElements(project);
-  host.innerHTML = `<div class="elements-actions"><button type="button" id="saveSelectedElement" class="smallbtn">Enregistrer la sélection</button><label><input type="checkbox" id="elementPreviewLoop"> Boucler l’aperçu</label></div>${elements.length ? elements.map(element => `<article class="element-card" draggable="true" tabindex="0" data-element-id="${htmlSafe(element.id)}"><b>${htmlSafe(element.name)}</b><span>${htmlSafe(element.type)}</span><div><button type="button" data-place-element="${htmlSafe(element.id)}">Ajouter</button><button type="button" data-top-element="${htmlSafe(element.id)}">TOP</button></div></article>`).join("") : `<p class="hint">Enregistre un node ou un sous-patch : il restera disponible ici pour toute la conduite.</p>`}`;
-  host.querySelector(".elements-actions")?.insertAdjacentHTML("beforeend", `<button type="button" id="installScenicPack" class="smallbtn" title="Ajoute les ${scenicPackElements().length} éléments du Scénographe (idempotent, n'écrase aucun élément utilisateur)">Pack Scénographe</button>`);
+  const q = elementsSearchQuery.trim().toLowerCase();
+
+  const filtered = elements.filter(item => {
+    const snap = item.snapshot || {};
+    const cat = (snap.category || "").toLowerCase();
+    const type = (item.type || "").toLowerCase();
+    const isLocal = snap.source === "local-file" || type.startsWith("media:");
+    const isUserPatch = Boolean(snap.node);
+
+    if (currentElementsFilter === "shadows") {
+      if (!cat.includes("ombre") && !cat.includes("personnage") && !type.includes("shadow")) return false;
+    } else if (currentElementsFilter === "creatures") {
+      if (!cat.includes("créature") && !cat.includes("creature") && !cat.includes("lumière") && !cat.includes("lumiere") && !type.includes("creature")) return false;
+    } else if (currentElementsFilter === "foley") {
+      if (!cat.includes("bruitage") && !cat.includes("objet") && !cat.includes("son") && !type.includes("foley") && !type.includes("audio")) return false;
+    } else if (currentElementsFilter === "fx") {
+      if (!cat.includes("effet") && !cat.includes("shader") && !cat.includes("matière") && !cat.includes("matiere") && !cat.includes("bloc") && !cat.includes("environnement")) return false;
+    } else if (currentElementsFilter === "media") {
+      if (!isLocal) return false;
+    } else if (currentElementsFilter === "patches") {
+      if (!isUserPatch) return false;
+    }
+
+    if (q) {
+      const text = `${item.name} ${snap.characterTitle || ""} ${snap.description || ""} ${snap.category || ""} ${item.type || ""}`.toLowerCase();
+      if (!text.includes(q)) return false;
+    }
+    return true;
+  });
+
+  host.innerHTML = `
+    <div class="elements-actions">
+      <button type="button" id="saveSelectedElement" class="smallbtn" title="Enregistrer le node sélectionné sur le canevas">Enregistrer sélection</button>
+      <label class="smallbtn timeline-media-btn" title="Importer un fichier vidéo, audio ou image">＋ Fichier<input id="elementsMediaFileInput" type="file" accept="video/*,audio/*,image/*" hidden multiple></label>
+      <button type="button" id="installScenicPack" class="smallbtn" title="Ajoute les ${scenicPackElements().length} éléments du Scénographe (idempotent, n'écrase aucun élément utilisateur)">Pack Scénographe</button>
+    </div>
+    <div class="elements-filter-row">
+      <input type="search" id="elementsSearchInput" class="elements-search-input" placeholder="Rechercher un média ou un patch…" value="${htmlSafe(elementsSearchQuery)}">
+    </div>
+    <div class="elements-chips">
+      <button type="button" class="chip ${currentElementsFilter === "all" ? "active" : ""}" data-elem-filter="all">Tous (${elements.length})</button>
+      <button type="button" class="chip ${currentElementsFilter === "shadows" ? "active" : ""}" data-elem-filter="shadows">Ombres</button>
+      <button type="button" class="chip ${currentElementsFilter === "creatures" ? "active" : ""}" data-elem-filter="creatures">Créatures</button>
+      <button type="button" class="chip ${currentElementsFilter === "foley" ? "active" : ""}" data-elem-filter="foley">Bruitages</button>
+      <button type="button" class="chip ${currentElementsFilter === "fx" ? "active" : ""}" data-elem-filter="fx">Effets</button>
+      <button type="button" class="chip ${currentElementsFilter === "media" ? "active" : ""}" data-elem-filter="media">Médias</button>
+      <button type="button" class="chip ${currentElementsFilter === "patches" ? "active" : ""}" data-elem-filter="patches">Mes Patchs</button>
+    </div>
+    <div class="elements-list">
+      ${filtered.length ? filtered.map(item => {
+        const snap = item.snapshot || {};
+        const isLocal = snap.source === "local-file" || String(item.type).startsWith("media:");
+        const isUserPatch = Boolean(snap.node);
+        const categoryLabel = isLocal ? "Média" : isUserPatch ? "Patch" : (snap.category || "Scénographe").split("&")[0].trim();
+        const duration = snap.defaultDuration || (snap.duration || (isLocal ? 10 : 12));
+        const desc = snap.characterTitle || snap.description || (isLocal ? `Fichier : ${snap.fileName || item.name}` : "Élément scénique prêt à l'emploi");
+        return `<article class="element-card" draggable="true" tabindex="0" data-element-id="${htmlSafe(item.id)}" data-element-name="${htmlSafe(item.name)}">
+          <div class="element-head">
+            <b>${htmlSafe(item.name)}</b>
+            <span class="element-type-badge">${htmlSafe(categoryLabel)} · ${duration}s</span>
+          </div>
+          <p class="element-sub">${htmlSafe(desc)}</p>
+          <div class="element-actions">
+            <button type="button" class="smallbtn primary" data-place-element="${htmlSafe(item.id)}" title="Placer sur la Timeline à la tête de lecture">＋ Timeline</button>
+            <button type="button" class="smallbtn" data-canvas-element="${htmlSafe(item.id)}" title="Insérer sur le Patch Canvas">＋ Canvas</button>
+            <button type="button" class="smallbtn" data-top-element="${htmlSafe(item.id)}" title="Créer un cue TOP spectacle">TOP</button>
+          </div>
+        </article>`;
+      }).join("") : `<p class="hint" style="padding:16px 8px;text-align:center;line-height:1.4;">${elements.length ? "Aucun élément ne correspond à ce filtre." : "Aucun élément pour l'instant.<br><br>Clique sur <b>Pack Scénographe</b> pour charger les 29 médias et patchs du spectacle, ou importe un <b>＋ Fichier</b>."}</p>`}
+    </div>
+  `;
+
+  $("#saveSelectedElement")?.addEventListener("click", () => {
+    saveSelectedElement();
+    renderElementsPane();
+  });
   $("#installScenicPack")?.addEventListener("click", () => {
     const stats = installScenicPack(project);
-    commitHistory(); autosave(); renderElementsPane();
+    commitHistory();
+    autosave();
+    renderElementsPane();
     log(`Pack Scénographe · ${stats.added} ajouté(s), ${stats.updated} mis à jour, ${stats.unchanged} déjà présent(s)`);
   });
-  $("#saveSelectedElement")?.addEventListener("click", saveSelectedElement);
-  host.querySelectorAll("[data-place-element]").forEach(button => button.addEventListener("click", () => placeElementInTimeline(button.dataset.placeElement)));
-  host.querySelectorAll("[data-top-element]").forEach(button => button.addEventListener("click", () => addElementTop(button.dataset.topElement)));
+  $("#elementsMediaFileInput")?.addEventListener("change", event => {
+    if (event.target.files?.length) {
+      handleDroppedMediaFiles(event.target.files, selectedElementTrack());
+      event.target.value = "";
+      renderElementsPane();
+    }
+  });
+
+  const searchInput = $("#elementsSearchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", e => {
+      elementsSearchQuery = e.target.value;
+      renderElementsPane();
+      const nextInput = $("#elementsSearchInput");
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+      }
+    });
+  }
+
+  host.querySelectorAll("[data-elem-filter]").forEach(chip => {
+    chip.addEventListener("click", () => {
+      currentElementsFilter = chip.dataset.elemFilter;
+      renderElementsPane();
+    });
+  });
+
+  host.querySelectorAll("[data-place-element]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      placeScenicInTimeline(btn.dataset.placeElement);
+    });
+  });
+  host.querySelectorAll("[data-canvas-element]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      placeScenicInCanvas(btn.dataset.canvasElement);
+    });
+  });
+  host.querySelectorAll("[data-top-element]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      addElementTop(btn.dataset.topElement);
+    });
+  });
+
   host.querySelectorAll(".element-card").forEach(card => {
-    card.addEventListener("dragstart", event => { event.dataTransfer.setData("application/x-nvd-element", card.dataset.elementId); event.dataTransfer.effectAllowed = "copy"; });
-    card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); placeElementInTimeline(card.dataset.elementId); } });
+    card.addEventListener("dragstart", event => {
+      event.dataTransfer.setData("application/x-nvd-element", card.dataset.elementId);
+      event.dataTransfer.setData("application/x-nvd-scenic-id", card.dataset.elementId);
+      event.dataTransfer.setData("text/plain", card.dataset.elementName || card.dataset.elementId);
+      event.dataTransfer.effectAllowed = "copy";
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        placeScenicInTimeline(card.dataset.elementId);
+      }
+    });
   });
 }
 
@@ -2423,117 +2533,11 @@ function handleDroppedMediaFiles(files, targetTrack = selectedElementTrack(), cl
 }
 
 function renderScenicLibrary() {
-  const host = $("#scenicList");
-  if (!host) return;
-  const q = $("#search")?.value?.trim?.().toLowerCase?.() || "";
-  
-  const scenicList = scenicPackElements();
-  const userList = listElements(project);
-  
-  const map = new Map();
-  for (const elem of scenicList) map.set(elem.id, elem);
-  for (const elem of userList) map.set(elem.id, elem);
-  const allElements = Array.from(map.values());
-  
-  const badge = $("#scenicTabCount");
-  if (badge) badge.textContent = String(allElements.length);
-
-  const filtered = allElements.filter(item => {
-    const snap = item.snapshot || {};
-    const cat = (snap.category || "").toLowerCase();
-    const type = (item.type || "").toLowerCase();
-    const isLocal = snap.source === "local-file" || type.startsWith("media:");
-    
-    if (currentScenicFilter === "shadows") {
-      if (!cat.includes("ombre") && !cat.includes("personnage") && !type.includes("shadow")) return false;
-    } else if (currentScenicFilter === "creatures") {
-      if (!cat.includes("créature") && !cat.includes("creature") && !cat.includes("lumière") && !cat.includes("lumiere") && !type.includes("creature")) return false;
-    } else if (currentScenicFilter === "foley") {
-      if (!cat.includes("bruitage") && !cat.includes("objet") && !cat.includes("son") && !type.includes("foley") && !type.includes("audio")) return false;
-    } else if (currentScenicFilter === "fx") {
-      if (!cat.includes("effet") && !cat.includes("shader") && !cat.includes("matière") && !cat.includes("matiere") && !cat.includes("bloc") && !cat.includes("environnement")) return false;
-    } else if (currentScenicFilter === "files") {
-      if (!isLocal && !snap.node) return false;
-    }
-    
-    if (q) {
-      const text = `${item.name} ${snap.characterTitle || ""} ${snap.description || ""} ${snap.category || ""} ${item.type || ""}`.toLowerCase();
-      if (!text.includes(q)) return false;
-    }
-    return true;
-  });
-
-  if (!filtered.length) {
-    host.innerHTML = `<p class="hint" style="padding:16px 10px;text-align:center;line-height:1.5">Aucun média ou patch trouvé.<br><small>Importe un fichier média avec <b>＋ Fichier Média</b> ou sélectionne <b>Tous</b>.</small></p>`;
-    return;
-  }
-
-  host.innerHTML = filtered.map(item => {
-    const snap = item.snapshot || {};
-    const isLocal = snap.source === "local-file" || String(item.type).startsWith("media:");
-    const isUserPatch = Boolean(snap.node);
-    const color = snap.color || (isLocal ? "#38bdf8" : isUserPatch ? "#a855f7" : "#d7b86a");
-    const categoryLabel = isLocal ? "Fichier Média" : isUserPatch ? "Mon Patch" : (snap.category || "Scénographe").split("&")[0].trim();
-    const duration = snap.defaultDuration || (snap.duration || (isLocal ? 10 : 12));
-    const desc = snap.characterTitle || snap.description || (isLocal ? `Fichier : ${snap.fileName || item.name}` : "Élément scénique prêt à l'emploi");
-    
-    return `<article class="scenic-card" draggable="true" data-scenic-id="${htmlSafe(item.id)}" data-scenic-name="${htmlSafe(item.name)}">
-      <div class="scenic-card-header">
-        <span class="scenic-badge" style="--badge-color: ${htmlSafe(color)}">${htmlSafe(categoryLabel)}</span>
-        <span class="scenic-duration">⏱ ${duration}s</span>
-      </div>
-      <div class="scenic-card-title">${htmlSafe(item.name)}</div>
-      <div class="scenic-card-desc">${htmlSafe(desc)}</div>
-      <div class="scenic-card-actions">
-        <button type="button" class="smallbtn primary scenic-btn-timeline" data-scenic-timeline="${htmlSafe(item.id)}" title="Placer sur la Timeline à la tête de lecture">＋ Timeline</button>
-        <button type="button" class="smallbtn scenic-btn-canvas" data-scenic-canvas="${htmlSafe(item.id)}" title="Insérer sur le Patch Canvas">＋ Canvas</button>
-      </div>
-    </article>`;
-  }).join("");
-
-  host.querySelectorAll(".scenic-card").forEach(card => {
-    card.addEventListener("dragstart", event => {
-      event.dataTransfer.setData("application/x-nvd-scenic-id", card.dataset.scenicId);
-      event.dataTransfer.setData("application/x-nvd-element", card.dataset.scenicId);
-      event.dataTransfer.setData("text/plain", card.dataset.scenicName);
-      event.dataTransfer.effectAllowed = "copy";
-      card.classList.add("dragging");
-    });
-    card.addEventListener("dragend", () => card.classList.remove("dragging"));
-  });
-
-  host.querySelectorAll("[data-scenic-timeline]").forEach(btn => {
-    btn.onclick = event => {
-      event.stopPropagation();
-      placeScenicInTimeline(btn.dataset.scenicTimeline);
-    };
-  });
-  host.querySelectorAll("[data-scenic-canvas]").forEach(btn => {
-    btn.onclick = event => {
-      event.stopPropagation();
-      placeScenicInCanvas(btn.dataset.scenicCanvas);
-    };
-  });
+  renderElementsPane();
 }
 
 function showLibraryPane(id) {
-  const nodesMode = $("#libraryNodesMode");
-  const scenicBar = $("#libraryScenicBar");
-  const nodesList = $("#libraryList");
-  const scenicList = $("#scenicList");
-  if (!nodesList || !scenicList) return;
-  const isScenic = id === "scenic";
-  if (nodesMode) nodesMode.classList.toggle("hidden", isScenic);
-  if (scenicBar) scenicBar.classList.toggle("hidden", !isScenic);
-  nodesList.classList.toggle("hidden", isScenic);
-  scenicList.classList.toggle("hidden", !isScenic);
-  if (isScenic) renderScenicLibrary();
-  else buildLibrary();
-  qall("[data-lib-tab]").forEach(btn => {
-    const on = btn.dataset.libTab === id;
-    btn.classList.toggle("active", on);
-    btn.setAttribute("aria-selected", on ? "true" : "false");
-  });
+  if (id === "scenic") showRightPane("elements");
 }
 function drawClip(c) {
   const el = document.createElement("div");
@@ -3553,6 +3557,8 @@ function showRightPane(id) {
   });
 }
 qall("[data-right-pane]").forEach(btn => btn.addEventListener("click", () => showRightPane(btn.dataset.rightPane)));
+const urlPane = new URLSearchParams(location.search).get("pane");
+if (urlPane) showRightPane(urlPane);
 
 function appendCxMessage(role, text) {
   const logEl = $("#cxChatLog");
@@ -4198,26 +4204,68 @@ qall(".collapse").forEach(b => b.onclick = () => {
   else panel?.classList.toggle("collapsed");
 });
 $("#search").oninput = () => {
-  const activeTab = document.querySelector("[data-lib-tab].active")?.dataset.libTab || "nodes";
-  if (activeTab === "scenic") renderScenicLibrary();
-  else buildLibrary();
+  buildLibrary();
 };
-qall("[data-lib-tab]").forEach(btn => btn.addEventListener("click", () => showLibraryPane(btn.dataset.libTab)));
-qall("[data-scenic-filter]").forEach(chip => chip.addEventListener("click", () => {
-  currentScenicFilter = chip.dataset.scenicFilter;
-  qall("[data-scenic-filter]").forEach(c => c.classList.toggle("active", c === chip));
-  renderScenicLibrary();
-}));
-$("#scenicMediaFileInput")?.addEventListener("change", event => {
+$("#timelineMediaFile")?.addEventListener("change", event => {
   if (event.target.files?.length) {
     handleDroppedMediaFiles(event.target.files, selectedElementTrack());
     event.target.value = "";
+    renderElementsPane();
   }
 });
-$("#libSaveSelectionBtn")?.addEventListener("click", () => {
-  saveSelectedElement();
-  renderScenicLibrary();
+$("#timelineOpenElements")?.addEventListener("click", () => {
+  showRightPane("elements");
+  const pane = $("#rightPane");
+  if (pane?.classList.contains("collapsed")) pane.classList.remove("collapsed");
+  renderElementsPane();
 });
+
+const patchSpaceEl = $("#patchSpace");
+if (patchSpaceEl) {
+  patchSpaceEl.addEventListener("dragover", event => {
+    const types = event.dataTransfer?.types || [];
+    if (types.includes("application/x-nvd-node-type") || types.includes("application/x-nvd-element") || types.includes("application/x-nvd-scenic-id")) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+    }
+  });
+  patchSpaceEl.addEventListener("drop", event => {
+    const elemId = event.dataTransfer?.getData("application/x-nvd-scenic-id") || event.dataTransfer?.getData("application/x-nvd-element");
+    const nodeType = event.dataTransfer?.getData("application/x-nvd-node-type");
+    const world = $("#patchWorld") || patchSpaceEl;
+    const wr = world.getBoundingClientRect();
+    const s = view.scale || 1;
+    const dropX = Math.max(20, Math.round((event.clientX - wr.left) / s));
+    const dropY = Math.max(20, Math.round((event.clientY - wr.top) / s));
+
+    if (elemId) {
+      event.preventDefault();
+      const node = placeScenicInCanvas(elemId);
+      if (node) {
+        node.x = dropX;
+        node.y = dropY;
+        const el = document.querySelector(`.node[data-id="${node.id}"]`);
+        if (el) { el.style.left = node.x + "px"; el.style.top = node.y + "px"; }
+        renderWires();
+        autosave();
+      }
+      return;
+    }
+    if (nodeType) {
+      event.preventDefault();
+      const node = addNode(nodeType);
+      if (node) {
+        node.x = dropX;
+        node.y = dropY;
+        const el = document.querySelector(`.node[data-id="${node.id}"]`);
+        if (el) { el.style.left = node.x + "px"; el.style.top = node.y + "px"; }
+        renderWires();
+        autosave();
+      }
+      return;
+    }
+  });
+}
 const experimentalToggle = $("#showExperimental");
 if (experimentalToggle) {
   experimentalToggle.checked = showExperimental;

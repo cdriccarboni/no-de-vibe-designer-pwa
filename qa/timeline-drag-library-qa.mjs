@@ -10,35 +10,34 @@ const app = fs.readFileSync(new URL("../desktop/app.js", import.meta.url), "utf8
 const css = fs.readFileSync(new URL("../desktop/styles.css", import.meta.url), "utf8");
 
 // 1. Structure HTML
-assert.ok(/data-lib-tab=["']nodes["']/.test(html), "Onglet Opérateurs présent dans la Library");
-assert.ok(/data-lib-tab=["']scenic["']/.test(html), "Onglet Médias & Scénographe présent dans la Library");
-assert.ok(/id=["']scenicTabCount["']/.test(html), "Badge compteur pour les médias/scénographe présent");
-assert.ok(/id=["']scenicMediaFileInput["']/.test(html), "Input d'import de fichier média présent");
-assert.ok(/id=["']scenicFilterChips["']/.test(html), "Filtres par catégorie (Ombres, Créatures, etc.) présents");
-assert.ok(/id=["']libraryList["']/.test(html), "Container #libraryList présent");
-assert.ok(/id=["']scenicList["']/.test(html), "Container #scenicList présent");
-console.log("✓ 1. Structure HTML de la bibliothèque et des onglets validée");
+assert.ok(/id=["']libraryList["']/.test(html), "Panneau gauche Library #libraryList présent et pur");
+assert.ok(/id=["']search["']/.test(html), "Champ recherche dans la Library présent");
+assert.ok(/data-right-pane=["']elements["']/.test(html), "Onglet Éléments & Chutier présent dans le panneau droit");
+assert.ok(/id=["']elementsPane["']/.test(html), "Conteneur #elementsPane présent dans le panneau droit");
+assert.ok(/id=["']timelineMediaFile["']/.test(html), "Bouton d'import de fichier média dans la Timeline présent");
+assert.ok(/id=["']timelineOpenElements["']/.test(html), "Bouton Éléments & Patchs dans la Timeline présent");
+console.log("✓ 1. Structure HTML épurée (Library pure à gauche, Chutier Éléments à droite, raccourcis Timeline)");
 
 // 2. Styles CSS
 assert.ok(css.includes(".timeline-layer-row.drag-over"), "Feedback visuel drag-over sur les pistes de timeline");
 assert.ok(css.includes(".timeline-drop-hint"), "Message d'aide sur piste vide présent dans le CSS");
-assert.ok(css.includes(".scenic-card"), "Cartes de prévisualisation médias/scénographe stylées");
-assert.ok(css.includes(".inspector-node-timeline-action"), "Bouton Programmer dans la Timeline stylé");
+assert.ok(css.includes(".element-card"), "Cartes de prévisualisation médias/patchs stylées");
+assert.ok(css.includes(".element-head"), "En-têtes de cartes d'éléments stylées");
+assert.ok(css.includes(".element-actions"), "Actions directes des cartes d'éléments stylées");
 console.log("✓ 2. Styles CSS drag & drop et retours visuels validés");
 
 // 3. Fonctions logiques dans app.js
-assert.ok(app.includes("function renderScenicLibrary()"), "renderScenicLibrary() déclarée");
+assert.ok(app.includes("function renderElementsPane()"), "renderElementsPane() déclarée");
 assert.ok(app.includes("function placeScenicInTimeline("), "placeScenicInTimeline() déclarée");
 assert.ok(app.includes("function placeScenicInCanvas("), "placeScenicInCanvas() déclarée");
 assert.ok(app.includes("function addNodeToTimeline("), "addNodeToTimeline() déclarée");
 assert.ok(app.includes("function handleDroppedMediaFiles("), "handleDroppedMediaFiles() déclarée");
-assert.ok(app.includes("function showLibraryPane("), "showLibraryPane() déclarée");
 console.log("✓ 3. Fonctions de placement, drag et gestion de média validées");
 
 // 4. Événements Drag & Drop sur la Timeline
 assert.ok(app.includes("application/x-nvd-scenic-id"), "Support MIME drag Scénographe");
+assert.ok(app.includes("application/x-nvd-element"), "Support MIME drag Éléments & Chutier");
 assert.ok(app.includes("application/x-nvd-node-type"), "Support MIME drag Node Library");
-assert.ok(app.includes("application/x-nvd-canvas-node"), "Support MIME drag Canvas Node");
 assert.ok(app.includes("handleDroppedMediaFiles"), "Prise en charge du drop de fichiers Finder (vidéo, audio, image)");
 console.log("✓ 4. Protocoles de Drag & Drop universels validés");
 

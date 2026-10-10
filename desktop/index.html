@@ -58,38 +58,12 @@
   </header>
 
   <section class="workspace">
-    <aside class="panel library resizable-x" id="libraryPanel">
-      <div class="panel-head">
-        <div class="pane-tabs lib-tabs" role="tablist">
-          <button type="button" class="pane-tab active" data-lib-tab="nodes" role="tab" aria-selected="true">Opérateurs</button>
-          <button type="button" class="pane-tab" data-lib-tab="scenic" role="tab" aria-selected="false">Médias &amp; Scénographe <span class="tab-badge" id="scenicTabCount">29</span></button>
-        </div>
-        <button type="button" id="loadExampleBtn" class="btn" title="Exemple interactif">Exemple</button>
-      </div>
-      <div class="search"><input id="search" placeholder="Rechercher média, patch, node…"></div>
-      <div id="libraryNodesMode">
-        <label class="library-mode"><input id="showExperimental" type="checkbox"> Afficher les expérimentaux</label>
-        <div id="engineOffers" class="engine-offers" hidden></div>
-      </div>
-      <div id="libraryScenicBar" class="library-scenic-bar hidden">
-        <div class="scenic-actions">
-          <label class="smallbtn scenic-file-pick" title="Importer un fichier vidéo, audio ou image depuis votre ordinateur">
-            ＋ Fichier Média
-            <input id="scenicMediaFileInput" type="file" accept="video/*,audio/*,image/*" hidden multiple>
-          </label>
-          <button type="button" id="libSaveSelectionBtn" class="smallbtn" title="Enregistrer le node sélectionné en tant que patch réutilisable">Sauver Sélection</button>
-        </div>
-        <div class="scenic-filter-chips" id="scenicFilterChips">
-          <button type="button" class="chip active" data-scenic-filter="all">Tous (29)</button>
-          <button type="button" class="chip" data-scenic-filter="shadows">Ombres</button>
-          <button type="button" class="chip" data-scenic-filter="creatures">Créatures</button>
-          <button type="button" class="chip" data-scenic-filter="foley">Bruitages</button>
-          <button type="button" class="chip" data-scenic-filter="fx">Effets</button>
-          <button type="button" class="chip" data-scenic-filter="files">Fichiers</button>
-        </div>
-      </div>
+    <aside class="panel library resizable-x">
+      <div class="panel-head">Library <span class="sub">＋ production · ○ expérimental</span><button type="button" id="loadExampleBtn" class="btn">Exemple</button></div>
+      <div class="search"><input id="search" placeholder="Rechercher…"></div>
+      <label class="library-mode"><input id="showExperimental" type="checkbox"> Afficher les expérimentaux</label>
+      <div id="engineOffers" class="engine-offers" hidden></div>
       <div id="libraryList" class="panel-body libscroll"></div>
-      <div id="scenicList" class="panel-body libscroll hidden"></div>
     </aside>
 
     <main class="center">
@@ -167,6 +141,8 @@
             <button id="stop" class="smallbtn">■</button>
             <span id="timecode">00:00.0</span>
             <div class="spacer"></div>
+            <label class="smallbtn timeline-media-btn" title="Importer un fichier vidéo, audio ou image depuis votre ordinateur">＋ Média<input id="timelineMediaFile" type="file" accept="video/*,audio/*,image/*" hidden multiple></label>
+            <button type="button" id="timelineOpenElements" class="smallbtn" title="Ouvrir les Éléments &amp; Patchs du spectacle">Éléments &amp; Patchs</button>
             <div class="layer-add-wrap"><button id="addLayer" class="smallbtn layer-add-btn" type="button">+ Layer</button><div id="layerAddMenu" class="layer-add-menu hidden" role="menu" aria-label="Ajouter un layer"><button type="button" data-add-layer="video">Vidéo</button><button type="button" data-add-layer="effect">Effet</button><button type="button" data-add-layer="shader">Shader</button><button type="button" data-add-layer="shadow">Ombre</button><button type="button" data-add-layer="cue">Cue</button><button type="button" data-add-layer="bridge">Liaison</button></div></div>
             <button id="cueGo" class="smallbtn">GO</button>
             <button id="cuePrev" class="smallbtn">◀ Cue</button>
