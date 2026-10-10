@@ -293,3 +293,4 @@ export class LivePerformanceBridge {
 }
 
 export const liveBridge = new LivePerformanceBridge();
+export const livePerformanceBridge = liveBridge;

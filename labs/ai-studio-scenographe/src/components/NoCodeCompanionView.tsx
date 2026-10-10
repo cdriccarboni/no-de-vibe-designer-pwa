@@ -14,7 +14,10 @@ import {
   ArrowLeft,
   RefreshCw,
   Eye,
+  Sun,
+  ShieldAlert,
 } from 'lucide-react';
+import { dmxLightingEngine } from '../services/dmxLightingEngine';
 
 interface NoCodeCompanionViewProps {
   onBackToMacStudio?: () => void;
@@ -26,7 +29,17 @@ export const NoCodeCompanionView: React.FC<NoCodeCompanionViewProps> = ({ onBack
     return params.get('pin') || '7392';
   });
   const [isPaired, setIsPaired] = useState(false);
-  const [activeTab, setActiveTab] = useState<'camera' | 'faders' | 'motion' | 'cues'>('camera');
+  const [activeTab, setActiveTab] = useState<'camera' | 'faders' | 'motion' | 'cues' | 'dmx'>('camera');
+  const [dmxState, setDmxState] = useState(dmxLightingEngine.getState());
+  const [dmxSubmasters, setDmxSubmasters] = useState(dmxLightingEngine.getSubmasters());
+
+  useEffect(() => {
+    const unsub = dmxLightingEngine.subscribe(() => {
+      setDmxState(dmxLightingEngine.getState());
+      setDmxSubmasters([...dmxLightingEngine.getSubmasters()]);
+    });
+    return () => unsub();
+  }, []);
 
   // Camera stream & brush canvas
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -442,48 +455,147 @@ export const NoCodeCompanionView: React.FC<NoCodeCompanionViewProps> = ({ onBack
             </div>
           </div>
         )}
+
+        {activeTab === 'dmx' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1.5">
+                <Sun className="w-4 h-4" />
+                Régie Lumière DMX Mobile
+              </span>
+              <button
+                onClick={() => dmxLightingEngine.toggleBlackout()}
+                className={`px-3 py-1 rounded text-xs font-bold flex items-center gap-1 ${
+                  dmxState.blackout ? 'bg-red-600 text-white animate-pulse' : 'bg-zinc-800 text-zinc-300'
+                }`}
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                {dmxState.blackout ? 'BO ACTIF' : 'BLACKOUT'}
+              </button>
+            </div>
+
+            {/* Grand Master Mobile */}
+            <div className="bg-[#161c24] border border-zinc-800 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-1.5 text-xs">
+                <span className="font-bold text-white">Grand Master DMX</span>
+                <span className="font-mono text-amber-300 font-bold">
+                  {Math.round((dmxState.grandMaster / 255) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="255"
+                value={dmxState.grandMaster}
+                onChange={(e) => dmxLightingEngine.setGrandMaster(Number(e.target.value))}
+                aria-label="Grand Master fader"
+                className="w-full accent-amber-400 cursor-pointer h-2"
+              />
+            </div>
+
+            {/* Submasters */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold uppercase text-zinc-400">Submasters</span>
+              {dmxSubmasters.slice(0, 4).map((sub) => (
+                <div key={sub.id} className="bg-[#161c24] border border-zinc-800 rounded-lg p-2.5">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-zinc-200 truncate">{sub.name}</span>
+                    <span className="font-mono text-amber-300">{sub.value}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="255"
+                    value={sub.value}
+                    onChange={(e) => dmxLightingEngine.setSubmasterValue(sub.id, Number(e.target.value))}
+                    aria-label={`Submaster ${sub.name}`}
+                    className="w-full accent-amber-400 cursor-pointer h-1.5"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Cues Lumière Directes */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => dmxLightingEngine.fireLightCue('cue-dmx-01')}
+                className="p-2.5 rounded-lg bg-amber-950/60 border border-amber-800 text-amber-200 text-xs font-semibold text-center"
+              >
+                Plein Feu
+              </button>
+              <button
+                onClick={() => dmxLightingEngine.fireLightCue('cue-dmx-03')}
+                className="p-2.5 rounded-lg bg-yellow-950/60 border border-yellow-800 text-yellow-200 text-xs font-semibold text-center"
+              >
+                Douche Maxime
+              </button>
+              <button
+                onClick={() => dmxLightingEngine.fireLightCue('cue-dmx-05')}
+                className="p-2.5 rounded-lg bg-sky-950/60 border border-sky-800 text-sky-200 text-xs font-semibold text-center"
+              >
+                Tempête Éclairs
+              </button>
+              <button
+                onClick={() => dmxLightingEngine.fireLightCue('cue-dmx-06')}
+                className="p-2.5 rounded-lg bg-cyan-950/60 border border-cyan-800 text-cyan-200 text-xs font-semibold text-center"
+              >
+                Nuit Marine
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Bottom Navigation Tabs */}
       <nav className="p-2 bg-[#11141a] border-t border-zinc-800 flex items-center justify-around text-xs shrink-0">
         <button
           onClick={() => setActiveTab('camera')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg transition-colors ${
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg transition-colors ${
             activeTab === 'camera' ? 'text-cyan-400 font-bold' : 'text-zinc-500'
           }`}
         >
-          <Camera className="w-5 h-5" />
-          <span className="text-[10px]">Pinceau</span>
+          <Camera className="w-4 h-4" />
+          <span className="text-[9px]">Pinceau</span>
         </button>
 
         <button
           onClick={() => setActiveTab('faders')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg transition-colors ${
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg transition-colors ${
             activeTab === 'faders' ? 'text-purple-400 font-bold' : 'text-zinc-500'
           }`}
         >
-          <Sliders className="w-5 h-5" />
-          <span className="text-[10px]">Faders</span>
+          <Sliders className="w-4 h-4" />
+          <span className="text-[9px]">Faders</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('dmx')}
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg transition-colors ${
+            activeTab === 'dmx' ? 'text-amber-400 font-bold' : 'text-zinc-500'
+          }`}
+        >
+          <Sun className="w-4 h-4" />
+          <span className="text-[9px]">Lumière</span>
         </button>
 
         <button
           onClick={() => setActiveTab('motion')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg transition-colors ${
-            activeTab === 'motion' ? 'text-amber-400 font-bold' : 'text-zinc-500'
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg transition-colors ${
+            activeTab === 'motion' ? 'text-sky-400 font-bold' : 'text-zinc-500'
           }`}
         >
-          <Compass className="w-5 h-5" />
-          <span className="text-[10px]">Mouvement</span>
+          <Compass className="w-4 h-4" />
+          <span className="text-[9px]">Mouvement</span>
         </button>
 
         <button
           onClick={() => setActiveTab('cues')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg transition-colors ${
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg transition-colors ${
             activeTab === 'cues' ? 'text-rose-400 font-bold' : 'text-zinc-500'
           }`}
         >
-          <Zap className="w-5 h-5" />
-          <span className="text-[10px]">Cues TOP</span>
+          <Zap className="w-4 h-4" />
+          <span className="text-[9px]">Cues TOP</span>
         </button>
       </nav>
     </div>

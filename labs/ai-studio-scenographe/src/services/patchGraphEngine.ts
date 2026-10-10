@@ -1,7 +1,9 @@
 // Moteur de Graphe de Patch Visuel & Câblage Réel No[co]de Vibe Designer
 // Conforme à la spécification officielle No[co]de :
 // Nodes avec headers déplaçables, ports typés, câbles vectoriels Bézier,
-// liaison temps réel avec les moteurs audio, GLSL, Radio Broadcast et Timeline.
+// liaison temps réel avec les moteurs audio, GLSL, Radio Broadcast, Timeline et Régie DMX.
+
+import { dmxLightingEngine } from './dmxLightingEngine';
 
 export type NodeCategory =
   | 'audio'
@@ -937,6 +939,20 @@ class PatchGraphEngine {
     const node = tab.nodes.find((n) => n.id === nodeId);
     if (node && node.params[paramKey]) {
       node.params[paramKey].value = value;
+      // Intégration temps réel Régie DMX
+      if (node.type === 'art-net-dmx' || node.name.includes('DMX')) {
+        if (paramKey === 'intensity') {
+          const u = Number(node.params.universe?.value || 1);
+          const ch = Number(node.params.channel?.value || 1);
+          dmxLightingEngine.setChannel(u, ch, Math.round(Number(value) * 255));
+        } else if (paramKey === 'grandMaster') {
+          dmxLightingEngine.setGrandMaster(Number(value));
+        } else if (paramKey === 'blackout') {
+          if (Boolean(value) !== dmxLightingEngine.getState().blackout) {
+            dmxLightingEngine.toggleBlackout();
+          }
+        }
+      }
       this.notify();
     }
   }
@@ -982,25 +998,55 @@ class PatchGraphEngine {
   public addNodeFromLibrary(item: { name: string; category: NodeCategory; type?: string }) {
     const tab = this.getActiveTab();
     const id = `node-${Date.now().toString(36)}`;
-    const newNode: PatchNode = {
-      id,
-      type: item.type || item.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-      name: item.name,
-      category: item.category,
-      x: 120 + Math.floor(Math.random() * 220),
-      y: 100 + Math.floor(Math.random() * 180),
-      inputs: [
-        { id: 'in-signal', name: 'Entrée', type: 'signal', direction: 'input' },
-      ],
-      outputs: [
-        { id: 'out-signal', name: 'Sortie', type: 'signal', direction: 'output' },
-      ],
-      params: {
-        intensity: { key: 'intensity', label: 'Intensité', type: 'slider', value: 0.8, min: 0, max: 1, step: 0.05 },
-        active: { key: 'active', label: 'Actif', type: 'toggle', value: true },
-      },
-      color: item.category === 'shader' ? '#38bdf8' : item.category === 'audio' ? '#d7b86a' : item.category === 'output' ? '#ef4444' : '#8fa79d',
-    };
+    const isDmxNode = item.name.includes('DMX') || item.name.includes('Art-Net');
+
+    const newNode: PatchNode = isDmxNode
+      ? {
+          id,
+          type: 'art-net-dmx',
+          name: 'Art-Net / DMX (Régie)',
+          category: 'control',
+          x: 120 + Math.floor(Math.random() * 220),
+          y: 100 + Math.floor(Math.random() * 180),
+          inputs: [
+            { id: 'in-dimmer', name: 'Dimmer (0-255)', type: 'signal', direction: 'input' },
+            { id: 'in-rgb', name: 'Couleur RGB', type: 'signal', direction: 'input' },
+            { id: 'in-strobe', name: 'Strobe Flash', type: 'signal', direction: 'input' },
+            { id: 'in-cue', name: 'Cue Trigger', type: 'cue', direction: 'input' },
+          ],
+          outputs: [
+            { id: 'out-dmx', name: 'DMX Univers 1', type: 'signal', direction: 'output' },
+            { id: 'out-gm', name: 'Grand Master', type: 'signal', direction: 'output' },
+          ],
+          params: {
+            universe: { key: 'universe', label: 'Univers DMX', type: 'select', value: 1, options: ['1', '2', '3', '4'] },
+            channel: { key: 'channel', label: 'Canal Départ', type: 'slider', value: 1, min: 1, max: 512, step: 1 },
+            intensity: { key: 'intensity', label: 'Intensité Fader', type: 'slider', value: 0.85, min: 0, max: 1, step: 0.01 },
+            grandMaster: { key: 'grandMaster', label: 'Grand Master', type: 'slider', value: 255, min: 0, max: 255, step: 1 },
+            blackout: { key: 'blackout', label: 'Blackout Urgence', type: 'toggle', value: false },
+          },
+          color: '#f59e0b',
+        }
+      : {
+          id,
+          type: item.type || item.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          name: item.name,
+          category: item.category,
+          x: 120 + Math.floor(Math.random() * 220),
+          y: 100 + Math.floor(Math.random() * 180),
+          inputs: [
+            { id: 'in-signal', name: 'Entrée', type: 'signal', direction: 'input' },
+          ],
+          outputs: [
+            { id: 'out-signal', name: 'Sortie', type: 'signal', direction: 'output' },
+          ],
+          params: {
+            intensity: { key: 'intensity', label: 'Intensité', type: 'slider', value: 0.8, min: 0, max: 1, step: 0.05 },
+            active: { key: 'active', label: 'Actif', type: 'toggle', value: true },
+          },
+          color: item.category === 'shader' ? '#38bdf8' : item.category === 'audio' ? '#d7b86a' : item.category === 'output' ? '#ef4444' : '#8fa79d',
+        };
+
     tab.nodes.push(newNode);
     tab.selectedNodeId = id;
     this.notify();

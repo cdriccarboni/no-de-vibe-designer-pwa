@@ -26,6 +26,7 @@ import { LiveFoleyInteractiveModal } from './components/LiveFoleyInteractiveModa
 import { AbletonLiveStudioModal } from './components/AbletonLiveStudioModal';
 import { SurtitrageStudioModal } from './components/SurtitrageStudioModal';
 import { MidiHubStudioModal } from './components/MidiHubStudioModal';
+import { DmxStudioModal } from './components/DmxStudioModal';
 import { InstallHubView } from './components/InstallHubView';
 import { OfficialTopbar } from './components/OfficialTopbar';
 import { OfficialWorkspace } from './components/OfficialWorkspace';
@@ -121,6 +122,7 @@ export default function App() {
   const [isAbletonModalOpen, setIsAbletonModalOpen] = useState(false);
   const [isMidiHubOpen, setIsMidiHubOpen] = useState(false);
   const [isSurtitrageOpen, setIsSurtitrageOpen] = useState(false);
+  const [isDmxModalOpen, setIsDmxModalOpen] = useState(false);
 
   // Sync scene change
   const handleSceneChange = useCallback((newScene: ArtisticScene) => {
@@ -535,6 +537,7 @@ export default function App() {
         onOpenAbletonModal={() => setIsAbletonModalOpen(true)}
         onOpenMidiHub={() => setIsMidiHubOpen(true)}
         onOpenSurtitrage={() => setIsSurtitrageOpen(true)}
+        onOpenDmxStudio={() => setIsDmxModalOpen(true)}
         onOpenInstallPage={() => {
           window.history.pushState({}, '', '/install');
           setRoutePath('/install');
@@ -557,6 +560,7 @@ export default function App() {
             onOpenAbletonModal={() => setIsAbletonModalOpen(true)}
             onOpenMidiHub={() => setIsMidiHubOpen(true)}
             onOpenSurtitrage={() => setIsSurtitrageOpen(true)}
+            onOpenDmxStudio={() => setIsDmxModalOpen(true)}
           />
         ) : viewMode === 'studio' ? (
           <ArtisticStudioView
@@ -693,6 +697,11 @@ export default function App() {
       <SurtitrageStudioModal
         isOpen={isSurtitrageOpen}
         onClose={() => setIsSurtitrageOpen(false)}
+      />
+
+      <DmxStudioModal
+        isOpen={isDmxModalOpen}
+        onClose={() => setIsDmxModalOpen(false)}
       />
     </div>
   );

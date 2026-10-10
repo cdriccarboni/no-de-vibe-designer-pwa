@@ -48,4 +48,10 @@ assert(radioHtml.includes("/listen"), "radio/index.html gère le flux /listen");
 assert(radioHtml.includes("radio-relay-production.up.railway.app"), "radio/index.html cible le relais Railway par défaut");
 console.log("  ✓ Lecteur d'écoute auditeur radio/index.html présent et configuré");
 
-console.log("\n✓ QA UI AUDIO & RADIO : Tous les contrôles, badges et sécurités sont validés.");
+// 6. Retour visuel des connexions : les points de ports connectés deviennent jaunes avec glow
+const stylesCss = fs.readFileSync(path.resolve(__dirname, "../desktop/styles.css"), "utf-8");
+assert(appJs.includes('dot.classList.remove("connected")') && appJs.includes('from.classList.add("connected")'), "renderWires applique la classe connected aux ports");
+assert(stylesCss.includes(".port-dot.connected") && stylesCss.includes("#f59e0b"), "styles.css applique le jaune vif #f59e0b et l'éclat aux ports connectés");
+console.log("  ✓ Retour visuel des ports connectés (jaune complet + halo lumineux) validé");
+
+console.log("\n✓ QA UI AUDIO & RADIO : Tous les contrôles, badges, retours visuels et sécurités sont validés.");

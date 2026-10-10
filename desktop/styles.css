@@ -123,7 +123,9 @@ body.gradient-strong{--gradient-alpha:.78}
 .patch-wires .wire{fill:none;stroke:color-mix(in srgb,var(--accent2) 72%,#d9e0e5);stroke-width:2.2;vector-effect:non-scaling-stroke;pointer-events:stroke;cursor:pointer;filter:drop-shadow(0 1px 1px #0008)}
 .patch-wires .wire:hover{stroke:var(--accent);stroke-width:3.4}
 .patch-wires .wire.draft{stroke:var(--accent);stroke-dasharray:5 5;opacity:0}.patch-wires .wire.draft.active{opacity:.9}
-.node{z-index:2}.nb{gap:3px}.port{min-height:22px;position:relative;display:grid;grid-template-columns:15px minmax(0,1fr) 15px;align-items:center;gap:4px}.port-label{grid-column:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.port-dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--line2);background:var(--panel);cursor:crosshair;touch-action:none;transition:transform .1s,border-color .1s,background .1s}.port-dot:hover{transform:scale(1.35);border-color:var(--accent);background:var(--accent)}.port-dot.input{grid-column:1}.port-dot.output{grid-column:3}.port-in .port-label{text-align:left}.port-out .port-label{text-align:right}
+.node{z-index:2}.nb{gap:3px}.port{min-height:22px;position:relative;display:grid;grid-template-columns:15px minmax(0,1fr) 15px;align-items:center;gap:4px}.port-label{grid-column:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.port-dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--line2);background:var(--panel);cursor:crosshair;touch-action:none;transition:transform .12s ease,border-color .12s ease,background .12s ease,box-shadow .12s ease}.port-dot:hover{transform:scale(1.35);border-color:var(--accent);background:var(--accent)}.port-dot.input{grid-column:1}.port-dot.output{grid-column:3}.port-in .port-label{text-align:left}.port-out .port-label{text-align:right}
+.port-dot.connected{background:#f59e0b!important;border-color:#fcd34d!important;box-shadow:0 0 7px rgba(245,158,11,.85);transform:scale(1.15)}
+.port-dot.connected:hover{transform:scale(1.45);box-shadow:0 0 10px rgba(245,158,11,1)}
 
 /* P00 — exécutable / indisponible */
 .lib-item.unavailable{opacity:.55}

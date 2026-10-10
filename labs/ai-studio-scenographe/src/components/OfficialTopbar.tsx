@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   ChevronDown,
   Type,
-  Download
+  Download,
+  Sun
 } from 'lucide-react';
 import { radioAudioEngine, RadioTelemetry } from '../services/radioAudioEngine';
 import { companionBridge, CompanionState } from '../services/companionBridge';
@@ -34,6 +35,7 @@ interface OfficialTopbarProps {
   onOpenAbletonModal: () => void;
   onOpenMidiHub?: () => void;
   onOpenSurtitrage: () => void;
+  onOpenDmxStudio?: () => void;
   onOpenInstallPage?: () => void;
   onOpenThemeModal: () => void;
   onOpenDocModal: () => void;
@@ -50,6 +52,7 @@ export const OfficialTopbar: React.FC<OfficialTopbarProps> = ({
   onOpenAbletonModal,
   onOpenMidiHub,
   onOpenSurtitrage,
+  onOpenDmxStudio,
   onOpenInstallPage,
   onOpenThemeModal,
   onOpenDocModal,
@@ -329,6 +332,17 @@ export const OfficialTopbar: React.FC<OfficialTopbarProps> = ({
         >
           <Type className="w-3.5 h-3.5 text-[#8fa79d]" />
           <span>Surtitres Pro</span>
+        </button>
+
+        {/* Régie Lumière DMX & Millumin */}
+        <button
+          type="button"
+          onClick={onOpenDmxStudio}
+          className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#1d2126] border border-[#2d333b] hover:border-amber-400 text-zinc-300 hover:text-white transition-all text-[11px]"
+          title="Régie Lumière & DMX (Compatible Millumin, Art-Net, sACN & USB DMX)"
+        >
+          <Sun className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+          <span>Lumière DMX</span>
         </button>
       </div>
 

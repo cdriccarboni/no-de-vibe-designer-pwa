@@ -36,7 +36,10 @@ import {
   Copy,
   Edit2,
   AlertOctagon,
-  ArrowRight
+  ArrowRight,
+  Sun,
+  ShieldCheck,
+  Download,
 } from 'lucide-react';
 import {
   patchGraphEngine,
@@ -50,6 +53,7 @@ import { localAiEngine, CreativePromptResult } from '../services/localAiEngine';
 import { radioAudioEngine } from '../services/radioAudioEngine';
 import { midiDeviceEngine, MidiMappingRule, MidiLearnState } from '../services/midiDeviceEngine';
 import { qlabCueEngine, QLabCue, ShowFile } from '../services/qlabCueEngine';
+import { dmxLightingEngine } from '../services/dmxLightingEngine';
 
 interface OfficialWorkspaceProps {
   onOpenRadioStudio: () => void;
@@ -59,6 +63,7 @@ interface OfficialWorkspaceProps {
   onOpenAbletonModal: () => void;
   onOpenSurtitrage?: () => void;
   onOpenMidiHub?: () => void;
+  onOpenDmxStudio?: () => void;
 }
 
 interface LibraryItem {
@@ -169,6 +174,7 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
   onOpenAbletonModal,
   onOpenSurtitrage,
   onOpenMidiHub,
+  onOpenDmxStudio,
 }) => {
   // Graphe de Patch State
   const [nodes, setNodes] = useState<PatchNode[]>(patchGraphEngine.getNodes());
@@ -1183,6 +1189,20 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
           <div className="flex items-center gap-1">
             <button
               type="button"
+              onClick={() => setRightTab('qlab')}
+              className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1.5 ${
+                rightTab === 'qlab'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                  : 'text-[#9ba4ae] hover:text-white'
+              }`}
+            >
+              <span>Conduite QLab</span>
+              <span className="px-1 py-0.2 rounded text-[9px] bg-amber-500 text-black font-mono font-bold">
+                {activeShow.cues.length}
+              </span>
+            </button>
+            <button
+              type="button"
               onClick={() => setRightTab('inspector')}
               className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
                 rightTab === 'inspector'
@@ -1215,10 +1235,249 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
               Historique CX
             </button>
           </div>
+          {onOpenDmxStudio && (
+            <button
+              type="button"
+              onClick={onOpenDmxStudio}
+              className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-all flex items-center gap-1"
+              title="Ouvrir le Pupitre Lumière DMX"
+            >
+              <Sun className="w-2.5 h-2.5" />
+              <span>DMX</span>
+            </button>
+          )}
         </div>
 
         {/* Corps de l'onglet actif */}
         <div className="flex-1 overflow-y-auto p-3 text-xs">
+          {rightTab === 'qlab' && (
+            <div className="flex flex-col gap-3">
+              {/* Pupitre de Transport QLab & Gros Bouton GO */}
+              <div className="bg-[#12161c] border border-[#2d3748] rounded-xl p-3 shadow-md flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-xs text-white uppercase tracking-wider flex items-center gap-1.5">
+                      <Play className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{activeShow.title}</span>
+                    </h3>
+                    <p className="text-[10px] text-zinc-400">
+                      Régie professionnelle · Espace = GO · Échap = PANIC
+                    </p>
+                  </div>
+                  {onOpenDmxStudio && (
+                    <button
+                      type="button"
+                      onClick={onOpenDmxStudio}
+                      className="px-2 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 text-[10px] font-bold flex items-center gap-1 transition-all"
+                    >
+                      <Sun className="w-3 h-3" />
+                      <span>Pupitre DMX</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* GROS BOUTON GO */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => qlabCueEngine.fireGo()}
+                    className="flex-1 h-14 rounded-lg bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-sm tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 active:scale-[0.98] transition-all"
+                  >
+                    <Play className="w-5 h-5 fill-current" />
+                    <span>GO</span>
+                    {standbyCue && (
+                      <span className="text-[11px] font-mono font-normal opacity-90 ml-1">
+                        [{standbyCue.qNumber} : {standbyCue.name}]
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => qlabCueEngine.panic()}
+                    className="h-14 px-3 rounded-lg bg-red-700/80 hover:bg-red-600 text-white font-bold text-xs flex flex-col items-center justify-center gap-0.5 border border-red-500/40 shadow active:scale-[0.98] transition-all"
+                    title="Arrêt d'urgence de toutes les cues et fondu au noir (Touche Échap)"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-red-200" />
+                    <span className="text-[10px]">PANIC</span>
+                  </button>
+                </div>
+
+                {/* Boutons Suivant / Précédent / Réinitialiser */}
+                <div className="flex items-center justify-between gap-1 pt-1 border-t border-[#2d3748]/60 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => qlabCueEngine.goToPrevCue()}
+                    className="px-2 py-1 rounded bg-[#1d2126] hover:bg-[#252b32] text-zinc-300 border border-[#2d333b]"
+                  >
+                    ◀ Précédent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => qlabCueEngine.advanceToNextCue()}
+                    className="px-2 py-1 rounded bg-[#1d2126] hover:bg-[#252b32] text-zinc-300 border border-[#2d333b]"
+                  >
+                    Suivant ▶
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => qlabCueEngine.resetAllCues()}
+                    className="px-2 py-1 rounded bg-[#1d2126] hover:bg-[#252b32] text-zinc-400 border border-[#2d333b]"
+                  >
+                    ↺ Reset
+                  </button>
+                </div>
+
+                {/* Export du Spectacle & Conduite */}
+                <div className="flex items-center gap-1.5 pt-1 border-t border-[#2d3748]/60 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => qlabCueEngine.exportShowAsJson()}
+                    className="flex-1 py-1 px-2 rounded bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold flex items-center justify-center gap-1 transition-colors"
+                    title="Télécharger le fichier complet du spectacle .vibe-show.json"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Pack Spectacle (.json)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => qlabCueEngine.exportConduiteAsText()}
+                    className="flex-1 py-1 px-2 rounded bg-[#1d2126] hover:bg-[#252b32] border border-[#2d333b] text-zinc-300 flex items-center justify-center gap-1 transition-colors"
+                    title="Télécharger la fiche de conduite technique imprimable"
+                  >
+                    <FileCode className="w-3 h-3 text-sky-400" />
+                    <span>Conduite (.txt)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Recherche de Cue */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={qlabSearch}
+                  onChange={(e) => setQlabSearch(e.target.value)}
+                  placeholder="Rechercher une cue (numéro, nom, lumière...)"
+                  className="w-full bg-[#12161c] border border-[#2d3748] rounded-lg px-2.5 py-1.5 text-[11px] text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Arborescence des Cues */}
+              <div className="space-y-1.5 max-h-[calc(100vh-340px)] overflow-y-auto pr-1">
+                {activeShow.cues
+                  .filter((cue) => {
+                    if (!qlabSearch.trim()) return true;
+                    const q = qlabSearch.toLowerCase();
+                    return (
+                      cue.name.toLowerCase().includes(q) ||
+                      cue.qNumber.toLowerCase().includes(q) ||
+                      (cue.notes && cue.notes.toLowerCase().includes(q))
+                    );
+                  })
+                  .map((cue) => {
+                    const isStandby = standbyCue?.id === cue.id;
+                    const isFired = lastFiredCue?.id === cue.id;
+                    const isGroup = cue.type === 'group';
+                    const isDmx = cue.type === 'dmx';
+
+                    if (isGroup) {
+                      return (
+                        <div
+                          key={cue.id}
+                          className="pt-2 pb-1 px-1 font-bold text-[11px] text-amber-300 uppercase tracking-wider flex items-center justify-between border-b border-[#2d3748]/50"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            <span>{cue.qNumber} — {cue.name}</span>
+                          </div>
+                          <span className="text-[9px] text-zinc-500 font-mono">Dossier</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={cue.id}
+                        className={`p-2 rounded-lg border transition-all flex flex-col gap-1.5 ${
+                          isStandby
+                            ? 'bg-amber-950/30 border-amber-500 shadow-md ring-1 ring-amber-500/40'
+                            : isFired
+                            ? 'bg-emerald-950/25 border-emerald-500/60'
+                            : 'bg-[#161c24] border-[#2d3748] hover:border-zinc-500'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-[11px] text-amber-300 w-10 shrink-0">
+                              {cue.qNumber}
+                            </span>
+                            <span className="font-semibold text-xs text-white truncate">
+                              {cue.name}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {/* Badge de Type */}
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold ${
+                                isDmx
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                  : cue.type === 'patch'
+                                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                                  : cue.type === 'audio'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : 'bg-zinc-800 text-zinc-300'
+                              }`}
+                            >
+                              {isDmx ? 'LUM DMX' : cue.type.toUpperCase()}
+                            </span>
+
+                            {/* Bouton GO Direct */}
+                            <button
+                              type="button"
+                              onClick={() => qlabCueEngine.fireCue(cue.id)}
+                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow"
+                              title="Déclencher cette cue immédiatement"
+                            >
+                              GO
+                            </button>
+                          </div>
+                        </div>
+
+                        {cue.notes && (
+                          <p className="text-[10px] text-zinc-400 pl-12 line-clamp-1">
+                            {cue.notes}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between pl-12 text-[9px] text-zinc-500 font-mono">
+                          <span>Durée : {cue.durationSec || 0}s</span>
+                          <div className="flex items-center gap-1.5">
+                            {isDmx && onOpenDmxStudio && (
+                              <button
+                                type="button"
+                                onClick={onOpenDmxStudio}
+                                className="text-amber-400 hover:underline"
+                              >
+                                Éditer DMX
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => qlabCueEngine.setStandbyCue(cue.id)}
+                              className="hover:text-amber-300"
+                            >
+                              {isStandby ? '● STANDBY ACTIF' : 'Mettre en Standby'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
           {rightTab === 'inspector' && (
             <div>
               {selectedNode ? (

@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-10-10T19:23:50.443Z",
+  "timestamp": "2026-10-10T21:18:45.030Z",
   "repos": {
     "pwa": {
       "dir": "/Users/cedriccarboni/Projects/Antigravity-NoCode/no-de-vibe-designer-pwa",
       "branch": "antigravity/audit-repair-20261010",
-      "sha": "841b4868d5bc84e1b982143aba6e161583a164b1",
+      "sha": "ca2ecd74ea0198574109b25d46ae379c9c881ae4",
       "remote": "https://github.com/cdriccarboni/no-de-vibe-designer-pwa.git",
       "available": true
     },
@@ -18,7 +18,7 @@
     "lab": {
       "dir": "/Users/cedriccarboni/Projects/Antigravity-NoCode/_ai-studio/nocode-ai-expert",
       "branch": "main",
-      "sha": "778e1fa9f1597552e8c2c5a6df432078e9cf738a",
+      "sha": "2c0daa57d57f80f738594eb7eb1260d2950567ca",
       "remote": "https://github.com/cdriccarboni/nocode-ai-expert.git",
       "available": true
     }

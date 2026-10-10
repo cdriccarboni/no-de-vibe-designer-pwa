@@ -884,10 +884,13 @@ function renderWires() {
   svg.setAttribute("width", Math.max(world.scrollWidth || 2400, 2400));
   svg.setAttribute("height", Math.max(world.scrollHeight || 1600, 1600));
   group.innerHTML = "";
+  qall(".port-dot").forEach(dot => dot.classList.remove("connected"));
   const g = activeGraph();
   for (const edge of g.edges || []) {
     const from = findPort(edge.from.node, edge.from.port, "out");
     const to = findPort(edge.to.node, edge.to.port, "in");
+    if (from) from.classList.add("connected");
+    if (to) to.classList.add("connected");
     if (!from || !to) continue;
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.classList.add("wire");

@@ -10,8 +10,9 @@
 import { patchGraphEngine } from './patchGraphEngine';
 import { radioAudioEngine } from './radioAudioEngine';
 import { midiDeviceEngine } from './midiDeviceEngine';
+import { dmxLightingEngine } from './dmxLightingEngine';
 
-export type CueType = 'group' | 'patch' | 'audio' | 'video' | 'shader' | 'osc' | 'midi' | 'top' | 'panic';
+export type CueType = 'group' | 'patch' | 'audio' | 'video' | 'shader' | 'osc' | 'midi' | 'top' | 'panic' | 'dmx';
 export type GroupMode = 'start_all' | 'start_first_and_go_next';
 
 export interface QLabCue {
@@ -22,6 +23,7 @@ export interface QLabCue {
   parentId: string | null; // Id du dossier/groupe parent (null pour racine)
   targetPatchTabId?: string; // Lien avec un Patch Canvas en onglet
   targetShaderId?: string;
+  targetDmxCueId?: string;   // Lien direct avec une Cue Lumière DMX
   targetOscAddress?: string;
   targetMidiCC?: number;
   durationSec?: number;
@@ -114,6 +116,31 @@ function generateOfficialShow(): QLabCue[] {
     notes: 'Détection micro direct + crête acoustique. Envoie le TOP régie.',
   });
 
+  // Cues Lumière DMX intégrées dans la scène
+  cues.push({
+    id: 'cue-q-lum-1',
+    qNumber: 'Q-L1',
+    name: 'Lumière : Plein Feu Ambré Scène',
+    type: 'dmx',
+    parentId: 'cue-act-1-sc-1',
+    targetDmxCueId: 'cue-dmx-01',
+    durationSec: 3.5,
+    color: '#fbbf24',
+    notes: 'Gradateurs face 85%, contre chaud 70%, cyclorama doux.',
+  });
+
+  cues.push({
+    id: 'cue-q-lum-3',
+    qNumber: 'Q-L3',
+    name: 'Lumière : Douche Soliste Maxime (Or)',
+    type: 'dmx',
+    parentId: 'cue-act-1-sc-1',
+    targetDmxCueId: 'cue-dmx-03',
+    durationSec: 1.5,
+    color: '#d7b86a',
+    notes: 'Découpe zénithale nette sur l’ombre et le tricorne du capitaine.',
+  });
+
   // Acte 1 -> Scène 2
   cues.push({
     id: 'cue-act-1-sc-2',
@@ -124,6 +151,18 @@ function generateOfficialShow(): QLabCue[] {
     isExpanded: true,
     groupMode: 'start_first_and_go_next',
     color: '#ef4444',
+  });
+
+  cues.push({
+    id: 'cue-q-lum-5',
+    qNumber: 'Q-L5',
+    name: 'Lumière : Tempête & Éclairs Stroboscope',
+    type: 'dmx',
+    parentId: 'cue-act-1-sc-2',
+    targetDmxCueId: 'cue-dmx-05',
+    durationSec: 0.2,
+    color: '#38bdf8',
+    notes: 'Déclenchement instantané stroboscope DMX et balayage lyres.',
   });
 
   cues.push({
@@ -363,6 +402,10 @@ class QLabCueEngine {
     }
   }
 
+  public setStandbyCue(cueId: string) {
+    this.setStandbyCueId(cueId);
+  }
+
   // GROS BOUTON GO (LE CŒUR DE QLAB)
   public fireGo(): QLabCue | null {
     const show = this.getActiveShow();
@@ -418,6 +461,11 @@ class QLabCueEngine {
     // 3. Déclencheur MIDI si configuré
     if (cue.targetMidiCC !== undefined) {
       midiDeviceEngine.simulateMidiMessage('cc', cue.targetMidiCC, 1.0);
+    }
+
+    // 4. Déclencheur Lumière DMX si cue type 'dmx' ou cible DMX configurée
+    if (cue.type === 'dmx' || cue.targetDmxCueId) {
+      dmxLightingEngine.fireLightCue(cue.targetDmxCueId || 'cue-dmx-01', cue.durationSec);
     }
 
     // 4. Émettre un signal global OSC / TOP pour régie
@@ -476,6 +524,22 @@ class QLabCueEngine {
     } else {
       show.currentStandbyCueId = playables[playables.length - 1].id;
     }
+    this.notify();
+  }
+
+  public goToPrevCue() {
+    this.previousCue();
+  }
+
+  public resetAllCues() {
+    const show = this.getActiveShow();
+    show.cues.forEach((c) => {
+      c.status = undefined;
+    });
+    const firstPlayable = show.cues.find((c) => c.type !== 'group');
+    show.currentStandbyCueId = firstPlayable ? firstPlayable.id : null;
+    this.lastFiredCue = null;
+    this.isPanicArmed = false;
     this.notify();
   }
 
@@ -650,6 +714,72 @@ class QLabCueEngine {
 
   public getTotalCuesCount(): number {
     return this.getActiveShow().cues.length;
+  }
+
+  // EXPORT DE SPECTACLE (.vibe-show.json & Conduite technique texte)
+  public exportShowAsJson(): string {
+    const show = this.getActiveShow();
+    const dataStr = JSON.stringify(show, null, 2);
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${show.id || 'spectacle'}-${new Date().toISOString().slice(0, 10)}.vibe-show.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    return dataStr;
+  }
+
+  public exportConduiteAsText(): string {
+    const show = this.getActiveShow();
+    let text = `========================================================================\n`;
+    text += `CONDUITE TECHNIQUE DE SPECTACLE — NO[CO]DE VIBE DESIGNER\n`;
+    text += `TITRE : ${show.title}\n`;
+    text += `AUTEUR / RÉGIE : ${show.author}\n`;
+    text += `DATE D'EXPORT : ${new Date().toLocaleString()}\n`;
+    text += `TOTAL CUES : ${show.cues.length}\n`;
+    text += `========================================================================\n\n`;
+
+    show.cues.forEach((c) => {
+      if (c.type === 'group') {
+        text += `\n------------------------------------------------------------------------\n`;
+        text += `>>> ${c.qNumber} : ${c.name}\n`;
+        text += `------------------------------------------------------------------------\n`;
+      } else {
+        const typeTag = c.type === 'dmx' ? '[LUM DMX]' : `[${c.type.toUpperCase()}]`;
+        text += `  • ${c.qNumber.padEnd(8)} | ${typeTag.padEnd(10)} | ${c.name.padEnd(35)} | Durée: ${(c.durationSec || 0)}s\n`;
+        if (c.notes) text += `    ↳ Didascalie: ${c.notes}\n`;
+      }
+    });
+
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `conduite-${show.id || 'spectacle'}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    return text;
+  }
+
+  public importShowFromJson(jsonString: string): boolean {
+    try {
+      const parsed = JSON.parse(jsonString) as ShowFile;
+      if (parsed && Array.isArray(parsed.cues)) {
+        parsed.id = parsed.id || `show-${Date.now()}`;
+        this.shows.push(parsed);
+        this.activeShowId = parsed.id;
+        this.notify();
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
   }
 }
 
