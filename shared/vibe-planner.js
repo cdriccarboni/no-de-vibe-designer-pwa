@@ -17,7 +17,7 @@ const INTENTS = [
   ["videofile", ["fichier video","fichier vidéo","video fichier","clip video"]],
   ["whale", ["baleine","whale"]],
   ["blob", ["blob","forme organique"]],
-  ["threadcurtain", ["thread curtain","rideau de fils numerique","rideau de fil numerique","rideau de fils numérique","rideau de fil numérique","fils numeriques","fils numériques"]],
+  ["threadcurtain", ["thread curtain","rideau de fils","rideau de fil","rideaux de fils","rideaux de fil","rideau interactif","rideau de fils numerique","rideau de fil numerique","rideau de fils numérique","rideau de fil numérique","fils numeriques","fils numériques"]],
   ["flowfield", ["flow field","champ de flux","particules flux","body particles"]],
   ["reactiondiffusion", ["reaction diffusion","reaction-diffusion","réaction diffusion"]],
   ["ribbontrail", ["ribbon trail","rubans","ruban lumineux","trails ruban"]],
@@ -350,10 +350,24 @@ export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
   }
 
   // Macros interactives issues de la veille TouchDesigner.
-  if (/thread curtain|rideau de fils numerique|rideau de fil numerique|rideau de fils numérique|rideau de fil numérique|fils numeriques|fils numériques/.test(t)) {
-    add("pointer",70,70); add("smooth",260,70); add("threadcurtain",500,70);
-    connect("pointer","smooth","number");
-    connect("smooth","threadcurtain","number");
+  if (/thread curtain|rideau(?:x)? de fil(?:s)?|rideau interactif|fils? numeriques?/.test(t)) {
+    const existingCurtain = ops.find(o => o.op === "addNode" && o.type === "threadcurtain");
+    if (existingCurtain) {
+      existingCurtain.x = 500;
+      existingCurtain.y = 70;
+    } else {
+      add("threadcurtain", 500, 70);
+    }
+    const existingPointer = ops.find(o => o.op === "addNode" && o.type === "pointer");
+    if (existingPointer) {
+      existingPointer.x = 70;
+      existingPointer.y = 70;
+    } else {
+      add("pointer", 70, 70);
+    }
+    add("smooth", 260, 70);
+    connect("pointer", "smooth", "number");
+    connect("smooth", "threadcurtain", "number");
     notes.push("Thread Curtain local : souris/main → lissage → rideau, sans caméra obligatoire.");
   }
   if (/essaim|swarm|boids/.test(t)) {

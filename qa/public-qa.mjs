@@ -37,7 +37,8 @@ assert(updateNoticeJs.includes("../install/"), "Update popup links to Installer"
 assert(fs.readFileSync(new URL("../show/show.js", import.meta.url), "utf8").includes("installUpdateNotice()"), "Show receives shared update popup");
 assert(libraryDesktopApp.includes("NVD_LIBRARY_BOOTSTRAP_GUARD"), "Designer has the early Library bootstrap guard");
 assert(libraryDesktopApp.indexOf("NVD_LIBRARY_BOOTSTRAP_GUARD") < libraryDesktopApp.indexOf("function startEngineDownload"), "Library bootstrap runs before secondary Designer startup");
-assert(SURFACES.length === 5, "five switchable No-de surfaces are available");
+assert(SURFACES.length === 6, "six switchable No-de surfaces are available (including Show)");
+assert(SURFACES.some(s => s.id === "show"), "Show is present in SURFACES");
 const surfaceMem = new Map();
 const surfaceStorage = {
   getItem: key => surfaceMem.get(key) ?? null,

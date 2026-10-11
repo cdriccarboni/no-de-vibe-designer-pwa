@@ -5,6 +5,7 @@ import {
 import { browserProbeRegistry, selectAgentsForRequest } from "../shared/agent-registry.js";
 import { executeWaveShader, nativeBridgeLabel, runShaderAgent } from "../shared/shader-agent.js";
 import { LIVE_TITLE_PRESETS, loadLiveTitleControlAddress, saveLiveTitleControlAddress, publishLiveTitle } from "../shared/live-title-broadcast.js";
+import { Runtime } from "../shared/runtime.js";
 
 import { installUpdateNotice } from "../shared/update-notice.js";
 
@@ -13,6 +14,8 @@ let session = loadExampleScene();
 let timer = 0;
 let liveTitleId = null;
 let liveTitlePublishing = false;
+let runtime = null;
+let probeCanvas = null;
 
 const $ = id => document.getElementById(id);
 
@@ -50,6 +53,10 @@ async function publishSelectedLiveTitle(titleId) {
 }
 
 function paint() {
+  if (runtime) {
+    runtime.time = session.time;
+    runtime.render();
+  }
   $("sceneName").textContent = session.sceneName || "Scène";
   $("clock").textContent = session.time.toFixed(2) + " s";
   $("runState").textContent = !session.running ? "Arrêt" : session.paused ? "Pause" : "Lecture";
@@ -63,9 +70,17 @@ function paint() {
   paintMonitor();
 }
 
+function getProbeGl() {
+  if (!probeCanvas) {
+    probeCanvas = document.createElement("canvas");
+    probeCanvas.width = 64;
+    probeCanvas.height = 64;
+  }
+  return probeCanvas.getContext("webgl2");
+}
+
 function compileInBrowser(source) {
-  const canvas = $("preview");
-  const gl = canvas.getContext("webgl2");
+  const gl = getProbeGl();
   const result = executeWaveShader(gl, source);
   return result.preview ? result : { ...result, preview: result.compile ? "show/index.html#preview" : "" };
 }
@@ -75,7 +90,7 @@ async function registryForChat() {
     try { return await globalThis.nvdDesktop.agentRegistry(); }
     catch { /* la sonde locale a échoué, le navigateur sonde ce qu'il peut */ }
   }
-  const gl = $("preview").getContext("webgl2");
+  const gl = getProbeGl();
   return browserProbeRegistry(gl);
 }
 
@@ -119,18 +134,42 @@ function remember() {
 $("openFile").onchange = async event => {
   const file = event.target.files?.[0];
   if (!file) return;
-  session = restoreShow(await file.text());
-  loadScene(session);
-  paint();
+  try {
+    session = restoreShow(await file.text());
+    loadScene(session);
+    if (runtime) runtime.setProject(session.project);
+    paint();
+    $("log").textContent = `Scène « ${session.sceneName || "importée"} » chargée.`;
+  } catch (err) {
+    $("log").textContent = `Erreur fichier : ${err?.message || "fichier JSON ou projet invalide"}`;
+  } finally {
+    event.target.value = "";
+  }
 };
 
-$("loadScene").onclick = () => { loadScene(session); paint(); };
+$("loadScene").onclick = () => {
+  loadScene(session);
+  if (runtime) runtime.setProject(session.project);
+  paint();
+};
 $("start").onclick = () => { startShow(session); paint(); };
 $("pause").onclick = () => { pauseShow(session); paint(); };
-$("stop").onclick = () => { stopShow(session); paint(); };
+$("stop").onclick = () => {
+  stopShow(session);
+  if (runtime) {
+    runtime.time = 0;
+    runtime.render();
+  }
+  paint();
+};
 $("go").onclick = () => {
   const result = fireCue(session);
   $("log").textContent = result.ok ? `Cue ${result.cue?.label || ""}` : (result.error || "cue refusée");
+  if (runtime) {
+    runtime.setProject(session.project);
+    runtime.time = session.time;
+    runtime.render();
+  }
   remember();
   paint();
 };
@@ -147,9 +186,14 @@ $("save").onclick = () => {
 $("restore").onclick = () => {
   const saved = localStorage.getItem(SAVE_KEY);
   if (!saved) { $("log").textContent = "Aucune sauvegarde Show"; return; }
-  session = restoreShow(saved);
-  loadScene(session);
-  paint();
+  try {
+    session = restoreShow(saved);
+    loadScene(session);
+    if (runtime) runtime.setProject(session.project);
+    paint();
+  } catch (err) {
+    $("log").textContent = `Restauration impossible : ${err?.message || "données invalides"}`;
+  }
 };
 $("ask").onclick = async () => {
   const text = $("chat").value.trim();
@@ -180,6 +224,7 @@ $("ask").onclick = async () => {
     ? `${result.added} node(s)${cue}${wave}${agents}${experimental} · ${result.note}`
     : `${result.error || "aucune opération"}${experimental} · ${result.note}`;
   remember();
+  if (runtime) runtime.setProject(session.project);
   paint();
 };
 $("chat").addEventListener("keydown", event => {
@@ -190,6 +235,7 @@ $("addKey").onclick = () => {
   if (!node) { $("log").textContent = "Aucun node à animer"; return; }
   setKeyframe(session.project, node.id, "opacity", Number($("keyTime").value) || 0, Number($("keyValue").value), $("keyEase").value);
   remember();
+  if (runtime) runtime.setProject(session.project);
   paint();
 };
 
@@ -202,10 +248,29 @@ timer = setInterval(() => {
   if (session.time !== before) paint();
 }, 100);
 
+const previewCanvas = $("preview");
+if (previewCanvas) {
+  try {
+    runtime = new Runtime(previewCanvas);
+    previewCanvas.addEventListener("pointermove", event => {
+      const rect = previewCanvas.getBoundingClientRect();
+      if (rect.width && rect.height && runtime) {
+        const x = (event.clientX - rect.left) / rect.width;
+        const y = (event.clientY - rect.top) / rect.height;
+        runtime.setPointer(x, y);
+        if (!session.running) runtime.render();
+      }
+    });
+  } catch (err) {
+    console.warn("Initialisation du runtime Show :", err);
+  }
+}
+
 const saved = localStorage.getItem(SAVE_KEY);
 if (saved) {
   try { session = restoreShow(saved); loadScene(session); } catch { session = loadExampleScene(); }
 }
+if (runtime) runtime.setProject(session.project);
 $("liveTitleAddress").value = loadLiveTitleControlAddress();
 if ($("liveTitleAddress").value) setLiveTitleStatus("Adresse de régie prête · en attente d’un top.");
 paintLiveTitle();

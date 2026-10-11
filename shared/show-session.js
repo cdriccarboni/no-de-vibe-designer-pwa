@@ -185,8 +185,10 @@ export function askShow(session, text, cx = null, registry = null) {
   const consultation = consultAgents(text, registry);
   const before = session.project.nodes.length;
   const result = performAction("patch-from-text", { project: session.project, text });
+  const added = session.project.nodes.length - before;
+  const requestedCue = /(?:^|\b)(?:cue|top|m[eé]moire|rep[eè]re|conduite)\b/i.test(String(text || ""));
   let cue = null;
-  if (result.ok) {
+  if (result.ok && requestedCue && added > 0) {
     const node = session.project.nodes.at(-1);
     if (node) {
       const id = `cx-${node.id}`;
