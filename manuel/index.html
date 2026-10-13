@@ -182,6 +182,20 @@ figure{margin:18px 0}img{max-width:100%;border:1px solid var(--line);border-radi
 
 <p class="small" style="margin-top:50px">Manuel terrain aligné sur No-de Vibe Designer V3. L’objectif : une personne novice doit pouvoir lancer et gérer une petite régie sans apprendre d’abord toute l’architecture du logiciel.</p>
 <p class="small"><a class="copyright-link" href="https://github.com/cdriccarboni" target="_blank" rel="noopener noreferrer" aria-label="GitHub de Cédric Carboni"><span class="copyright-default">© 2026 Cédric Carboni</span><span class="copyright-hover">GitHub · Cédric Carboni ↗</span></a></p>
+<section id="navigation-patch-3312">
+<h2>Navigation dans le patch — correctif de la version locale 3.3.12</h2>
+<p>Correctif testé le 13 octobre 2026 dans Chrome sur macOS. Il concerne le Designer de la version locale de test ; sa présence dans les téléchargements publics ou dans l’application installée doit être vérifiée séparément.</p>
+<ul>
+<li><strong>Déplacer la vue :</strong> maintenir Alt et glisser avec le bouton gauche, ou glisser avec le bouton central. Les positions des nodes ne sont pas modifiées.</li>
+<li><strong>Zoomer à la molette :</strong> placer le pointeur sur la zone à examiner. Le point sous le pointeur reste fixe, même après déplacement de la vue.</li>
+<li><strong>Boutons + / − :</strong> le centre de la zone de patch reste fixe pendant le zoom.</li>
+<li><strong>Recentrer :</strong> cliquer sur le pourcentage de zoom revient explicitement à 100 % et à l’origine. Ce bouton est un reset, pas un simple changement d’échelle.</li>
+</ul>
+<p><strong>Exemple en répétition :</strong> se déplacer jusqu’à la chaîne audio, placer le pointeur sur sa connexion et zoomer pour la vérifier sans perdre la zone de travail. En représentation, préparer les déplacements de vue avant les tops ; cette correction ne remplace pas une validation de sécurité complète du mode Show.</p>
+<p><strong>Limites :</strong> zoom entre 40 % et 220 %. La molette dans le patch change l’échelle ; utiliser Alt-glisser pour déplacer la vue. Aucun geste tactile nouveau n’est ajouté dans cette correction.</p>
+<figure><img src="captures/designer-navigation-patch-3312.png" alt="Capture réelle du Designer local 3.3.12 après test du déplacement, du zoom ancré et du retour à 100 pour cent" loading="lazy" style="max-width:100%;height:auto"><figcaption>Capture réelle du navigateur Chrome, viewport 1440 × 1000, après le scénario automatisé de navigation.</figcaption></figure>
+<p>Vérification : <code>qa/patch-zoom-anchor-qa.cjs</code> — déplacement puis zoom à la molette, boutons de zoom, limite haute sans déplacement parasite et reset explicite. Le test échouait avant le correctif et passe après.</p>
+</section>
 </main>
 </body>
 </html>

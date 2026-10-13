@@ -4159,8 +4159,15 @@ document.addEventListener("keydown", e => {
 });
 
 // Zoom / pan Patch Canvas
-function setZoom(next) {
-  view.scale = Math.max(0.4, Math.min(2.2, next));
+function setZoom(next, anchor = null) {
+  const space = $("#patchSpace");
+  const point = anchor || { x: space.clientWidth / 2, y: space.clientHeight / 2 };
+  const scale = Math.max(0.4, Math.min(2.2, next));
+  // Preserve the world point under the pointer (or viewport center).
+  const ratio = scale / view.scale;
+  view.x = point.x - (point.x - view.x) * ratio;
+  view.y = point.y - (point.y - view.y) * ratio;
+  view.scale = scale;
   applyViewTransform();
   renderWires();
   const percent = `${Math.round(view.scale * 100)} %`;
@@ -4173,11 +4180,16 @@ function setZoom(next) {
 $("#zoomIn").onclick = () => setZoom(view.scale + 0.1);
 $("#zoomOut").onclick = () => setZoom(view.scale - 0.1);
 if ($("#wrapBtn")) $("#wrapBtn").onclick = () => wrapSelection();
-$("#zoomReset").onclick = () => { view.x = 0; view.y = 0; setZoom(1); };
+$("#zoomReset").onclick = () => { view.x = 0; view.y = 0; setZoom(1, { x: 0, y: 0 }); };
 $("#patchSpace").addEventListener("wheel", e => {
   e.preventDefault();
   const delta = e.deltaY < 0 ? 0.08 : -0.08;
-  setZoom(view.scale + delta);
+  const space = $("#patchSpace");
+  const rect = space.getBoundingClientRect();
+  setZoom(view.scale + delta, {
+    x: e.clientX - rect.left - space.clientLeft + space.scrollLeft,
+    y: e.clientY - rect.top - space.clientTop + space.scrollTop
+  });
 }, { passive: false });
 $("#patchSpace").addEventListener("pointerdown", e => {
   if (e.button === 1 || (e.button === 0 && e.altKey)) {
