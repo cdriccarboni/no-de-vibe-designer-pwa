@@ -35,6 +35,9 @@ export interface CreativePromptResult {
   suggestedUniforms?: Record<string, number>;
   sourceAgent: string;
   modeUsed: AiMode;
+  origin: 'ai' | 'procedural';
+  model?: string;
+  warning?: string;
 }
 
 export const BUILTIN_LOCAL_MODELS: LocalModelInfo[] = [
@@ -44,27 +47,6 @@ export const BUILTIN_LOCAL_MODELS: LocalModelInfo[] = [
     status: 'installed',
     description: 'Moteur procédural autonome de synthèse de shaders et routage scénographique.',
     specialty: 'GLSL, Shaders temps réel, Cues Millumin, Audio réactif',
-  },
-  {
-    name: 'llama3.2:1b-instruct',
-    size: '1.3 Go (Ollama)',
-    status: 'available',
-    description: 'Modèle léger ultra-rapide pour Mac Apple Silicon (16 Go RAM).',
-    specialty: 'Dialogue scénique, interprétation de didascalies',
-  },
-  {
-    name: 'phi3:mini',
-    size: '2.2 Go (Ollama)',
-    status: 'available',
-    description: 'Modèle compact haute fidélité pour génération logique et paramètres.',
-    specialty: 'Algorithmes, géométrie, transformation de signaux',
-  },
-  {
-    name: 'qwen2.5-coder:1.5b',
-    size: '1.6 Go (Ollama)',
-    status: 'available',
-    description: 'Spécialiste de code GLSL, p5.js et scripts de spectacle.',
-    specialty: 'Programmation graphique et shaders',
   },
 ];
 
@@ -110,11 +92,11 @@ export const BUILTIN_AGENTS: AiAgentInfo[] = [
 class LocalAiEngine {
   private currentMode: AiMode = 'auto';
   private activeAgentId: string = 'agent-shader-glsl';
-  private isOllamaConnected: boolean = false;
+  private isGatewayVerified: boolean = false;
   private listeners: Set<() => void> = new Set();
 
   constructor() {
-    this.probeLocalOllama();
+    // Une configuration n'est pas une preuve de génération réussie.
   }
 
   public getMode(): AiMode {
@@ -136,7 +118,7 @@ class LocalAiEngine {
   }
 
   public isLocalAvailable(): boolean {
-    return this.isOllamaConnected || this.currentMode === 'sans_ia';
+    return this.isGatewayVerified;
   }
 
   public subscribe(listener: () => void): () => void {
@@ -148,24 +130,44 @@ class LocalAiEngine {
     this.listeners.forEach((l) => l());
   }
 
-  public async probeLocalOllama(): Promise<boolean> {
-    try {
-      const resp = await fetch('/api/ai/status');
-      if (resp.ok) {
-        const data = await resp.json();
-        this.isOllamaConnected = !!data.connected;
-        this.notify();
-        return this.isOllamaConnected;
-      }
-    } catch {
-      this.isOllamaConnected = false;
-    }
-    return false;
-  }
-
   // Synthèse créative universelle : fonctionne avec ou sans IA !
   // RÈGLE FONDAMENTALE : Les demandes visuelles génèrent des shaders et nodes visuels 100% autonomes, sans imposer de matériel (micro/caméra facultatifs).
   public async interpretCreativePrompt(prompt: string): Promise<CreativePromptResult> {
+    if (!prompt.trim()) throw new Error('Décris un effet à créer.');
+    let gatewayWarning: string | undefined;
+    if (this.currentMode !== 'sans_ia') {
+      try {
+        const response = await fetch('/api/ai/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: prompt.trim() }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'La passerelle IA ne répond pas.');
+        if (!data.glslCode || !data.model) throw new Error('Le modèle n’a pas produit de shader utilisable.');
+        this.isGatewayVerified = true;
+        this.notify();
+        return {
+          title: data.title,
+          explanation: data.explanation || 'Shader produit par un modèle réellement appelé.',
+          glslCode: data.glslCode,
+          nodesToCreate: [
+            { name: 'Shader GLSL (IA)', category: 'shader', type: 'glsl-shader' },
+            { name: 'Vibe Out (Vidéo / Mapping)', category: 'output', type: 'vibe-out' },
+          ],
+          wiresToCreate: [{ sourceIndex: 0, targetIndex: 1, sourcePort: 'out-texture', targetPort: 'in-video' }],
+          sourceAgent: `Passerelle IA : ${data.model}`,
+          model: data.model,
+          origin: 'ai',
+          modeUsed: this.currentMode,
+        };
+      } catch (error: any) {
+        this.isGatewayVerified = false;
+        this.notify();
+        gatewayWarning = error?.message || 'Passerelle IA indisponible';
+        if (this.currentMode !== 'auto') throw new Error(`Échec de génération IA : ${gatewayWarning}. Sélectionne SANS IA pour utiliser les presets.`);
+      }
+    }
     const cleanPrompt = prompt.trim().toLowerCase();
 
     // 1. OMBRES DE PIRATES & MULTITUDE D'OMBRES FANTOMATIQUES (Demande spécifique de l'artiste)
@@ -290,7 +292,9 @@ void main() {
           u_ghostGlow: 1.1,
         },
         sourceAgent: 'Agent Scénographie & Shaders (Moteur Visuel Autonome)',
-        modeUsed: this.currentMode,
+        modeUsed: 'sans_ia',
+        origin: 'procedural',
+        warning: gatewayWarning,
       };
     }
 
@@ -338,7 +342,9 @@ void main() {
           u_glowIntensity: 1.4,
         },
         sourceAgent: 'Agent Shader & WebGL (Moteur Procédural Local)',
-        modeUsed: this.currentMode,
+        modeUsed: 'sans_ia',
+        origin: 'procedural',
+        warning: gatewayWarning,
       };
     }
 
@@ -364,7 +370,9 @@ void main() {
           u_glowIntensity: 2.0,
         },
         sourceAgent: 'Agent Bruitage Vivant (Moteur Local)',
-        modeUsed: this.currentMode,
+        modeUsed: 'sans_ia',
+        origin: 'procedural',
+        warning: gatewayWarning,
       };
     }
 
@@ -398,7 +406,9 @@ void main() {
         u_energy: 0.8,
       },
       sourceAgent: 'Agent No[co]de Studio (Local First)',
-      modeUsed: this.currentMode,
+      modeUsed: 'sans_ia',
+      origin: 'procedural',
+      warning: gatewayWarning,
     };
   }
 }

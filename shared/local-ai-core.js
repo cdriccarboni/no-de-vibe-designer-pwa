@@ -5,7 +5,7 @@ import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError, LOCAL
 export { LOCAL_AI_CHAT_TIMEOUT_MS, LOCAL_AI_PROBE_TIMEOUT_MS, assessLocalModels, classifyLocalAiFailure };
 
 export const LOCAL_AI_DEFAULTS = Object.freeze({
-  enabled: true,
+  enabled: false,
   baseUrl: "http://127.0.0.1:11434",
   model: "qwen2.5-coder:7b",
   secondaryModel: "gemma3:1b",
@@ -22,9 +22,11 @@ export const LOCAL_AI_DEFAULTS = Object.freeze({
 export function normalizeLocalAiConfig(raw = {}) {
   const cfg = raw && typeof raw === "object" ? raw : {};
   const legacyEndpoint = typeof cfg.localEndpoint === "string" ? cfg.localEndpoint : "";
+  const endpoint = String(cfg.localBaseUrl || legacyEndpoint || LOCAL_AI_DEFAULTS.baseUrl).replace(/\/+$/, "");
+  const explicitlyConfigured = endpoint !== LOCAL_AI_DEFAULTS.baseUrl && !!cfg.localModel;
   return {
-    enabled: cfg.localEnabled !== false,
-    baseUrl: String(cfg.localBaseUrl || legacyEndpoint || LOCAL_AI_DEFAULTS.baseUrl).replace(/\/+$/, ""),
+    enabled: cfg.localEnabled === true || (cfg.localEnabled !== false && explicitlyConfigured),
+    baseUrl: endpoint,
     model: String(cfg.localModel || LOCAL_AI_DEFAULTS.model).trim() || LOCAL_AI_DEFAULTS.model,
     secondaryModel: String(cfg.localSecondaryModel || LOCAL_AI_DEFAULTS.secondaryModel).trim() || LOCAL_AI_DEFAULTS.secondaryModel,
     parallel: cfg.localParallel !== false,
