@@ -137,9 +137,9 @@ details{position:relative;z-index:1;border-top:1px solid var(--line);margin-top:
 (async()=>{
   const releaseBase="https://github.com/cdriccarboni/no-de-vibe-designer-pwa/releases";
   const apiBase="https://api.github.com/repos/cdriccarboni/no-de-vibe-designer-pwa/releases/tags/";
-  let info={version:"3.3.11",files:"?",cacheRevision:"—"};
+  let info={version:"3.3.12",files:"?",cacheRevision:"—"};
   try{info=await fetch("../build-info.json",{cache:"no-store"}).then(r=>r.json())}catch{}
-  const version=info.version||"3.3.11", tag="v"+version;
+  const version=info.version||"3.3.12", tag="v"+version;
   const ua=(navigator.userAgent||"").toLowerCase();
   const platform=(navigator.userAgentData?.platform||navigator.platform||"").toLowerCase();
   let detected="web", label="Web / PWA";
@@ -159,12 +159,14 @@ details{position:relative;z-index:1;border-top:1px solid var(--line);margin-top:
   document.getElementById("macVersionTag").textContent="v"+version;
 
   let names=new Set();
+  let verifiedRelease = false;
   try{
     const rel=await fetch(apiBase+tag,{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(r.status));
     names=new Set((rel.assets||[]).map(a=>a.name));
+    verifiedRelease = true;
     document.getElementById("releaseState").textContent="Release "+tag+" vérifiée · "+names.size+" fichiers publiés · cache "+(info.cacheRevision||"—");
   }catch{
-    document.getElementById("releaseState").textContent="Build "+version+" · vérification GitHub indisponible pour le moment.";
+    document.getElementById("releaseState").textContent="Build "+version+" · Internet requis pour vérifier ou télécharger les paquets GitHub.";
   }
 
   const assets=[...document.querySelectorAll("[data-asset]")];
@@ -174,11 +176,12 @@ details{position:relative;z-index:1;border-top:1px solid var(--line);margin-top:
       link.href=releaseBase+"/download/"+tag+"/"+name;
       link.classList.remove("disabled");
       link.setAttribute("aria-disabled","false");
+      link.title = "";
     }else{
       link.removeAttribute("href");
       link.classList.add("disabled");
       link.setAttribute("aria-disabled","true");
-      link.title="Build en cours de préparation";
+      link.title = verifiedRelease ? "Paquet non disponible dans cette release" : "Internet requis pour vérifier la disponibilité de ce paquet";
     }
   }
   const surfaceCopy={
@@ -203,7 +206,7 @@ details{position:relative;z-index:1;border-top:1px solid var(--line);margin-top:
   const macReady=assets.filter(a=>a.id==="macUniversalDmg"||a.id==="macUniversalZip").some(a=>!a.classList.contains("disabled"));
   const macStatus=document.getElementById("macStatus");
   macStatus.classList.toggle("building",!macReady);
-  macStatus.querySelector("span").textContent=macReady?"Stable · Universal":"Universal en préparation";
+  macStatus.querySelector("span").textContent=macReady ? "Stable · Universal" : (verifiedRelease ? "Universal non disponible" : "Internet requis pour vérifier");
 })();
 </script>
 </body>

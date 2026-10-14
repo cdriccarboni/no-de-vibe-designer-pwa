@@ -44,11 +44,11 @@
 <div id="app">
   <header class="topbar">
     <div class="brand"><span class="brandmark" aria-hidden="true"><img src="../icons/nocode-rings.svg" alt=""></span><div><b>No<span class="co">[co]</span>de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v3.3.8</span>
+    <span class="badge">v3.3.12</span>
     <span id="showLockBadge" class="show-lock-badge" role="status" aria-live="polite" hidden>Spectacle verrouillé</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
-    <div class="themes workspace-modes"><button type="button" id="modeBureau" class="btn active">Bureau</button><button type="button" id="modePlateau" class="btn">Plateau</button><a class="active" href="./index.html">Designer</a><a href="../show/index.html">Show</a></div>
+    <div class="themes workspace-modes"><button type="button" id="modeBureau" class="btn active">Bureau</button><button type="button" id="modePlateau" class="btn">Plateau</button><a class="active" href="./index.html">Designer</a><a href="../show/index.html">Show</a><a href="../labs/ai-studio-scenographe/dist/index.html" target="_blank" title="Scénographe Vivant · Lab AI Studio">Scénographe ↗</a><a href="../radio/index.html" target="_blank" title="Radio Paillettes · Écoute Live">Radio ↗</a></div>
     <button id="controlsBtn" class="btn">Controls</button>
     <button id="preferencesBtn" class="btn">Préférences</button>
     <button id="saveProject" class="btn">Enregistrer</button>
@@ -141,6 +141,8 @@
             <button id="stop" class="smallbtn">■</button>
             <span id="timecode">00:00.0</span>
             <div class="spacer"></div>
+            <label class="smallbtn timeline-media-btn" title="Importer un fichier vidéo, audio ou image depuis votre ordinateur">＋ Média<input id="timelineMediaFile" type="file" accept="video/*,audio/*,image/*" hidden multiple></label>
+            <button type="button" id="timelineOpenElements" class="smallbtn" title="Ouvrir les Éléments &amp; Patchs du spectacle">Éléments &amp; Patchs</button>
             <div class="layer-add-wrap"><button id="addLayer" class="smallbtn layer-add-btn" type="button">+ Layer</button><div id="layerAddMenu" class="layer-add-menu hidden" role="menu" aria-label="Ajouter un layer"><button type="button" data-add-layer="video">Vidéo</button><button type="button" data-add-layer="effect">Effet</button><button type="button" data-add-layer="shader">Shader</button><button type="button" data-add-layer="shadow">Ombre</button><button type="button" data-add-layer="cue">Cue</button><button type="button" data-add-layer="bridge">Liaison</button></div></div>
             <button id="cueGo" class="smallbtn">GO</button>
             <button id="cuePrev" class="smallbtn">◀ Cue</button>

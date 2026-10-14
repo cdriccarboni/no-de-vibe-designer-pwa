@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Play, RotateCcw, Copy, Check, FileCode, AlertCircle } from 'lucide-react';
+import { Play, RotateCcw, Copy, Check, FileCode, AlertCircle, Eye, Volume2, Database, Layers, Filter } from 'lucide-react';
 import { CodePreset } from '../types/engine';
 
 interface CodeEditorProps {
@@ -19,6 +19,9 @@ interface CodeEditorProps {
   onTabChange?: (tab: 'primary' | 'secondary') => void;
   primaryTabLabel?: string;
   secondaryTabLabel?: string;
+  // Preset Category filtering
+  presetCategoryFilter?: 'All' | 'Visual' | 'Audio' | 'Data';
+  onPresetCategoryFilterChange?: (cat: 'All' | 'Visual' | 'Audio' | 'Data') => void;
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -37,6 +40,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onTabChange,
   primaryTabLabel = 'Code Source',
   secondaryTabLabel = 'Post-Traitement GLSL',
+  presetCategoryFilter = 'All',
+  onPresetCategoryFilterChange,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
@@ -124,24 +129,109 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             </div>
           )}
 
-          {/* Preset Selector */}
+          {/* Preset Category Filter Buttons & Dropdown */}
           {presets.length > 0 && (
-            <div className="flex items-center gap-1.5 ml-2">
-              <span className="text-zinc-500 hidden sm:inline">Exemple :</span>
-              <select
-                value={activePresetId}
-                onChange={(e) => {
-                  const found = presets.find((p) => p.id === e.target.value);
-                  if (found) onSelectPreset(found);
-                }}
-                className="bg-zinc-950 text-zinc-300 border border-zinc-800 rounded px-2 py-1 text-xs focus:outline-none focus:border-cyan-500/80 cursor-pointer"
-              >
-                {presets.map((preset) => (
-                  <option key={preset.id} value={preset.id} className="bg-zinc-950 text-zinc-200">
-                    {preset.title}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-center gap-2 ml-1 flex-wrap">
+              {/* Category Filter Pills */}
+              {onPresetCategoryFilterChange && (
+                <div className="flex items-center p-0.5 bg-zinc-950 rounded border border-zinc-800 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => onPresetCategoryFilterChange('All')}
+                    className={`px-2 py-0.5 rounded flex items-center gap-1 transition-colors ${
+                      presetCategoryFilter === 'All'
+                        ? 'bg-zinc-800 text-zinc-100 font-semibold'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                    title="Tous les presets"
+                  >
+                    <Layers className="w-3 h-3 text-cyan-400" />
+                    <span className="hidden sm:inline">Tous</span>
+                    <span className="text-[10px] px-1 rounded-full bg-zinc-900 text-zinc-400 font-mono">
+                      {presets.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onPresetCategoryFilterChange('Visual')}
+                    className={`px-2 py-0.5 rounded flex items-center gap-1 transition-colors ${
+                      presetCategoryFilter === 'Visual'
+                        ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 font-semibold'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                    title="Presets Visuels"
+                  >
+                    <Eye className="w-3 h-3 text-cyan-400" />
+                    <span className="hidden sm:inline">Visuel</span>
+                    <span className="text-[10px] px-1 rounded-full bg-zinc-900 text-cyan-400 font-mono">
+                      {presets.filter((p) => (p.type || 'Visual') === 'Visual').length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onPresetCategoryFilterChange('Audio')}
+                    className={`px-2 py-0.5 rounded flex items-center gap-1 transition-colors ${
+                      presetCategoryFilter === 'Audio'
+                        ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60 font-semibold'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                    title="Presets Audio"
+                  >
+                    <Volume2 className="w-3 h-3 text-amber-400" />
+                    <span className="hidden sm:inline">Audio</span>
+                    <span className="text-[10px] px-1 rounded-full bg-zinc-900 text-amber-400 font-mono">
+                      {presets.filter((p) => p.type === 'Audio').length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onPresetCategoryFilterChange('Data')}
+                    className={`px-2 py-0.5 rounded flex items-center gap-1 transition-colors ${
+                      presetCategoryFilter === 'Data'
+                        ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-semibold'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                    title="Presets Données"
+                  >
+                    <Database className="w-3 h-3 text-emerald-400" />
+                    <span className="hidden sm:inline">Data</span>
+                    <span className="text-[10px] px-1 rounded-full bg-zinc-900 text-emerald-400 font-mono">
+                      {presets.filter((p) => p.type === 'Data').length}
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              {/* Preset Selector with Category tag */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-zinc-500 hidden md:inline">Preset :</span>
+                <select
+                  value={activePresetId}
+                  onChange={(e) => {
+                    const found = presets.find((p) => p.id === e.target.value);
+                    if (found) onSelectPreset(found);
+                  }}
+                  className="bg-zinc-950 text-zinc-300 border border-zinc-800 rounded px-2 py-1 text-xs focus:outline-none focus:border-cyan-500/80 cursor-pointer max-w-[200px] truncate"
+                >
+                  {(presetCategoryFilter === 'All'
+                    ? presets
+                    : presets.filter((p) => (p.type || 'Visual') === presetCategoryFilter)
+                  ).map((preset) => (
+                    <option key={preset.id} value={preset.id} className="bg-zinc-950 text-zinc-200">
+                      {preset.type ? `[${preset.type.toUpperCase()}] ` : ''}{preset.title}
+                    </option>
+                  ))}
+                  {(presetCategoryFilter !== 'All' &&
+                    presets.filter((p) => (p.type || 'Visual') === presetCategoryFilter).length === 0) && (
+                    <option disabled value="">
+                      Aucun preset ({presetCategoryFilter})
+                    </option>
+                  )}
+                </select>
+              </div>
             </div>
           )}
         </div>

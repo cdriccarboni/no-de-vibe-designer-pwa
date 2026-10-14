@@ -71,6 +71,68 @@ const $ = s => document.querySelector(s);
 const qall = s => [...document.querySelectorAll(s)];
 const htmlSafe = value => String(value ?? "").replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
 
+const RADIO_PAIR_URL = "https://radio-relay-production.up.railway.app/pair";
+const RADIO_PUBLIC_URL = "https://art.acousmatic-theatre.fr/radio-paillettes/en-ligne";
+const RADIO_OWNER_KEY = "nvd.radio.owner";
+
+function readRadioOwner() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RADIO_OWNER_KEY) || "null");
+    if (!parsed?.publishToken || !parsed?.publishEndpoint) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function pairRadioOwner(pin) {
+  const code = String(pin || "").trim();
+  if (!code) throw new Error("Code régie requis");
+  const response = await fetch(RADIO_PAIR_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pin: code })
+  });
+  if (!response.ok) throw new Error(response.status === 401 ? "Code régie incorrect" : `Appairage radio HTTP ${response.status}`);
+  const profile = await response.json();
+  if (!profile?.publishToken || !profile?.publishEndpoint) throw new Error("Profil radio incomplet");
+  localStorage.setItem(RADIO_OWNER_KEY, JSON.stringify(profile));
+  return profile;
+}
+
+function clearRadioOwner() {
+  try { localStorage.removeItem(RADIO_OWNER_KEY); } catch { /* storage unavailable */ }
+}
+
+function audioCaptureOptionsFromNode(node, profile = "interaction") {
+  const p = node?.params || {};
+  const broadcast = profile === "broadcast";
+  return {
+    deviceId: p.deviceId || "",
+    echoCancellation: p.echoCancellation === true,
+    noiseSuppression: p.noiseSuppression === true,
+    autoGainControl: p.autoGainControl === true,
+    channelCount: Number(p.channelCount ?? (broadcast ? 2 : 1)),
+    sampleRate: Number(p.sampleRate ?? 48000),
+    latency: Number(p.latency ?? (broadcast ? 0.02 : 0.01)),
+    inputGain: Number(p.inputGain ?? 1),
+    highpassHz: Number(p.highpassHz ?? 20),
+    compressor: p.compressor === true,
+    compressorThreshold: Number(p.compressorThreshold ?? -18),
+    limiter: p.limiter === true,
+    limiterThreshold: Number(p.limiterThreshold ?? -3),
+    monitor: Number(p.monitor ?? 0)
+  };
+}
+
+function paintNodeOnAir(node) {
+  const badge = document.querySelector(`.node[data-id="${node?.id}"] .node-on-air`);
+  if (!badge) return;
+  const live = node?.params?.onAir === true;
+  badge.classList.toggle("live", live);
+  badge.textContent = live ? "ON AIR" : "STANDBY";
+}
+
 if ("serviceWorker" in navigator && window.nvdDesktop?.runtime !== "electron") {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("../sw.js", { scope: "../" }).catch(err => console.warn("PWA_SW", err?.message || err));
@@ -637,7 +699,9 @@ function buildLibrary() {
         const ok = isLibraryExecutable(t);
         const unstable = ["depthmask","opticalflow","ndi-out","remote-camera","phone-camera-back","phone-camera-front"].includes(t);
         const mark = (!ok || unstable) ? " · EXPÉRIMENTAL" : "";
-        return `<div class="lib-item ${ok ? "executable" : "unavailable"}" data-add="${t}" title="${nodeReadiness(t)}"><span>${n}${mark}</span><span>${ok ? "＋" : "○"}</span></div>`;
+        return `<div class="lib-item ${ok ? "executable" : "unavailable"}" draggable="true" data-add="${t}" data-node-label="${htmlSafe(n)}" title="${nodeReadiness(t)}">
+          <span>${n}${mark}</span><span>${ok ? "＋" : "○"}</span>
+        </div>`;
       }).join("")}</div>
     </div>`;
   }).join("");
@@ -650,7 +714,16 @@ function buildLibrary() {
       buildLibrary();
     };
   });
-  qall("[data-add]").forEach(x => x.onclick = () => addNode(x.dataset.add));
+  qall("#libraryList [data-add]").forEach(x => {
+    x.onclick = () => addNode(x.dataset.add);
+    x.addEventListener("dragstart", event => {
+      const type = x.dataset.add;
+      const label = x.dataset.nodeLabel || type;
+      event.dataTransfer.setData("application/x-nvd-node-type", type);
+      event.dataTransfer.setData("text/plain", label);
+      event.dataTransfer.effectAllowed = "copy";
+    });
+  });
   if (q) qall(".lib-item").forEach(x => {
     x.style.display = x.textContent.toLowerCase().includes(q) ? "flex" : "none";
   });
@@ -822,10 +895,13 @@ function renderWires() {
   svg.setAttribute("width", Math.max(world.scrollWidth || 2400, 2400));
   svg.setAttribute("height", Math.max(world.scrollHeight || 1600, 1600));
   group.innerHTML = "";
+  qall(".port-dot").forEach(dot => dot.classList.remove("connected"));
   const g = activeGraph();
   for (const edge of g.edges || []) {
     const from = findPort(edge.from.node, edge.from.port, "out");
     const to = findPort(edge.to.node, edge.to.port, "in");
+    if (from) from.classList.add("connected");
+    if (to) to.classList.add("connected");
     if (!from || !to) continue;
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.classList.add("wire");
@@ -1006,6 +1082,33 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
     x, y,
     params: { enabled: true, duration: 5, opacity: 1, intensity: 1, host: "bridge", address: "/nvd/value", value: 0, fallback: 0, freq: 220, gain: 0.15, mode: "tone" }
   };
+  if (type === "audio-in") Object.assign(n.params, {
+    enabled:false, deviceId:"", channelCount:1, sampleRate:48000, inputGain:1,
+    highpassHz:20, echoCancellation:false, noiseSuppression:false, autoGainControl:false,
+    compressor:false, compressorThreshold:-18, limiter:false, limiterThreshold:-3, monitor:0
+  });
+  if (type === "broadcast-in") Object.assign(n.params, {
+    enabled:false, deviceId:"", channelCount:2, sampleRate:48000, inputGain:1,
+    highpassHz:40, echoCancellation:false, noiseSuppression:false, autoGainControl:false,
+    compressor:true, compressorThreshold:-18, limiter:true, limiterThreshold:-3, monitor:0
+  });
+  if (type === "radio-live") Object.assign(n.params, {
+    enabled:false, onAir:false, deviceId:"", channelCount:2, sampleRate:48000, inputGain:1,
+    highpassHz:40, echoCancellation:false, noiseSuppression:false, autoGainControl:false,
+    compressor:true, compressorThreshold:-18, limiter:true, limiterThreshold:-3, monitor:0,
+    station:"Radio Paillettes", show:"", audioBitsPerSecond:128000, chunkMs:250
+  });
+  if (type === "stream-studio") Object.assign(n.params, {
+    enabled:true, onAir:false, station:"Radio Paillettes", show:"", audioBitsPerSecond:128000, chunkMs:250
+  });
+  if (type === "audio-mixer") Object.assign(n.params,{ gainA:1, gainB:1 });
+  if (type === "audio-gain" || type === "radio-bus") n.params.gain = 1;
+  if (type === "audio-limiter") n.params.threshold = -6;
+  if (type === "audio-monitor") n.params.monitor = 0;
+  if (type === "radio-out") Object.assign(n.params, {
+    enabled:true, onAir:false, transport:"relay", station:"Radio Paillettes", show:"",
+    audioBitsPerSecond:128000, chunkMs:250, iceServers:[]
+  });
   if (type === "libpd") n.params.patch = LIBPD_AUDIO_PATCH;
   if (type === "subpatch") ensureSubGraph(n);
   g.nodes.push(n);
@@ -1025,14 +1128,20 @@ function addNode(type, x = 50 + (nodeSeq % 4) * 180, y = 60 + Math.floor(nodeSeq
 
 function drawNode(n) {
   const el = document.createElement("div");
-  el.className = "node" + (isExecutable(n.type) ? " executable" : " unavailable");
+  const familyClass = String(n.type).startsWith("radio-")
+    ? " node-radio"
+    : (String(n.type).startsWith("audio-") || n.type === "broadcast-in")
+      ? " node-audio"
+      : (n.type === "stream-studio" ? " node-broadcast" : "");
+  el.className = "node" + (isExecutable(n.type) ? " executable" : " unavailable") + familyClass;
   el.dataset.id = n.id;
   el.title = nodeReadiness(n.type);
   el.style.left = n.x + "px";
   el.style.top = n.y + "px";
   const ports = portLabels(n.type, n) || spec(n.type)[1];
   el.className += selection.has(n.id) ? " sel" : "";
-  el.innerHTML = `<div class="nh">${n.title}${isExecutable(n.type) ? "" : " · ○"}</div><div class="nb">${ports.map((p, i) => {
+  const onAirNode = ["radio-live","radio-out","stream-studio"].includes(n.type);
+  el.innerHTML = `<div class="nh"><span class="nh-title">${n.title}${isExecutable(n.type) ? "" : " · ○"}</span>${onAirNode ? `<span class="node-on-air ${n.params?.onAir ? "live" : ""}">${n.params?.onAir ? "ON AIR" : "STANDBY"}</span>` : ""}</div><div class="nb">${ports.map((p, i) => {
     const dir = portDirection(n.type, i, ports.length, n);
     return `<div class="port port-${dir}">${dir === "in" ? `<span class="port-dot input" data-node="${n.id}" data-port-index="${i}" data-dir="in" title="Entrée ${p}"></span>` : ""}<span class="port-label">${p}</span>${dir === "out" ? `<span class="port-dot output" data-node="${n.id}" data-port-index="${i}" data-dir="out" title="Sortie ${p}"></span>` : ""}</div>`;
   }).join("")}</div>`;
@@ -1041,6 +1150,14 @@ function drawNode(n) {
   el.ondblclick = () => {
     if (n.type === "subpatch") enterSubpatch(n);
     else if (n.type === "shader") openShaderLab(n);
+    else {
+      selectNode(n.id);
+      showRightPane("inspector");
+      const panel = document.querySelector(".inspector");
+      panel?.classList.add("node-settings-focus");
+      panel?.scrollIntoView?.({ block:"nearest", behavior:"smooth" });
+      window.setTimeout(() => panel?.classList.remove("node-settings-focus"), 700);
+    }
   };
   attachPortInteractions(el);
   makeDraggable(el, n);
@@ -1115,6 +1232,10 @@ function exposeChannel(node, def) {
   commitHistory();
   renderControlSurface();
   log(`Channel exposé · ${node.title} · ${label}`);
+}
+
+function renderInspector(id) {
+  selectNode(id);
 }
 
 function selectNode(id, { additive = false } = {}) {
@@ -1256,6 +1377,57 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<p id="showImportStatus" class="hint">${summary.ok ? `${summary.count} cue(s) prêt(s) ${summary.name ? "· "+summary.name : ""}` : "Manifest invalide · "+summary.error}</p>`;
     extra += `<p class="hint">Formats : projet .cvd.json ou {"name":"Spectacle","cues":[{"label":"TOP","time":12.5,"actions":[]}]}.</p>`;
   }
+  if (["audio-in","broadcast-in","radio-live"].includes(n.type)) {
+    const broadcastProfile = n.type !== "audio-in";
+    extra += `<div class="audio-settings-card">
+      <div class="audio-settings-head"><b>${broadcastProfile ? "ENTRÉE BROADCAST" : "AUDIO IN"}</b><span>${n.params.enabled ? "OUVERTE" : "OFF"}</span></div>
+      <div class="field"><label>Entrée audio</label><select id="nAudioDevice"><option value="">Entrée système par défaut</option></select></div>
+      <div class="field"><label>Canaux</label><select id="nAudioChannels"><option value="1">Mono</option><option value="2">Stéréo</option></select></div>
+      <div class="field"><label>Fréquence</label><select id="nAudioSampleRate"><option value="44100">44,1 kHz</option><option value="48000">48 kHz</option><option value="96000">96 kHz</option></select></div>
+      <div class="field"><label>Gain entrée</label><input id="nAudioInputGain" type="range" min="0" max="3" step=".01" value="${n.params.inputGain ?? 1}"></div>
+      <div class="field"><label>Coupe-bas</label><input id="nAudioHighpass" type="range" min="10" max="240" step="1" value="${n.params.highpassHz ?? (broadcastProfile ? 40 : 20)}"><small>${n.params.highpassHz ?? (broadcastProfile ? 40 : 20)} Hz</small></div>
+      <div class="audio-toggle-grid">
+        <label><span>Écho</span><select id="nAudioEcho"><option value="false">OFF</option><option value="true">ON</option></select></label>
+        <label><span>Réduction bruit</span><select id="nAudioNoise"><option value="false">OFF</option><option value="true">ON</option></select></label>
+        <label><span>Gain auto</span><select id="nAudioAgc"><option value="false">OFF</option><option value="true">ON</option></select></label>
+        <label><span>Compresseur</span><select id="nAudioCompressor"><option value="false">OFF</option><option value="true">ON</option></select></label>
+        <label><span>Limiteur</span><select id="nAudioLimiter"><option value="false">OFF</option><option value="true">ON</option></select></label>
+      </div>
+      <div class="field"><label>Écoute locale</label><input id="nAudioCaptureMonitor" type="range" min="0" max="1" step=".01" value="${n.params.monitor ?? 0}"></div>
+      <div class="camera-actions"><button id="audioInputStart" type="button">OUVRIR L’ENTRÉE</button><button id="audioInputStop" class="stop" type="button">COUPER</button></div>
+      <p class="hint">Micro interne, interface USB/Thunderbolt ou console reconnue comme carte son. Aucune entrée ne s’ouvre sans action utilisateur.</p>
+    </div>`;
+  }
+  if (n.type === "audio-mixer") {
+    extra += `<div class="field"><label>Gain A</label><input id="nMixGainA" type="range" min="0" max="2" step=".01" value="${n.params.gainA ?? 1}"></div>`;
+    extra += `<div class="field"><label>Gain B</label><input id="nMixGainB" type="range" min="0" max="2" step=".01" value="${n.params.gainB ?? 1}"></div>`;
+  }
+  if (n.type === "audio-gain" || n.type === "radio-bus") {
+    extra += `<div class="field"><label>Gain</label><input id="nStreamGain" type="range" min="0" max="2" step=".01" value="${n.params.gain ?? 1}"></div>`;
+  }
+  if (n.type === "audio-limiter") {
+    extra += `<div class="field"><label>Seuil limiteur (dB)</label><input id="nLimiterThreshold" type="range" min="-36" max="0" step=".5" value="${n.params.threshold ?? -6}"></div>`;
+  }
+  if (n.type === "audio-monitor") {
+    extra += `<div class="field"><label>Écoute locale</label><input id="nAudioMonitor" type="range" min="0" max="1" step=".01" value="${n.params.monitor ?? 0}"></div><p class="hint">0 par défaut pour éviter le larsen.</p>`;
+  }
+  if (["radio-live","radio-out","stream-studio"].includes(n.type)) {
+    const owner = readRadioOwner();
+    const radioState = runtime.broadcastEngine?.state?.(n.id) || { detail:"STANDBY", live:false };
+    extra += `<div class="radio-live-card ${n.params.onAir ? "armed" : ""}">
+      <div class="radio-live-head"><b>RADIO PAILLETTES</b><span id="radioState">${htmlSafe(radioState.detail || "STANDBY")}</span></div>
+      ${owner
+        ? `<div class="radio-owner-ok"><span>✓ CE MAC EST ASSOCIÉ</span><button id="radioUnpairBtn" type="button">Dissocier</button></div>`
+        : `<div class="radio-pair"><input id="radioPairPin" inputmode="numeric" autocomplete="one-time-code" placeholder="Code régie à 6 chiffres"><button id="radioPairBtn" type="button">ASSOCIER CE MAC</button></div>`}
+      <div class="field"><label>Station</label><input id="nRadioStation" value="${htmlSafe(n.params.station || "Radio Paillettes")}"></div>
+      <div class="field"><label>Émission / session</label><input id="nRadioShow" value="${htmlSafe(n.params.show || "")}" placeholder="Lecture, installation…"></div>
+      <div class="field"><label>Débit audio</label><select id="nRadioBitrate"><option value="96000">96 kb/s</option><option value="128000">128 kb/s</option><option value="160000">160 kb/s</option><option value="192000">192 kb/s</option></select></div>
+      ${n.type === "radio-out" ? `<div class="field"><label>Transport avancé</label><select id="nRadioTransport"><option value="relay">Relais Radio Paillettes</option><option value="whip">WHIP personnalisé</option></select></div><div class="field"><label>Endpoint personnalisé</label><input id="nRadioEndpoint" value="${htmlSafe(n.params.endpoint || "")}" placeholder="laisser vide pour Radio Paillettes"></div>` : ""}
+      <div class="radio-air-actions"><button id="radioOnAirBtn" class="radio-on-air-btn" type="button">ON AIR</button><button id="radioStandbyBtn" class="radio-standby-btn" type="button">STANDBY</button></div>
+      <div class="radio-public-actions"><button id="radioCopyLinkBtn" type="button">Copier le lien</button><button id="radioOpenPublicBtn" type="button">Ouvrir la radio ↗</button></div>
+      <p class="hint">Un clic ON AIR suffit après l’association de ce Mac. Les identifiants restent locaux à cet appareil et ne sont jamais enregistrés dans le projet.</p>
+    </div>`;
+  }
   if (n.type === "midi") {
     extra += `<div class="field"><label>Fallback CC (0–1)</label><input id="nFb" type="range" min="0" max="1" step=".01" value="${n.params.fallback ?? 0}"></div>`;
     extra += `<p class="hint">Matériel MIDI : à vérifier sur périphérique réel. Test logiciel = bus interne.</p>`;
@@ -1378,9 +1550,13 @@ function selectNode(id, { additive = false } = {}) {
     <div class="field"><label>Opacité</label><input id="nOpa" type="range" min="0" max="1" step=".01" value="${n.params.opacity}"></div>
     <div class="field"><label>Actif</label><select id="nEnabled"><option value="true">Oui</option><option value="false">Non</option></select></div>
     ${extra}
-    <button id="toolBtn" class="smallbtn">${n.type === "subpatch" ? "Ouvrir sous-patch ↗" : "Ouvrir outil ↗"}</button>
-    <button id="dupNodeBtn" class="smallbtn">Dupliquer</button>
-    <button id="delNodeBtn" class="smallbtn danger">Supprimer</button>`;
+    <div class="inspector-actions" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;">
+      <button id="addNodeToTimelineBtn" class="smallbtn primary" type="button" title="Ajouter ce node à la Timeline à la tête de lecture">＋ Timeline</button>
+      <button id="saveAsElementBtn" class="smallbtn" type="button" title="Enregistrer ce node dans les Éléments &amp; Patchs">Enregistrer Élément</button>
+      <button id="toolBtn" class="smallbtn">${n.type === "subpatch" ? "Ouvrir sous-patch ↗" : "Ouvrir outil ↗"}</button>
+      <button id="dupNodeBtn" class="smallbtn">Dupliquer</button>
+      <button id="delNodeBtn" class="smallbtn danger" style="grid-column:span 2;">Supprimer</button>
+    </div>`;
   $("#nEnabled").value = String(n.params.enabled);
   $("#nTitle").onchange = e => {
     n.title = e.target.value.trim() || spec(n.type)[0];
@@ -1392,8 +1568,13 @@ function selectNode(id, { additive = false } = {}) {
   $("#nOpa").oninput = e => { n.params.opacity = +e.target.value; runtime.render(); autosave(); };
   $("#nEnabled").onchange = e => {
     n.params.enabled = e.target.value === "true";
-    if (!n.params.enabled && (n.type === "audio" || n.type === "organicaudio" || n.type === "soundmemo")) {
+    if (!n.params.enabled && (n.type === "audio" || n.type === "organicaudio" || n.type === "soundmemo" || ["audio-in","broadcast-in","radio-live","audio-mixer","audio-gain","audio-limiter","audio-monitor","radio-bus"].includes(n.type))) {
       sharedAudio.release(n.id);
+    }
+    if (!n.params.enabled && ["radio-live","radio-out","stream-studio"].includes(n.type)) {
+      n.params.onAir = false;
+      runtime.broadcastEngine?.stop?.(n.id).catch?.(() => {});
+      paintNodeOnAir(n);
     }
     if (["camera", "phone-camera-front", "phone-camera-back"].includes(n.type)) runtime.setProject(project);
     else runtime.render();
@@ -1496,6 +1677,167 @@ function selectNode(id, { additive = false } = {}) {
     }
   };
   if ($("#nFb")) $("#nFb").oninput = e => { n.params.fallback = +e.target.value; runtime.render(); autosave(); };
+  const captureProfile = n.type === "audio-in" ? "interaction" : "broadcast";
+  const restartCaptureIfOpen = () => {
+    if (!["audio-in","broadcast-in","radio-live"].includes(n.type)) return;
+    if (n.params.enabled) {
+      sharedAudio.release(n.id);
+      runtime.render();
+    }
+    autosave();
+  };
+  const populateAudioDevices = async () => {
+    const select = $("#nAudioDevice");
+    if (!select || !navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devicesList = await navigator.mediaDevices.enumerateDevices();
+      const current = n.params.deviceId || "";
+      select.innerHTML = '<option value="">Entrée système par défaut</option>';
+      devicesList.filter(device => device.kind === "audioinput").forEach((device, index) => {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.textContent = device.label || `Entrée audio ${index + 1}`;
+        select.appendChild(option);
+      });
+      select.value = current;
+    } catch { /* permissions not granted yet */ }
+  };
+  if ($("#nAudioDevice")) {
+    $("#nAudioDevice").value = n.params.deviceId || "";
+    $("#nAudioDevice").onchange = e => { n.params.deviceId = e.target.value; restartCaptureIfOpen(); commitHistory(); };
+    void populateAudioDevices();
+  }
+  for (const [id,key,numeric] of [
+    ["nAudioChannels","channelCount",true],
+    ["nAudioSampleRate","sampleRate",true],
+    ["nAudioInputGain","inputGain",true],
+    ["nAudioHighpass","highpassHz",true],
+    ["nAudioEcho","echoCancellation",false],
+    ["nAudioNoise","noiseSuppression",false],
+    ["nAudioAgc","autoGainControl",false],
+    ["nAudioCompressor","compressor",false],
+    ["nAudioLimiter","limiter",false],
+    ["nAudioCaptureMonitor","monitor",true]
+  ]) {
+    const field = $("#"+id);
+    if (!field) continue;
+    if (numeric) field.value = String(n.params[key] ?? (key === "channelCount" ? (captureProfile === "broadcast" ? 2 : 1) : key === "sampleRate" ? 48000 : key === "inputGain" ? 1 : key === "highpassHz" ? (captureProfile === "broadcast" ? 40 : 20) : 0));
+    else field.value = String(n.params[key] === true);
+    field.onchange = e => {
+      n.params[key] = numeric ? +e.target.value : e.target.value === "true";
+      restartCaptureIfOpen();
+      commitHistory();
+    };
+  }
+  if ($("#audioInputStart")) $("#audioInputStart").onclick = async () => {
+    try {
+      n.params.enabled = true;
+      $("#nEnabled").value = "true";
+      sharedAudio.release(n.id);
+      await sharedAudio.ensureInput(n.id, audioCaptureOptionsFromNode(n, captureProfile));
+      await populateAudioDevices();
+      runtime.render(); autosave(); commitHistory();
+      log(`${n.title} · entrée ouverte · ${sharedAudio.inputInfo(n.id)?.label || "entrée système"}`);
+      selectNode(n.id);
+    } catch (error) {
+      n.params.enabled = false;
+      $("#nEnabled").value = "false";
+      log(`${n.title} · entrée refusée · ${error?.message || error}`);
+    }
+  };
+  if ($("#audioInputStop")) $("#audioInputStop").onclick = () => {
+    n.params.enabled = false;
+    n.params.onAir = false;
+    $("#nEnabled").value = "false";
+    sharedAudio.release(n.id);
+    runtime.broadcastEngine?.stop?.(n.id).catch?.(() => {});
+    paintNodeOnAir(n);
+    runtime.render(); autosave(); commitHistory();
+    log(`${n.title} · entrée coupée`);
+  };
+  if ($("#nMixGainA")) $("#nMixGainA").oninput = e => { n.params.gainA = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nMixGainB")) $("#nMixGainB").oninput = e => { n.params.gainB = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nStreamGain")) $("#nStreamGain").oninput = e => { n.params.gain = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nLimiterThreshold")) $("#nLimiterThreshold").oninput = e => { n.params.threshold = +e.target.value; runtime.render(); autosave(); };
+  if ($("#nAudioMonitor")) $("#nAudioMonitor").oninput = e => { n.params.monitor = +e.target.value; runtime.render(); autosave(); };
+  if ($("#radioPairBtn")) $("#radioPairBtn").onclick = async () => {
+    const button = $("#radioPairBtn");
+    button.disabled = true;
+    try {
+      await pairRadioOwner($("#radioPairPin")?.value || "");
+      log("Radio Paillettes · ce Mac est associé");
+      selectNode(n.id);
+    } catch (error) {
+      log(`Radio Paillettes · appairage refusé · ${error?.message || error}`);
+    } finally {
+      if (button?.isConnected) button.disabled = false;
+    }
+  };
+  if ($("#radioUnpairBtn")) $("#radioUnpairBtn").onclick = () => {
+    n.params.onAir = false;
+    runtime.broadcastEngine?.stop?.(n.id).catch?.(() => {});
+    clearRadioOwner();
+    paintNodeOnAir(n);
+    autosave();
+    log("Radio Paillettes · Mac dissocié");
+    selectNode(n.id);
+  };
+  if ($("#nRadioTransport")) {
+    $("#nRadioTransport").value = n.params.transport || "relay";
+    $("#nRadioTransport").onchange = e => { n.params.transport = e.target.value; autosave(); commitHistory(); };
+  }
+  if ($("#nRadioEndpoint")) $("#nRadioEndpoint").onchange = e => { n.params.endpoint = e.target.value.trim(); autosave(); commitHistory(); };
+  if ($("#nRadioStation")) $("#nRadioStation").onchange = e => { n.params.station = e.target.value.trim() || "Radio Paillettes"; autosave(); commitHistory(); };
+  if ($("#nRadioShow")) $("#nRadioShow").onchange = e => { n.params.show = e.target.value.trim(); autosave(); commitHistory(); };
+  if ($("#nRadioBitrate")) {
+    $("#nRadioBitrate").value = String(n.params.audioBitsPerSecond || 128000);
+    $("#nRadioBitrate").onchange = e => { n.params.audioBitsPerSecond = +e.target.value || 128000; autosave(); commitHistory(); };
+  }
+  if ($("#radioOnAirBtn")) $("#radioOnAirBtn").onclick = async () => {
+    const owner = readRadioOwner();
+    if (!owner) {
+      log("Radio Paillettes · associe d’abord ce Mac avec le code régie");
+      $("#radioPairPin")?.focus();
+      return;
+    }
+    try {
+      if (n.type === "radio-live") {
+        n.params.enabled = true;
+        if (!sharedAudio.audioValue(n.id)) {
+          await sharedAudio.ensureInput(n.id, audioCaptureOptionsFromNode(n, "broadcast"));
+        }
+      }
+      n.params.onAir = true;
+      paintNodeOnAir(n);
+      runtime.render(); autosave(); commitHistory();
+      log(`${n.title} · ON AIR demandé`);
+      window.setTimeout(() => {
+        const state = $("#radioState");
+        if (state) state.textContent = runtime.broadcastEngine?.state?.(n.id)?.detail || "CONNEXION…";
+      }, 450);
+    } catch (error) {
+      n.params.onAir = false;
+      paintNodeOnAir(n);
+      log(`${n.title} · ON AIR impossible · ${error?.message || error}`);
+    }
+  };
+  if ($("#radioStandbyBtn")) $("#radioStandbyBtn").onclick = () => {
+    n.params.onAir = false;
+    paintNodeOnAir(n);
+    runtime.broadcastEngine?.stop?.(n.id).finally?.(() => runtime.render());
+    const state = $("#radioState"); if (state) state.textContent = "STANDBY";
+    autosave(); commitHistory(); log(`${n.title} · STANDBY`);
+  };
+  if ($("#radioCopyLinkBtn")) $("#radioCopyLinkBtn").onclick = async () => {
+    const url = readRadioOwner()?.publicUrl || RADIO_PUBLIC_URL;
+    try { await navigator.clipboard.writeText(url); log("Radio Paillettes · lien public copié"); }
+    catch { log(`Radio Paillettes · lien public · ${url}`); }
+  };
+  if ($("#radioOpenPublicBtn")) $("#radioOpenPublicBtn").onclick = () => {
+    const url = readRadioOwner()?.publicUrl || RADIO_PUBLIC_URL;
+    if (typeof window.nvdDesktop?.openExternal === "function") window.nvdDesktop.openExternal(url).catch(() => {});
+    else window.open(url, "_blank", "noopener,noreferrer");
+  };
   if ($("#nFreq")) $("#nFreq").onchange = e => { n.params.freq = +e.target.value; runtime.render(); autosave(); commitHistory(); };
   if ($("#nGain")) $("#nGain").oninput = e => { n.params.gain = +e.target.value; runtime.render(); autosave(); };
   if ($("#nSmooth")) $("#nSmooth").oninput = e => { n.params.amount = +e.target.value; runtime.render(); autosave(); };
@@ -1715,6 +2057,12 @@ function selectNode(id, { additive = false } = {}) {
     else if (!isExecutable(n.type)) log(`Outil · ${n.title} indisponible (pas de moteur)`);
     else log(`Outil · ${n.title} — paramètres dans l'inspecteur`);
   };
+  $("#addNodeToTimelineBtn").onclick = () => addNodeToTimeline(n);
+  $("#saveAsElementBtn").onclick = () => {
+    saveSelectedElement();
+    renderElementsPane();
+    showRightPane("elements");
+  };
   $("#dupNodeBtn").onclick = () => duplicateNode(n.id);
   $("#delNodeBtn").onclick = () => deleteNode(n.id);
 }
@@ -1858,24 +2206,338 @@ function addElementTop(elementId) {
   return cue;
 }
 
+let currentElementsFilter = "all";
+let elementsSearchQuery = "";
+
 function renderElementsPane() {
   const host = $("#elementsPane");
   if (!host) return;
   const elements = listElements(project);
-  host.innerHTML = `<div class="elements-actions"><button type="button" id="saveSelectedElement" class="smallbtn">Enregistrer la sélection</button><label><input type="checkbox" id="elementPreviewLoop"> Boucler l’aperçu</label></div>${elements.length ? elements.map(element => `<article class="element-card" draggable="true" tabindex="0" data-element-id="${htmlSafe(element.id)}"><b>${htmlSafe(element.name)}</b><span>${htmlSafe(element.type)}</span><div><button type="button" data-place-element="${htmlSafe(element.id)}">Ajouter</button><button type="button" data-top-element="${htmlSafe(element.id)}">TOP</button></div></article>`).join("") : `<p class="hint">Enregistre un node ou un sous-patch : il restera disponible ici pour toute la conduite.</p>`}`;
-  host.querySelector(".elements-actions")?.insertAdjacentHTML("beforeend", `<button type="button" id="installScenicPack" class="smallbtn" title="Ajoute les ${scenicPackElements().length} éléments du Scénographe (idempotent, n'écrase aucun élément utilisateur)">Pack Scénographe</button>`);
+  const q = elementsSearchQuery.trim().toLowerCase();
+
+  const filtered = elements.filter(item => {
+    const snap = item.snapshot || {};
+    const cat = (snap.category || "").toLowerCase();
+    const type = (item.type || "").toLowerCase();
+    const isLocal = snap.source === "local-file" || type.startsWith("media:");
+    const isUserPatch = Boolean(snap.node);
+
+    if (currentElementsFilter === "shadows") {
+      if (!cat.includes("ombre") && !cat.includes("personnage") && !type.includes("shadow")) return false;
+    } else if (currentElementsFilter === "creatures") {
+      if (!cat.includes("créature") && !cat.includes("creature") && !cat.includes("lumière") && !cat.includes("lumiere") && !type.includes("creature")) return false;
+    } else if (currentElementsFilter === "foley") {
+      if (!cat.includes("bruitage") && !cat.includes("objet") && !cat.includes("son") && !type.includes("foley") && !type.includes("audio")) return false;
+    } else if (currentElementsFilter === "fx") {
+      if (!cat.includes("effet") && !cat.includes("shader") && !cat.includes("matière") && !cat.includes("matiere") && !cat.includes("bloc") && !cat.includes("environnement")) return false;
+    } else if (currentElementsFilter === "media") {
+      if (!isLocal) return false;
+    } else if (currentElementsFilter === "patches") {
+      if (!isUserPatch) return false;
+    }
+
+    if (q) {
+      const text = `${item.name} ${snap.characterTitle || ""} ${snap.description || ""} ${snap.category || ""} ${item.type || ""}`.toLowerCase();
+      if (!text.includes(q)) return false;
+    }
+    return true;
+  });
+
+  host.innerHTML = `
+    <div class="elements-actions">
+      <button type="button" id="saveSelectedElement" class="smallbtn" title="Enregistrer le node sélectionné sur le canevas">Enregistrer sélection</button>
+      <label class="smallbtn timeline-media-btn" title="Importer un fichier vidéo, audio ou image">＋ Fichier<input id="elementsMediaFileInput" type="file" accept="video/*,audio/*,image/*" hidden multiple></label>
+      <button type="button" id="installScenicPack" class="smallbtn" title="Ajoute les ${scenicPackElements().length} éléments du Scénographe (idempotent, n'écrase aucun élément utilisateur)">Pack Scénographe</button>
+    </div>
+    <div class="elements-filter-row">
+      <input type="search" id="elementsSearchInput" class="elements-search-input" placeholder="Rechercher un média ou un patch…" value="${htmlSafe(elementsSearchQuery)}">
+    </div>
+    <div class="elements-chips">
+      <button type="button" class="chip ${currentElementsFilter === "all" ? "active" : ""}" data-elem-filter="all">Tous (${elements.length})</button>
+      <button type="button" class="chip ${currentElementsFilter === "shadows" ? "active" : ""}" data-elem-filter="shadows">Ombres</button>
+      <button type="button" class="chip ${currentElementsFilter === "creatures" ? "active" : ""}" data-elem-filter="creatures">Créatures</button>
+      <button type="button" class="chip ${currentElementsFilter === "foley" ? "active" : ""}" data-elem-filter="foley">Bruitages</button>
+      <button type="button" class="chip ${currentElementsFilter === "fx" ? "active" : ""}" data-elem-filter="fx">Effets</button>
+      <button type="button" class="chip ${currentElementsFilter === "media" ? "active" : ""}" data-elem-filter="media">Médias</button>
+      <button type="button" class="chip ${currentElementsFilter === "patches" ? "active" : ""}" data-elem-filter="patches">Mes Patchs</button>
+    </div>
+    <div class="elements-list">
+      ${filtered.length ? filtered.map(item => {
+        const snap = item.snapshot || {};
+        const isLocal = snap.source === "local-file" || String(item.type).startsWith("media:");
+        const isUserPatch = Boolean(snap.node);
+        const categoryLabel = isLocal ? "Média" : isUserPatch ? "Patch" : (snap.category || "Scénographe").split("&")[0].trim();
+        const duration = snap.defaultDuration || (snap.duration || (isLocal ? 10 : 12));
+        const desc = snap.characterTitle || snap.description || (isLocal ? `Fichier : ${snap.fileName || item.name}` : "Élément scénique prêt à l'emploi");
+        return `<article class="element-card" draggable="true" tabindex="0" data-element-id="${htmlSafe(item.id)}" data-element-name="${htmlSafe(item.name)}">
+          <div class="element-head">
+            <b>${htmlSafe(item.name)}</b>
+            <span class="element-type-badge">${htmlSafe(categoryLabel)} · ${duration}s</span>
+          </div>
+          <p class="element-sub">${htmlSafe(desc)}</p>
+          <div class="element-actions">
+            <button type="button" class="smallbtn primary" data-place-element="${htmlSafe(item.id)}" title="Placer sur la Timeline à la tête de lecture">＋ Timeline</button>
+            <button type="button" class="smallbtn" data-canvas-element="${htmlSafe(item.id)}" title="Insérer sur le Patch Canvas">＋ Canvas</button>
+            <button type="button" class="smallbtn" data-top-element="${htmlSafe(item.id)}" title="Créer un cue TOP spectacle">TOP</button>
+          </div>
+        </article>`;
+      }).join("") : `<p class="hint" style="padding:16px 8px;text-align:center;line-height:1.4;">${elements.length ? "Aucun élément ne correspond à ce filtre." : "Aucun élément pour l'instant.<br><br>Clique sur <b>Pack Scénographe</b> pour charger les 29 médias et patchs du spectacle, ou importe un <b>＋ Fichier</b>."}</p>`}
+    </div>
+  `;
+
+  $("#saveSelectedElement")?.addEventListener("click", () => {
+    saveSelectedElement();
+    renderElementsPane();
+  });
   $("#installScenicPack")?.addEventListener("click", () => {
     const stats = installScenicPack(project);
-    commitHistory(); autosave(); renderElementsPane();
+    commitHistory();
+    autosave();
+    renderElementsPane();
     log(`Pack Scénographe · ${stats.added} ajouté(s), ${stats.updated} mis à jour, ${stats.unchanged} déjà présent(s)`);
   });
-  $("#saveSelectedElement")?.addEventListener("click", saveSelectedElement);
-  host.querySelectorAll("[data-place-element]").forEach(button => button.addEventListener("click", () => placeElementInTimeline(button.dataset.placeElement)));
-  host.querySelectorAll("[data-top-element]").forEach(button => button.addEventListener("click", () => addElementTop(button.dataset.topElement)));
-  host.querySelectorAll(".element-card").forEach(card => {
-    card.addEventListener("dragstart", event => { event.dataTransfer.setData("application/x-nvd-element", card.dataset.elementId); event.dataTransfer.effectAllowed = "copy"; });
-    card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); placeElementInTimeline(card.dataset.elementId); } });
+  $("#elementsMediaFileInput")?.addEventListener("change", event => {
+    if (event.target.files?.length) {
+      handleDroppedMediaFiles(event.target.files, selectedElementTrack());
+      event.target.value = "";
+      renderElementsPane();
+    }
   });
+
+  const searchInput = $("#elementsSearchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", e => {
+      elementsSearchQuery = e.target.value;
+      renderElementsPane();
+      const nextInput = $("#elementsSearchInput");
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+      }
+    });
+  }
+
+  host.querySelectorAll("[data-elem-filter]").forEach(chip => {
+    chip.addEventListener("click", () => {
+      currentElementsFilter = chip.dataset.elemFilter;
+      renderElementsPane();
+    });
+  });
+
+  host.querySelectorAll("[data-place-element]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      placeScenicInTimeline(btn.dataset.placeElement);
+    });
+  });
+  host.querySelectorAll("[data-canvas-element]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      placeScenicInCanvas(btn.dataset.canvasElement);
+    });
+  });
+  host.querySelectorAll("[data-top-element]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      addElementTop(btn.dataset.topElement);
+    });
+  });
+
+  host.querySelectorAll(".element-card").forEach(card => {
+    card.addEventListener("dragstart", event => {
+      event.dataTransfer.setData("application/x-nvd-element", card.dataset.elementId);
+      event.dataTransfer.setData("application/x-nvd-scenic-id", card.dataset.elementId);
+      event.dataTransfer.setData("text/plain", card.dataset.elementName || card.dataset.elementId);
+      event.dataTransfer.effectAllowed = "copy";
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        placeScenicInTimeline(card.dataset.elementId);
+      }
+    });
+  });
+}
+
+let currentScenicFilter = "all";
+
+function addNodeToTimeline(node, track = selectedElementTrack(), clientX = null, row = null) {
+  if (!node) return null;
+  const target = row?.querySelector(".timeline-track") || document.querySelector(`.timeline-track[data-track="${track}"]`);
+  let start = 0;
+  if (Number.isFinite(clientX) && target) {
+    const rect = target.getBoundingClientRect();
+    start = Math.max(0, Math.min(59, (clientX - rect.left) / Math.max(1, rect.width) * 60));
+  } else {
+    start = Math.max(0, Math.min(59, runtime.time || 0));
+  }
+  const duration = Math.max(0.5, Number(node.params?.duration) || 5);
+  const layer = (project.layers || [])[track];
+  const clip = addClip(track, start, duration, node.title || node.type, layer?.type || "effect", {
+    nodeId: node.id,
+    nodeType: node.type
+  });
+  commitHistory();
+  autosave();
+  log(`Timeline · « ${node.title || node.type} » programmé sur la piste ${track + 1} (${start.toFixed(1)}s)`);
+  return clip;
+}
+
+function placeScenicInTimeline(elementId, track = selectedElementTrack(), clientX = null, row = null) {
+  let el = listElements(project).find(e => e.id === elementId);
+  if (!el) {
+    const raw = scenicPackElements().find(e => e.id === elementId);
+    if (raw) el = saveElement(project, raw);
+  }
+  if (!el) {
+    log(`Élément · ${elementId} introuvable`);
+    return null;
+  }
+  const clip = placeElementInTimeline(el.id, track, clientX, row);
+  renderScenicLibrary();
+  return clip;
+}
+
+function placeScenicInCanvas(elementId) {
+  let el = listElements(project).find(e => e.id === elementId);
+  if (!el) {
+    const raw = scenicPackElements().find(e => e.id === elementId);
+    if (raw) el = saveElement(project, raw);
+  }
+  if (!el) return null;
+  
+  const g = activeGraph();
+  if (refuseCanvasEdit("ajout de patch")) return null;
+  
+  if (el.snapshot?.node) {
+    const cloned = JSON.parse(JSON.stringify(el.snapshot.node));
+    const seq = (g.nodes.reduce((m, n) => Math.max(m, parseInt(String(n.id).replace(/\D/g, "")) || 0), 0) + 1);
+    cloned.id = `n${seq}`;
+    cloned.x = Math.max(40, (-view.x + 280) / view.scale);
+    cloned.y = Math.max(40, (-view.y + 160) / view.scale);
+    g.nodes.push(cloned);
+    if (isRootGraph()) project.nodes = g.nodes;
+    drawNode(cloned);
+    selectNode(cloned.id);
+    redraw();
+    commitHistory();
+    autosave();
+    log(`Canvas · Patch « ${cloned.title || el.name} » ajouté au canevas`);
+    return cloned;
+  }
+
+  const cat = (el.snapshot?.category || "").toLowerCase();
+  let nodeType = "generator";
+  if (cat.includes("bruitage") || cat.includes("audio") || cat.includes("son")) nodeType = "audio";
+  else if (cat.includes("ombre") || cat.includes("personnage")) nodeType = "livingshadow";
+  else if (cat.includes("créature") || cat.includes("creature") || cat.includes("lumière")) nodeType = "whale";
+  else if (cat.includes("shader") || cat.includes("effet")) nodeType = "shader";
+  else if (el.snapshot?.source === "local-file") {
+    nodeType = el.snapshot.mimeType?.startsWith("video/") ? "videofile" : el.snapshot.mimeType?.startsWith("audio/") ? "audio" : "image";
+  }
+
+  const n = addNode(nodeType);
+  if (n) {
+    n.title = el.name;
+    if (el.snapshot) {
+      Object.assign(n.params, el.snapshot);
+      if (el.snapshot.mediaUrl) n.params.src = el.snapshot.mediaUrl;
+    }
+    const head = document.querySelector(`.node[data-id="${n.id}"] .nh`);
+    if (head) head.textContent = n.title;
+    redraw();
+    commitHistory();
+    autosave();
+    log(`Canvas · Élément « ${el.name} » ajouté au canevas`);
+  }
+  return n;
+}
+
+function handleDroppedMediaFiles(files, targetTrack = selectedElementTrack(), clientX = null, row = null) {
+  if (!files || !files.length) return;
+  project.layers ||= [];
+  
+  for (const file of Array.from(files)) {
+    const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v|mkv)$/i.test(file.name);
+    const isAudio = file.type.startsWith("audio/") || /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(file.name);
+    const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name);
+    const mediaType = isVideo ? "video" : isAudio ? "audio" : isImage ? "image" : "media";
+    
+    const objectUrl = URL.createObjectURL(file);
+    
+    let track = targetTrack;
+    if (track == null || !project.layers[track]) {
+      const preferredKind = isVideo ? "video" : "effect";
+      let idx = project.layers.findIndex(l => l.type === preferredKind);
+      if (idx < 0) {
+        addTimelineLayer(preferredKind);
+        idx = project.layers.length - 1;
+      }
+      track = idx;
+    }
+    
+    let start = 0;
+    const target = row?.querySelector(".timeline-track") || document.querySelector(`.timeline-track[data-track="${track}"]`);
+    if (Number.isFinite(clientX) && target) {
+      const rect = target.getBoundingClientRect();
+      start = Math.max(0, Math.min(59, (clientX - rect.left) / Math.max(1, rect.width) * 60));
+    } else {
+      start = Math.max(0, Math.min(59, runtime.time || 0));
+    }
+
+    const duration = isVideo ? 12 : isAudio ? 10 : 8;
+
+    const nodeType = isVideo ? "videofile" : isAudio ? "audio" : isImage ? "image" : "videofile";
+    const n = addNode(nodeType);
+    if (n) {
+      n.title = file.name;
+      n.params.src = objectUrl;
+      n.params.srcName = file.name;
+      n.params.duration = duration;
+      const head = document.querySelector(`.node[data-id="${n.id}"] .nh`);
+      if (head) head.textContent = n.title;
+    }
+
+    const element = saveElement(project, {
+      id: `media-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      name: file.name,
+      type: `media:${mediaType}`,
+      tags: ["media", mediaType, "local"],
+      snapshot: {
+        source: "local-file",
+        fileName: file.name,
+        mediaUrl: objectUrl,
+        mimeType: file.type,
+        fileSize: file.size,
+        defaultDuration: duration,
+        nodeId: n?.id
+      }
+    });
+
+    addClip(track, start, duration, file.name, isVideo ? "video" : "effect", {
+      elementId: element.id,
+      nodeId: n?.id,
+      mediaUrl: objectUrl,
+      fileName: file.name
+    });
+
+    log(`Timeline · Média « ${file.name} » ajouté (piste ${track + 1}, ${start.toFixed(1)}s)`);
+  }
+
+  commitHistory();
+  autosave();
+  redraw();
+  renderScenicLibrary();
+}
+
+function renderScenicLibrary() {
+  renderElementsPane();
+}
+
+function showLibraryPane(id) {
+  if (id === "scenic") showRightPane("elements");
 }
 function drawClip(c) {
   const el = document.createElement("div");
@@ -1934,6 +2596,7 @@ function redraw() {
     runtime.setProject(project);
   }
   renderElementsPane();
+  renderScenicLibrary();
   updateGraphBreadcrumb();
   requestAnimationFrame(renderWires);
 }
@@ -1998,7 +2661,7 @@ function renderTimelineLayers() {
     const selected = selectedTimelineLayerId === layer.id ? " selected" : "";
     return `<div class="timeline-layer-row${selected}" data-layer-id="${htmlSafe(layer.id)}" data-track="${index}" style="--layer-height:${height}px" role="row">
       <div class="timeline-track-label" role="gridcell"><span class="layer-type-dot layer-${htmlSafe(meta.kind)}"></span><span class="layer-name">${htmlSafe(layer.name || meta.label)}</span><span class="layer-index">${index + 1}</span></div>
-      <div class="timeline-track" data-track="${index}" role="gridcell"></div>
+      <div class="timeline-track" data-track="${index}" role="gridcell"><span class="timeline-drop-hint">Glisser un média ou un patch ici</span></div>
       <div class="timeline-route" role="gridcell"><button class="route-btn" data-track-route="${index}">Principal</button></div>
       <div class="layer-row-resize" title="Redimensionner le layer"></div>
     </div>`;
@@ -2050,14 +2713,72 @@ function installTimelineLayerEvents() {
     event.stopPropagation();
   });
   host.addEventListener("dragover", event => {
-    if (event.dataTransfer?.types?.includes("application/x-nvd-element")) event.preventDefault();
+    const types = event.dataTransfer?.types || [];
+    const isSupported = types.includes("application/x-nvd-element")
+      || types.includes("application/x-nvd-scenic-id")
+      || types.includes("application/x-nvd-node-type")
+      || types.includes("application/x-nvd-canvas-node")
+      || types.includes("Files");
+
+    if (isSupported) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      const row = event.target.closest(".timeline-layer-row");
+      qall(".timeline-layer-row.drag-over").forEach(r => { if (r !== row) r.classList.remove("drag-over"); });
+      if (row) row.classList.add("drag-over");
+    }
+  });
+  host.addEventListener("dragleave", event => {
+    const row = event.target.closest(".timeline-layer-row");
+    if (row && !row.contains(event.relatedTarget)) {
+      row.classList.remove("drag-over");
+    }
   });
   host.addEventListener("drop", event => {
+    qall(".timeline-layer-row.drag-over").forEach(r => r.classList.remove("drag-over"));
     const row = event.target.closest(".timeline-layer-row");
+    const track = row ? Number(row.dataset.track) : selectedElementTrack();
+    
+    // 1. Files from Finder
+    if (event.dataTransfer?.files?.length) {
+      event.preventDefault();
+      handleDroppedMediaFiles(event.dataTransfer.files, track, event.clientX, row);
+      return;
+    }
+    
+    // 2. Scenic element
+    const scenicId = event.dataTransfer?.getData("application/x-nvd-scenic-id");
+    if (scenicId) {
+      event.preventDefault();
+      placeScenicInTimeline(scenicId, track, event.clientX, row);
+      return;
+    }
+    
+    // 3. Official element
     const elementId = event.dataTransfer?.getData("application/x-nvd-element");
-    if (!row || !elementId) return;
-    event.preventDefault();
-    placeElementInTimeline(elementId, Number(row.dataset.track), event.clientX, row);
+    if (elementId) {
+      event.preventDefault();
+      placeElementInTimeline(elementId, track, event.clientX, row);
+      return;
+    }
+    
+    // 4. Node type from library
+    const nodeType = event.dataTransfer?.getData("application/x-nvd-node-type");
+    if (nodeType) {
+      event.preventDefault();
+      const n = addNode(nodeType);
+      if (n) addNodeToTimeline(n, track, event.clientX, row);
+      return;
+    }
+    
+    // 5. Node dragged from canvas
+    const canvasNodeId = event.dataTransfer?.getData("application/x-nvd-canvas-node");
+    if (canvasNodeId) {
+      event.preventDefault();
+      const n = nodeById(canvasNodeId);
+      if (n) addNodeToTimeline(n, track, event.clientX, row);
+      return;
+    }
   });
   window.addEventListener("mousemove", event => {
     if (!resize) return;
@@ -2589,9 +3310,37 @@ $("#vibeImageClear")?.addEventListener("click", () => {
   if ($("#vibeImageFile")) $("#vibeImageFile").value = "";
 });
 
+const VIBE_STATUS_LABELS = {
+  complete: ["Patch complet", "ok"],
+  partial: ["Patch partiel", "warn"],
+  unchanged: ["Déjà présent", "info"],
+  ai: ["Proposition IA à vérifier", "info"],
+  none: ["Rien généré", "err"]
+};
+
+/** Bilan de couverture lisible (statut + ce qui est réalisé + ce qui manque réellement). */
+function vibeCoverageHtml(coverage) {
+  if (!coverage) return "";
+  const [label, tone] = VIBE_STATUS_LABELS[coverage.status] || [coverage.status, "info"];
+  const list = (items, mapper) => items?.length ? `<ul>${items.map(x => `<li>${mapper(x)}</li>`).join("")}</ul>` : "";
+  return `<div class="vibe-coverage vibe-coverage-${tone}" role="status">
+    <b class="vibe-coverage-badge">${htmlSafe(label)}</b>${coverage.label ? ` · ${htmlSafe(coverage.label)}` : ""}
+    ${coverage.fulfilled?.length ? `<div class="vibe-coverage-title">Réalisé</div>${list(coverage.fulfilled, x => htmlSafe(x))}` : ""}
+    ${coverage.missing?.length ? `<div class="vibe-coverage-title">Ce qui manque</div>${list(coverage.missing, m => `<b>${htmlSafe(m.need)}</b> — ${htmlSafe(m.reason)}${m.alternative ? ` <i>Alternative : ${htmlSafe(m.alternative)}</i>` : ""}`)}` : ""}
+    ${coverage.notes?.length ? `<div class="vibe-coverage-title">À savoir</div>${list(coverage.notes, x => htmlSafe(x))}` : ""}
+  </div>`;
+}
+
 function showVibePreview(result, logPrefix) {
   if (!result?.ops?.length) {
-    log(`${logPrefix} · aucune opération générée (pas de réussite simulée)`);
+    const cov = result?.coverage;
+    const why = cov?.status === "unchanged" ? (cov.fulfilled?.[0] || result.note) : "aucune opération générée (pas de réussite simulée)";
+    log(`${logPrefix} · ${why}`);
+    const box0 = $("#vibePreview");
+    if (box0 && cov) {
+      box0.classList.remove("hidden");
+      box0.innerHTML = `<div class="vibe-preview-head"><b>Aperçu Vibe</b> · aucune modification</div>${vibeCoverageHtml(cov)}`;
+    }
     pendingVibe = null;
     creatorSession.clearProposal();
     $("#vibePreview")?.classList.add("hidden");
@@ -2603,12 +3352,14 @@ function showVibePreview(result, logPrefix) {
   if (box) {
     box.classList.remove("hidden");
     box.innerHTML = `<div class="vibe-preview-head"><b>Aperçu Vibe</b> · ${htmlSafe(result.engine || "")} · ${result.ops.length} op(s)</div>
+      ${vibeCoverageHtml(result.coverage)}
       <pre class="vibe-preview-ops">${result.ops.map(o => htmlSafe(JSON.stringify(o))).join("\n")}</pre>`;
   }
   const resultBar = $("#vibeResult");
   if (resultBar) {
     resultBar.classList.remove("hidden");
-    $("#vibeResultSummary").textContent = `${result.ops.length} action${result.ops.length > 1 ? "s" : ""} prête${result.ops.length > 1 ? "s" : ""}`;
+    const covLabel = VIBE_STATUS_LABELS[result.coverage?.status]?.[0];
+    $("#vibeResultSummary").textContent = `${covLabel ? `${covLabel} · ` : ""}${result.ops.length} action${result.ops.length > 1 ? "s" : ""} prête${result.ops.length > 1 ? "s" : ""}`;
     $("#vibeResultConfirm").onclick = () => confirmPendingVibe();
     $("#vibeResultCancel").onclick = () => cancelPendingVibe(logPrefix);
   }
@@ -2696,7 +3447,12 @@ async function confirmPendingVibe() {
   syncPlayButton();
   autosave();
   commitHistory();
-  log(`Vibe · ${applied.length} op(s) appliquée(s) — annulable via Undo`);
+  const realApplied = applied.filter(a => !a.skipped).length;
+  const skipped = applied.length - realApplied;
+  const covStatus = proposal.coverage?.status;
+  const outcome = errors.length ? "PARTIEL" : covStatus === "partial" ? "partiel" : "OK";
+  log(`Vibe · ${outcome} · ${realApplied} op(s) appliquée(s)${skipped ? `, ${skipped} ignorée(s) (déjà présentes)` : ""}${errors.length ? `, ${errors.length} erreur(s)` : ""} — annulable via Undo`);
+  for (const m of proposal.coverage?.missing || []) log(`Vibe · manque · ${m.need} — ${m.reason}`);
   for (const err of errors) log(`Vibe ERREUR · ${err}`);
 }
 
@@ -2801,6 +3557,8 @@ function showRightPane(id) {
   });
 }
 qall("[data-right-pane]").forEach(btn => btn.addEventListener("click", () => showRightPane(btn.dataset.rightPane)));
+const urlPane = new URLSearchParams(location.search).get("pane");
+if (urlPane) showRightPane(urlPane);
 
 function appendCxMessage(role, text) {
   const logEl = $("#cxChatLog");
@@ -3401,8 +4159,15 @@ document.addEventListener("keydown", e => {
 });
 
 // Zoom / pan Patch Canvas
-function setZoom(next) {
-  view.scale = Math.max(0.4, Math.min(2.2, next));
+function setZoom(next, anchor = null) {
+  const space = $("#patchSpace");
+  const point = anchor || { x: space.clientWidth / 2, y: space.clientHeight / 2 };
+  const scale = Math.max(0.4, Math.min(2.2, next));
+  // Preserve the world point under the pointer (or viewport center).
+  const ratio = scale / view.scale;
+  view.x = point.x - (point.x - view.x) * ratio;
+  view.y = point.y - (point.y - view.y) * ratio;
+  view.scale = scale;
   applyViewTransform();
   renderWires();
   const percent = `${Math.round(view.scale * 100)} %`;
@@ -3415,11 +4180,16 @@ function setZoom(next) {
 $("#zoomIn").onclick = () => setZoom(view.scale + 0.1);
 $("#zoomOut").onclick = () => setZoom(view.scale - 0.1);
 if ($("#wrapBtn")) $("#wrapBtn").onclick = () => wrapSelection();
-$("#zoomReset").onclick = () => { view.x = 0; view.y = 0; setZoom(1); };
+$("#zoomReset").onclick = () => { view.x = 0; view.y = 0; setZoom(1, { x: 0, y: 0 }); };
 $("#patchSpace").addEventListener("wheel", e => {
   e.preventDefault();
   const delta = e.deltaY < 0 ? 0.08 : -0.08;
-  setZoom(view.scale + delta);
+  const space = $("#patchSpace");
+  const rect = space.getBoundingClientRect();
+  setZoom(view.scale + delta, {
+    x: e.clientX - rect.left - space.clientLeft + space.scrollLeft,
+    y: e.clientY - rect.top - space.clientTop + space.scrollTop
+  });
 }, { passive: false });
 $("#patchSpace").addEventListener("pointerdown", e => {
   if (e.button === 1 || (e.button === 0 && e.altKey)) {
@@ -3445,7 +4215,69 @@ qall(".collapse").forEach(b => b.onclick = () => {
   if (panel?.classList.contains("floatable")) floatPanels.toggleCollapse(panel);
   else panel?.classList.toggle("collapsed");
 });
-$("#search").oninput = () => buildLibrary();
+$("#search").oninput = () => {
+  buildLibrary();
+};
+$("#timelineMediaFile")?.addEventListener("change", event => {
+  if (event.target.files?.length) {
+    handleDroppedMediaFiles(event.target.files, selectedElementTrack());
+    event.target.value = "";
+    renderElementsPane();
+  }
+});
+$("#timelineOpenElements")?.addEventListener("click", () => {
+  showRightPane("elements");
+  const pane = $("#rightPane");
+  if (pane?.classList.contains("collapsed")) pane.classList.remove("collapsed");
+  renderElementsPane();
+});
+
+const patchSpaceEl = $("#patchSpace");
+if (patchSpaceEl) {
+  patchSpaceEl.addEventListener("dragover", event => {
+    const types = event.dataTransfer?.types || [];
+    if (types.includes("application/x-nvd-node-type") || types.includes("application/x-nvd-element") || types.includes("application/x-nvd-scenic-id")) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+    }
+  });
+  patchSpaceEl.addEventListener("drop", event => {
+    const elemId = event.dataTransfer?.getData("application/x-nvd-scenic-id") || event.dataTransfer?.getData("application/x-nvd-element");
+    const nodeType = event.dataTransfer?.getData("application/x-nvd-node-type");
+    const world = $("#patchWorld") || patchSpaceEl;
+    const wr = world.getBoundingClientRect();
+    const s = view.scale || 1;
+    const dropX = Math.max(20, Math.round((event.clientX - wr.left) / s));
+    const dropY = Math.max(20, Math.round((event.clientY - wr.top) / s));
+
+    if (elemId) {
+      event.preventDefault();
+      const node = placeScenicInCanvas(elemId);
+      if (node) {
+        node.x = dropX;
+        node.y = dropY;
+        const el = document.querySelector(`.node[data-id="${node.id}"]`);
+        if (el) { el.style.left = node.x + "px"; el.style.top = node.y + "px"; }
+        renderWires();
+        autosave();
+      }
+      return;
+    }
+    if (nodeType) {
+      event.preventDefault();
+      const node = addNode(nodeType);
+      if (node) {
+        node.x = dropX;
+        node.y = dropY;
+        const el = document.querySelector(`.node[data-id="${node.id}"]`);
+        if (el) { el.style.left = node.x + "px"; el.style.top = node.y + "px"; }
+        renderWires();
+        autosave();
+      }
+      return;
+    }
+  });
+}
 const experimentalToggle = $("#showExperimental");
 if (experimentalToggle) {
   experimentalToggle.checked = showExperimental;

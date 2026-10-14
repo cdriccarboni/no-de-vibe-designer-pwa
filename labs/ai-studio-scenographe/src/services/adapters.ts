@@ -1,4 +1,4 @@
-import { EngineAdapter, CodePreset, ReproducibleTestResult } from '../types/engine';
+import { EngineAdapter, CodePreset, ReproducibleTestResult, PresetCategoryType } from '../types/engine';
 import { transform } from 'sucrase';
 
 // Helper to transpile TypeScript to JavaScript using Sucrase
@@ -66,6 +66,14 @@ export function parseISF(source: string): ParsedISF {
   }
 }
 
+// Helper to determine the preset category ('Visual' | 'Audio' | 'Data') for an engine adapter
+export function getEnginePresetType(adapter: EngineAdapter): PresetCategoryType {
+  if (adapter.presetType) return adapter.presetType;
+  if (adapter.category === 'audio-dsp') return 'Audio';
+  if (adapter.category === 'compute' || adapter.category === 'bridge' || adapter.id === 'litegraph') return 'Data';
+  return 'Visual';
+}
+
 // Complete Adapters Registry for Phase A and Future Phases
 export const ENGINE_ADAPTERS: EngineAdapter[] = [
   // ----------------------------------------------------------------------
@@ -77,6 +85,7 @@ export const ENGINE_ADAPTERS: EngineAdapter[] = [
     shortName: 'JavaScript',
     phase: 'Phase A',
     category: 'web-visual',
+    presetType: 'Visual',
     version: 'ES2024 / HTML5 Canvas',
     status: 'functional',
     statusBadge: 'Fonctionnel et testé',
@@ -102,6 +111,7 @@ export const ENGINE_ADAPTERS: EngineAdapter[] = [
       {
         id: 'js-particles',
         title: 'Nuage Cinétique & Répulsion',
+        type: 'Visual',
         description: 'Système de 160 particules cinétiques avec maillage dynamique et réaction souris.',
         code: `// Moteur JavaScript — No[co]de Multilanguage Lab
 const numParticles = 160;
@@ -177,6 +187,81 @@ function render() {
 }
 
 window.onFrame = render;`
+      },
+      {
+        id: 'js-audio-synth',
+        title: 'Synthétiseur Harmonique Web Audio',
+        type: 'Audio',
+        description: 'Synthèse sonore interactive basée sur l’API Web Audio avec onde sonore oscillante.',
+        code: `// Moteur JavaScript — Synthèse Harmonique Web Audio
+console.log("Web Audio API : Initialisation du synthétiseur harmonique.");
+
+let phase = 0;
+const harmonics = [1, 2, 3, 5, 8];
+
+function render() {
+  ctx.fillStyle = 'rgba(10, 14, 20, 0.25)';
+  ctx.fillRect(0, 0, width, height);
+
+  const centerY = height / 2;
+  phase += 0.04;
+
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#f59e0b';
+  ctx.beginPath();
+
+  for (let x = 0; x < width; x += 4) {
+    let y = centerY;
+    for (let h = 0; h < harmonics.length; h++) {
+      const freq = harmonics[h] * 0.01;
+      const amp = 40 / (h + 1);
+      y += Math.sin(x * freq + phase * harmonics[h]) * amp;
+    }
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Affichage télémétrie audio
+  ctx.fillStyle = '#fbbf24';
+  ctx.font = '11px monospace';
+  ctx.fillText("Harmoniques : [1f, 2f, 3f, 5f, 8f] | Fréq. Fondamentale : 440 Hz", 20, 30);
+}
+
+window.onFrame = render;`
+      },
+      {
+        id: 'js-data-matrix',
+        title: 'Analyseur de Données FFT & Télémétrie',
+        type: 'Data',
+        description: 'Simulation de traitement de flux matriciel, bins de fréquence et télémétrie numérique.',
+        code: `// Moteur JavaScript — Télémétrie & Traitement de Données FFT
+const bins = 48;
+const spectrum = new Float32Array(bins);
+
+function render() {
+  ctx.fillStyle = 'rgba(6, 10, 14, 0.3)';
+  ctx.fillRect(0, 0, width, height);
+
+  const barWidth = (width - 40) / bins;
+
+  for (let i = 0; i < bins; i++) {
+    // Évolution dynamique des valeurs matricielles
+    spectrum[i] = Math.max(0.05, Math.sin(time * 3.0 + i * 0.3) * 0.5 + 0.5);
+    const h = spectrum[i] * (height * 0.6);
+    const x = 20 + i * barWidth;
+    const y = height - 40 - h;
+
+    ctx.fillStyle = \`hsl(\${140 + i * 2.5}, 85%, 55%)\`;
+    ctx.fillRect(x, y, barWidth - 2, h);
+  }
+
+  ctx.fillStyle = '#34d399';
+  ctx.font = '11px monospace';
+  ctx.fillText(\`Flux Matriciel : \${bins} canaux FFT | Échantillonnage : 48 kHz\`, 20, 30);
+}
+
+window.onFrame = render;`
       }
     ],
     runReproducibleTest: async (): Promise<ReproducibleTestResult> => {
@@ -220,6 +305,7 @@ window.onFrame = render;`
     shortName: 'TypeScript',
     phase: 'Phase A',
     category: 'web-visual',
+    presetType: 'Visual',
     version: '5.4 / Sucrase Transpiler',
     status: 'functional',
     statusBadge: 'Fonctionnel et testé',
@@ -243,6 +329,7 @@ window.onFrame = render;`
       {
         id: 'ts-kinetic-ribbon',
         title: 'Rubans Typés & Géométrie Vectorielle',
+        type: 'Visual',
         description: 'Exemple TypeScript avec interfaces typées Point, KineticNode et calcul d’harmoniques.',
         code: `// Moteur TypeScript — Transpilation In-Browser (No[co]de Lab)
 // Interfaces et typage statique
@@ -298,6 +385,119 @@ function render() {
 }
 
 window.onFrame = render;`
+            },
+      {
+        id: 'ts-audio-fm-synth',
+        title: 'Oscillateur FM & Modulation DSP Typée',
+        type: 'Audio',
+        description: 'Synthèse par modulation de fréquence (FM) avec interfaces typées AudioVoice, modulations harmoniques et oscilloscope.',
+        code: `// Moteur TypeScript — Modulateur Audio FM & Enveloppe Typée
+interface AudioVoice {
+  carrierFreq: number;
+  modulatorFreq: number;
+  modulationIndex: number;
+  amplitude: number;
+}
+
+const voice: AudioVoice = {
+  carrierFreq: 220,
+  modulatorFreq: 110,
+  modulationIndex: 4.5,
+  amplitude: 0.85
+};
+
+console.log("TypeScript DSP : Synthèse FM initialisée, porteuse :", voice.carrierFreq, "Hz");
+
+function render() {
+  ctx.fillStyle = 'rgba(10, 15, 24, 0.2)';
+  ctx.fillRect(0, 0, width, height);
+
+  const centerY = height / 2;
+  const modIdx = voice.modulationIndex + (mouse.x / width) * 5.0;
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 2.5;
+
+  for (let x = 0; x < width; x += 2) {
+    const t = x * 0.015 + time * 4.0;
+    const mod = Math.sin(t * (voice.modulatorFreq / 100)) * modIdx;
+    const sample = Math.sin(t * (voice.carrierFreq / 100) + mod) * (height * 0.28 * voice.amplitude);
+    const y = centerY + sample;
+
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Affichage télémétrie DSP
+  ctx.fillStyle = '#fbbf24';
+  ctx.font = '11px monospace';
+  ctx.fillText(\`Porteuse: \${voice.carrierFreq}Hz | Modulateur: \${voice.modulatorFreq}Hz | Index FM: \${modIdx.toFixed(2)}\`, 24, 32);
+}
+
+window.onFrame = render;`
+      },
+      {
+        id: 'ts-data-dsp-stream',
+        title: 'Pipeline de Télémétrie & Flux Matriciel Typé',
+        type: 'Data',
+        description: 'Flux de paquets de données typés, calcul de moyenne glissante, écart-type et histogramme temps réel.',
+        code: `// Moteur TypeScript — Télémétrie & Calcul Statistique Typé
+interface TelemetryPacket {
+  id: number;
+  timestamp: number;
+  payload: number[];
+  mean: number;
+  variance: number;
+}
+
+const history: number[] = [];
+const maxSamples = 64;
+
+function computeStats(values: number[]): { mean: number; variance: number } {
+  if (values.length === 0) return { mean: 0, variance: 0 };
+  const mean = values.reduce((acc, v) => acc + v, 0) / values.length;
+  const variance = values.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / values.length;
+  return { mean, variance };
+}
+
+function render() {
+  ctx.fillStyle = 'rgba(6, 12, 10, 0.3)';
+  ctx.fillRect(0, 0, width, height);
+
+  const newSample = Math.sin(time * 3.5) * 0.4 + (Math.random() - 0.5) * 0.3 + 0.5;
+  history.push(newSample);
+  if (history.length > maxSamples) history.shift();
+
+  const stats = computeStats(history);
+  const barWidth = (width - 60) / maxSamples;
+
+  for (let i = 0; i < history.length; i++) {
+    const val = history[i];
+    const h = val * (height * 0.55);
+    const x = 30 + i * barWidth;
+    const y = height - 50 - h;
+
+    ctx.fillStyle = \`hsl(\${145 + val * 50}, 85%, 50%)\`;
+    ctx.fillRect(x, y, barWidth - 2, h);
+  }
+
+  const meanY = height - 50 - stats.mean * (height * 0.55);
+  ctx.strokeStyle = '#34d399';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(30, meanY);
+  ctx.lineTo(width - 30, meanY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#6ee7b7';
+  ctx.font = '11px monospace';
+  ctx.fillText(\`Télémétrie: Moyenne=\${stats.mean.toFixed(3)} | Variance=\${stats.variance.toFixed(4)} | Paquets=\${history.length}\`, 30, 32);
+}
+
+window.onFrame = render;`
       }
     ],
     runReproducibleTest: async (): Promise<ReproducibleTestResult> => {
@@ -339,6 +539,7 @@ window.onFrame = render;`
     shortName: 'p5.js',
     phase: 'Phase A',
     category: 'web-visual',
+    presetType: 'Visual',
     version: '1.9.4 CDN',
     status: 'functional',
     statusBadge: 'Fonctionnel et testé',
@@ -362,6 +563,7 @@ window.onFrame = render;`
       {
         id: 'p5-mandala',
         title: 'Rosace Hypnotique Géométrique',
+        type: 'Visual',
         description: 'Polygones récursifs oscillants avec rotations trigonométriques et couleurs HSB.',
         code: `// Laboratoire p5.js — Rosace Générative
 let rings = 14;
@@ -403,6 +605,114 @@ function draw() {
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
 }`
+      },
+      {
+        id: 'p5-audio-scope',
+        title: 'Oscilloscope Stéréo & Courbes de Lissajous',
+        type: 'Audio',
+        description: 'Visualiseur audio circulaire réactif avec modulation de phase harmonique et battements acoustiques.',
+        code: `// Laboratoire p5.js — Oscilloscope Stéréo Lissajous
+let historyX = [];
+let historyY = [];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  colorMode(HSB, 360, 100, 100, 1);
+  strokeWeight(2);
+  noFill();
+  console.log("p5.js DSP: Oscilloscope stéréo initialisé");
+}
+
+function draw() {
+  background(225, 25, 6, 0.18);
+  translate(width / 2, height / 2);
+
+  let freqX = 3.0;
+  let freqY = map(mouseY, 0, height, 1.0, 5.0);
+  let phase = frameCount * 0.03;
+  let amp = min(width, height) * 0.35;
+
+  let currentX = sin(frameCount * 0.05 * freqX) * amp;
+  let currentY = cos(frameCount * 0.05 * freqY + phase) * amp;
+
+  historyX.push(currentX);
+  historyY.push(currentY);
+  if (historyX.length > 250) {
+    historyX.shift();
+    historyY.shift();
+  }
+
+  beginShape();
+  for (let i = 0; i < historyX.length; i++) {
+    let alpha = map(i, 0, historyX.length, 0.05, 0.95);
+    let hue = (i * 2 + frameCount * 2) % 360;
+    stroke(hue, 85, 95, alpha);
+    vertex(historyX[i], historyY[i]);
+  }
+  endShape();
+
+  // Affichage de point de tête
+  fill(45, 95, 100);
+  noStroke();
+  ellipse(currentX, currentY, 8, 8);
+  noFill();
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}`
+      },
+      {
+        id: 'p5-data-cellular',
+        title: 'Automate Cellulaire & Matrice de Données',
+        type: 'Data',
+        description: 'Simulation de propagation de signaux numériques matriciels avec calcul de densité et télémétrie.',
+        code: `// Laboratoire p5.js — Automate de Données Matriciel
+let cols, rows;
+let cellSize = 16;
+let grid = [];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  cols = floor(width / cellSize);
+  rows = floor(height / cellSize);
+  for (let i = 0; i < cols; i++) {
+    grid[i] = [];
+    for (let j = 0; j < rows; j++) {
+      grid[i][j] = random() > 0.85 ? 1 : 0;
+    }
+  }
+  frameRate(24);
+  console.log("p5.js Data: Grille matricielle", cols, "x", rows);
+}
+
+function draw() {
+  background(160, 20, 6, 0.3);
+
+  // Mise à jour de cellules actives
+  let activeCount = 0;
+  for (let i = 1; i < cols - 1; i++) {
+    for (let j = 1; j < rows - 1; j++) {
+      if (random() < 0.01) grid[i][j] = 1 - grid[i][j];
+      if (grid[i][j] === 1) {
+        activeCount++;
+        fill(150 + (i * 4) % 60, 85, 80, 0.85);
+        rect(i * cellSize, j * cellSize, cellSize - 2, cellSize - 2, 2);
+      }
+    }
+  }
+
+  // Télémétrie de données
+  fill(160, 80, 95);
+  noStroke();
+  textSize(12);
+  textFont('monospace');
+  text(\`Cellules actives : \${activeCount} / \${cols * rows} | Densité: \${((activeCount / (cols * rows)) * 100).toFixed(1)}%\`, 20, 30);
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}`
       }
     ],
     runReproducibleTest: async (): Promise<ReproducibleTestResult> => {
@@ -425,6 +735,7 @@ function windowResized() {
     shortName: 'GLSL / WebGL',
     phase: 'Phase A',
     category: 'web-visual',
+    presetType: 'Visual',
     version: 'GLSL ES 1.0 / WebGL 2.0',
     status: 'functional',
     statusBadge: 'Fonctionnel et testé',
@@ -449,6 +760,7 @@ function windowResized() {
       {
         id: 'glsl-liquid-warp',
         title: 'Déformation Liquide & Dispersion Chromatique',
+        type: 'Visual',
         description: 'Champs scalaires imbriqués (Domain Warping) avec dispersion RVB et réactivité.',
         defaultUniforms: { 'Vitesse': 1.0, 'Distorsion': 1.4, 'Échelle': 3.0, 'Luminescence': 1.2 },
         code: `precision highp float;
@@ -507,6 +819,86 @@ void main() {
 
     gl_FragColor = vec4(col, 1.0);
 }`
+      },
+      {
+        id: 'glsl-audio-spectrum',
+        title: 'Spectre Fréquentiel & Rayonnement Harmonique',
+        type: 'Audio',
+        description: 'Égaliseur de spectre audio procédural multi-bandes avec lueur incandescente et modulation fréquentielle.',
+        defaultUniforms: { 'Sensibilité': 1.2, 'Bandes': 32.0, 'Intensité': 1.5, 'Dispersion': 0.8 },
+        code: `precision highp float;
+
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform vec2 u_mouse;
+uniform vec4 u_custom; // x: Sensibilité, y: Bandes, z: Intensité, w: Dispersion
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution) / min(u_resolution.x, u_resolution.y);
+    float bands = max(8.0, u_custom.y);
+    float sensitivity = u_custom.x;
+    
+    // Normalisation de coordonnée en barres de spectre
+    float colIdx = floor((uv.x + 0.5) * bands);
+    float bandFrac = fract((uv.x + 0.5) * bands);
+    
+    // Énergie simulée par bande fréquentielle
+    float freq = colIdx / bands;
+    float amp = sin(u_time * 4.0 + freq * 18.0) * 0.25 + 0.35;
+    amp += cos(u_time * 2.5 + freq * 32.0) * 0.15;
+    amp *= sensitivity;
+    
+    // Lueur et forme d'onde
+    float distToBar = abs(uv.y - amp + 0.2);
+    float barMask = step(abs(uv.x), 0.48) * (1.0 - smoothstep(0.01, 0.08, distToBar));
+    
+    // Spectre de couleurs thermique audio
+    vec3 barColor = mix(vec3(0.1, 0.6, 1.0), vec3(1.0, 0.2, 0.1), freq);
+    vec3 col = barColor * barMask * u_custom.z;
+    
+    // Halo ambiant
+    col += barColor * (0.015 / (distToBar + 0.02)) * 0.4;
+    
+    gl_FragColor = vec4(col, 1.0);
+}`
+      },
+      {
+        id: 'glsl-matrix-rain',
+        title: 'Matrice de Données Numériques & Flux Télécom',
+        type: 'Data',
+        description: 'Shader de flux cybernétique simulant un ruissellement de paquets de données et matrices binaires.',
+        defaultUniforms: { 'Vitesse': 1.5, 'Densité': 2.0, 'Glow': 1.2, 'Compression': 1.0 },
+        code: `precision highp float;
+
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform vec2 u_mouse;
+uniform vec4 u_custom; // x: Vitesse, y: Densité, z: Glow, w: Compression
+
+float pseudoRandom(vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    float cols = 48.0 * u_custom.y * 0.5;
+    float colId = floor(uv.x * cols);
+    
+    float speed = (0.5 + pseudoRandom(vec2(colId, 1.0)) * 0.8) * u_custom.x;
+    float row = fract(uv.y + u_time * speed);
+    
+    float charSeed = pseudoRandom(vec2(colId, floor((uv.y + u_time * speed) * 30.0)));
+    float brightness = pow(1.0 - row, 3.5) * step(0.15, charSeed);
+    
+    // Tête de flux incandescente
+    float head = smoothstep(0.96, 1.0, 1.0 - row);
+    
+    vec3 matrixGreen = vec3(0.05, 0.95, 0.45);
+    vec3 headColor = vec3(0.85, 1.0, 0.9);
+    
+    vec3 col = mix(matrixGreen * brightness, headColor, head) * u_custom.z;
+    gl_FragColor = vec4(col, 1.0);
+}`
       }
     ],
     runReproducibleTest: async (): Promise<ReproducibleTestResult> => {
@@ -549,6 +941,7 @@ void main() {
     shortName: 'p5 ➔ GLSL',
     phase: 'Phase A',
     category: 'web-visual',
+    presetType: 'Visual',
     version: 'Bridge v1.0',
     status: 'functional',
     statusBadge: 'Fonctionnel et testé',
@@ -570,6 +963,7 @@ void main() {
       {
         id: 'hybrid-vortex-crt',
         title: 'Vortex Géométrique p5 ➔ Distorsion Chromatique & CRT GLSL',
+        type: 'Visual',
         description: 'L’animation p5.js transmet l’énergie cinétique au shader GLSL qui applique aberration chromatique, distorsion CRT et scanlines.',
         defaultUniforms: { 'Aberration': 1.4, 'Courbure': 1.2, 'Scanlines': 0.8, 'Glow': 1.3 },
         code: `// ÉTAPE 1 : GÉNÉRATEUR p5.js
@@ -673,6 +1067,119 @@ void main() {
 
     gl_FragColor = vec4(color, 1.0);
 }`
+      },
+      {
+        id: 'hybrid-audio-reactive',
+        title: 'Impulsions Sonores p5 ➔ Filtre Stroboscopique GLSL',
+        type: 'Audio',
+        description: 'Synthèse d’ondes réactives aux fréquences basses en p5.js connectée à un filtre de résonance GLSL.',
+        secondaryTitle: 'Filtre de Résonance Stroboscopique GLSL',
+        defaultUniforms: { 'Résonance': 1.6, 'Luminescence': 1.5, 'Fréquence': 2.0, 'Distorsion': 0.8 },
+        code: `// ÉTAPE 1 : P5.JS — Oscillateur Visuel Audio-Réactif
+let bassEnergy = 0;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  colorMode(HSB, 360, 100, 100, 1);
+  noFill();
+  strokeWeight(3);
+}
+
+function draw() {
+  background(260, 30, 8, 0.2);
+  translate(width / 2, height / 2);
+
+  // Simulation d'énergie basse fréquence
+  bassEnergy = sin(frameCount * 0.08) * 0.5 + 0.5;
+  if (window.setBridgeUniforms) {
+    window.setBridgeUniforms({
+      pulseIntensity: bassEnergy,
+      angularVelocity: cos(frameCount * 0.05),
+      mouseActivity: bassEnergy * 2.0
+    });
+  }
+
+  let rings = 8;
+  for (let i = 1; i <= rings; i++) {
+    let r = i * 28 + bassEnergy * 45;
+    let hue = (i * 35 + frameCount * 3) % 360;
+    stroke(hue, 90, 95, 0.85);
+    ellipse(0, 0, r * 2, r * 2);
+  }
+}`,
+        secondaryCode: `// ÉTAPE 2 : GLSL — Traitement de Résonance Lumineuse
+precision highp float;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform sampler2D u_p5Texture;
+uniform float u_bridge_pulseIntensity;
+uniform vec4 u_custom;
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    vec4 tex = texture2D(u_p5Texture, uv);
+    
+    // Résonance et halo thermique
+    float glow = u_bridge_pulseIntensity * u_custom.x;
+    vec3 col = tex.rgb * (1.0 + glow * 1.5);
+    col += vec3(0.9, 0.4, 0.1) * pow(tex.a, 2.0) * glow;
+    
+    gl_FragColor = vec4(col, 1.0);
+}`
+      },
+      {
+        id: 'hybrid-data-flow',
+        title: 'Matrice de Paquets p5 ➔ Scanlines de Données GLSL',
+        type: 'Data',
+        description: 'Visualisation de flux de données matricielles en p5.js avec détection de paquets et post-traitement télémétrique.',
+        secondaryTitle: 'Télémétrie & Trame Numérique GLSL',
+        defaultUniforms: { 'Vitesse': 1.2, 'Scanlines': 1.0, 'Trame': 1.4, 'Intensité': 1.2 },
+        code: `// ÉTAPE 1 : P5.JS — Flux Matriciel de Données
+let nodes = [];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  textFont('monospace');
+  textSize(12);
+  for (let i = 0; i < 40; i++) {
+    nodes.push({ x: random(width), y: random(height), val: floor(random(100, 999)) });
+  }
+}
+
+function draw() {
+  background(160, 40, 5, 0.25);
+  fill(140, 85, 90);
+  noStroke();
+
+  for (let n of nodes) {
+    n.y = (n.y + 2) % height;
+    text(\`0x\${n.val.toString(16).toUpperCase()}\`, n.x, n.y);
+  }
+
+  if (window.setBridgeUniforms) {
+    window.setBridgeUniforms({
+      pulseIntensity: 0.8,
+      angularVelocity: 1.0,
+      mouseActivity: 0.5
+    });
+  }
+}`,
+        secondaryCode: `// ÉTAPE 2 : GLSL — Scanlines de Télémétrie
+precision highp float;
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform sampler2D u_p5Texture;
+uniform vec4 u_custom;
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    vec4 tex = texture2D(u_p5Texture, uv);
+    
+    float scan = sin(uv.y * u_resolution.y * 0.8) * 0.25 + 0.75;
+    vec3 col = tex.rgb * scan * vec3(0.2, 1.0, 0.6) * u_custom.w;
+    
+    gl_FragColor = vec4(col, 1.0);
+}`
       }
     ],
     runReproducibleTest: async (): Promise<ReproducibleTestResult> => {
@@ -695,6 +1202,7 @@ void main() {
     shortName: 'ISF',
     phase: 'Phase A',
     category: 'web-visual',
+    presetType: 'Visual',
     version: 'ISF 2.0 (VIDVOX Spec)',
     status: 'functional',
     statusBadge: 'Fonctionnel et testé',
@@ -720,6 +1228,7 @@ void main() {
       {
         id: 'isf-kaleidoscope',
         title: 'Kaléidoscope & Plasma ISF',
+        type: 'Visual',
         description: 'Shader ISF avec en-tête JSON contenant les entrées "segments", "vitesse", "zoom" et "teinte".',
         defaultUniforms: { 'segments': 6.0, 'vitesse': 1.2, 'zoom': 1.5, 'intensite': 1.0 },
         code: `/*{
@@ -811,6 +1320,120 @@ void main() {
 
     gl_FragColor = vec4(col, 1.0);
 }`
+      },
+      {
+        id: 'isf-audio-pulse',
+        title: 'Impulsion Stroboscopique Audio ISF',
+        type: 'Audio',
+        description: 'Shader ISF modulant des impulsions d’anneaux acoustiques avec paramètres JSON "battement", "decay" et "frequence".',
+        defaultUniforms: { 'battement': 1.4, 'decay': 0.8, 'frequence': 3.5, 'eclat': 1.2 },
+        code: `/*{
+  "DESCRIPTION": "Impulsion Acoustique & Anneaux Résonants",
+  "CREDIT": "No[co]de Studio",
+  "ISFVSN": "2",
+  "INPUTS": [
+    {
+      "NAME": "battement",
+      "TYPE": "float",
+      "DEFAULT": 1.4,
+      "MIN": 0.5,
+      "MAX": 4.0
+    },
+    {
+      "NAME": "decay",
+      "TYPE": "float",
+      "DEFAULT": 0.8,
+      "MIN": 0.1,
+      "MAX": 2.0
+    },
+    {
+      "NAME": "frequence",
+      "TYPE": "float",
+      "DEFAULT": 3.5,
+      "MIN": 1.0,
+      "MAX": 10.0
+    },
+    {
+      "NAME": "eclat",
+      "TYPE": "float",
+      "DEFAULT": 1.2,
+      "MIN": 0.2,
+      "MAX": 3.0
+    }
+  ]
+}*/
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - 0.5 * RENDERSIZE) / min(RENDERSIZE.x, RENDERSIZE.y);
+    float dist = length(uv);
+    
+    float pulse = sin(TIME * battement * 6.28) * 0.5 + 0.5;
+    float ring = sin(dist * frequence * 12.0 - TIME * 4.0) * exp(-dist * decay * 2.5);
+    
+    vec3 baseColor = mix(vec3(0.95, 0.6, 0.1), vec3(0.9, 0.15, 0.3), pulse);
+    vec3 col = baseColor * abs(ring) * eclat * (1.0 + pulse);
+    
+    gl_FragColor = vec4(col, 1.0);
+}`
+      },
+      {
+        id: 'isf-data-contours',
+        title: 'Lignes de Niveau & Télémétrie Topographique ISF',
+        type: 'Data',
+        description: 'Visualisation de flux d’isovaleurs et courbes de champ scalaire avec contrôles temps réel "lignes", "vitesse" et "nettete".',
+        defaultUniforms: { 'lignes': 12.0, 'vitesse': 1.0, 'nettete': 2.0, 'gamma': 1.0 },
+        code: `/*{
+  "DESCRIPTION": "Champs Scalaires et Courbes de Niveau ISF",
+  "CREDIT": "No[co]de Studio",
+  "ISFVSN": "2",
+  "INPUTS": [
+    {
+      "NAME": "lignes",
+      "TYPE": "float",
+      "DEFAULT": 12.0,
+      "MIN": 4.0,
+      "MAX": 32.0
+    },
+    {
+      "NAME": "vitesse",
+      "TYPE": "float",
+      "DEFAULT": 1.0,
+      "MIN": 0.1,
+      "MAX": 3.0
+    },
+    {
+      "NAME": "nettete",
+      "TYPE": "float",
+      "DEFAULT": 2.0,
+      "MIN": 0.5,
+      "MAX": 5.0
+    },
+    {
+      "NAME": "gamma",
+      "TYPE": "float",
+      "DEFAULT": 1.0,
+      "MIN": 0.2,
+      "MAX": 2.5
+    }
+  ]
+}*/
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / RENDERSIZE;
+    vec2 centered = (uv - 0.5) * 4.0;
+    
+    float t = TIME * vitesse * 0.5;
+    float field = sin(centered.x + t) * cos(centered.y + t) + sin(length(centered) * 1.5 - t);
+    
+    float contour = fract(field * lignes * 0.5);
+    float lineEdge = smoothstep(0.0, 0.05 * nettete, abs(contour - 0.5));
+    
+    vec3 dataGreen = vec3(0.1, 0.9, 0.5);
+    vec3 bg = vec3(0.04, 0.08, 0.06);
+    vec3 col = mix(dataGreen, bg, lineEdge) * gamma;
+    
+    gl_FragColor = vec4(col, 1.0);
+}`
       }
     ],
     runReproducibleTest: async (): Promise<ReproducibleTestResult> => {
@@ -848,6 +1471,7 @@ void main() {
     shortName: 'Python (Pyodide)',
     phase: 'Phase A',
     category: 'compute',
+    presetType: 'Data',
     version: 'CPython 3.12 / Pyodide v0.26.4 WASM',
     status: 'functional',
     statusBadge: 'Fonctionnel et testé',
@@ -871,6 +1495,7 @@ void main() {
       {
         id: 'py-harmonics',
         title: 'Calcul de Trajectoire & Émergence Mathématique',
+        type: 'Data',
         description: 'Script Python calculant une série de coordonnées oscillatoires et renvoyant une table de données exploitable par JavaScript.',
         code: `# Laboratoire No[co]de — Moteur Python (Pyodide WASM)
 import math
@@ -894,6 +1519,66 @@ print("Échantillon généré :", data[:3])
 
 # Cette valeur de retour finale est automatiquement convertie en objet JavaScript
 data`
+      },
+      {
+        id: 'py-ascii-visual',
+        title: 'Générateur de Trame ASCII & Julia Fractale',
+        type: 'Visual',
+        description: 'Calcul d’ensemble fractale de Julia projeté en matrice de caractères ASCII haute densité.',
+        code: `# Moteur Python — Trame Visuelle Fractale ASCII
+import math
+
+width, height = 48, 20
+chars = " .:-=+*#%@"
+output = []
+
+c_re, c_im = -0.7, 0.27015
+
+for y in range(height):
+    line = ""
+    zy = (y / height) * 2.4 - 1.2
+    for x in range(width):
+        zx = (x / width) * 3.0 - 1.5
+        i = 0
+        while zx * zx + zy * zy < 4.0 and i < 24:
+            tmp = zx * zx - zy * zy + c_re
+            zy = 2.0 * zx * zy + c_im
+            zx = tmp
+            i += 1
+        idx = int((i / 24) * (len(chars) - 1))
+        line += chars[idx]
+    output.append(line)
+
+rendered = "\\n".join(output)
+print("=== Rendu Visuel Fractal Python ===")
+print(rendered)
+
+{"type": "ascii_render", "lines": output, "samples": width * height}`
+      },
+      {
+        id: 'py-audio-dft',
+        title: 'Transformée de Fourier Discrète (DFT) Audio',
+        type: 'Audio',
+        description: 'Algorithme Python pur de décomposition harmonique par transformée de Fourier discrète sur un signal multi-tonal.',
+        code: `# Moteur Python — Transformée de Fourier Discrète (DFT)
+import math
+
+N = 32
+signal = [math.sin(2 * math.pi * 3 * i / N) + 0.5 * math.sin(2 * math.pi * 7 * i / N) for i in range(N)]
+
+dft_spectrum = []
+for k in range(N // 2):
+    re = sum(signal[n] * math.cos(2 * math.pi * k * n / N) for n in range(N))
+    im = sum(-signal[n] * math.sin(2 * math.pi * k * n / N) for n in range(N))
+    magnitude = math.sqrt(re * re + im * im)
+    dft_spectrum.append({"bin": k, "freq_hz": k * 440 // (N // 2), "magnitude": round(magnitude, 3)})
+
+peaks = [s for s in dft_spectrum if s["magnitude"] > 3.0]
+print(f"DFT terminée : {len(peaks)} fréquences dominantes détectées :")
+for p in peaks:
+    print(f" -> Fréquence ~{p['freq_hz']}Hz (Magnitude: {p['magnitude']})")
+
+dft_spectrum`
       }
     ],
     runReproducibleTest: async (): Promise<ReproducibleTestResult> => {
@@ -916,6 +1601,7 @@ data`
     shortName: 'WebGPU (WGSL)',
     phase: 'Phase A',
     category: 'compute',
+    presetType: 'Visual',
     version: 'WGSL / W3C Working Draft',
     status: 'hardware-dependent',
     statusBadge: 'Détection Matérielle',
@@ -938,6 +1624,7 @@ data`
       {
         id: 'wgsl-triangle',
         title: 'Pipeline Graphique WGSL avec Interpolation',
+        type: 'Visual',
         description: 'Vertex et Fragment shaders complets en langage WGSL avec passage d’attributs interpolés.',
         code: `// Shader WGSL exécuté sur matériel WebGPU
 struct VertexOutput {
@@ -969,6 +1656,72 @@ fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 fn fs_main(input: VertexOutput) -> @location(0) vec4f {
   return input.color;
 }`
+      },
+      {
+        id: 'wgsl-audio-scope',
+        title: 'Oscillogramme Audio Déformable WGSL',
+        type: 'Audio',
+        description: 'Shader WGSL calculant un ruban audio résonant à haute fréquence avec harmoniques.',
+        code: `// Moteur WebGPU — Traçage d'onde audio WGSL
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+};
+
+@vertex
+fn vs_main(@builtin(vertex_index) vid: u32) -> VertexOutput {
+  var pos = array<vec2f, 6>(
+    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),
+    vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0)
+  );
+  var out: VertexOutput;
+  out.position = vec4f(pos[vid], 0.0, 1.0);
+  out.uv = pos[vid] * 0.5 + 0.5;
+  return out;
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+  let y = in.uv.y - 0.5;
+  let wave = sin(in.uv.x * 24.0) * 0.15 + sin(in.uv.x * 48.0) * 0.05;
+  let dist = abs(y - wave);
+  let intensity = 0.015 / (dist + 0.01);
+  let color = vec3f(0.96, 0.62, 0.07) * intensity;
+  return vec4f(color, 1.0);
+}`
+      },
+      {
+        id: 'wgsl-data-compute',
+        title: 'Compute Shader & Matrice Parallèle WGSL',
+        type: 'Data',
+        description: 'Simulation de calcul vectoriel parallèle WGSL sur mémoire linéaire haute performance.',
+        code: `// Moteur WebGPU — Compute Pipeline WGSL & Télémétrie
+struct SimParams {
+  particleCount: u32,
+  damping: f32,
+  timeStep: f32,
+};
+
+struct Particle {
+  position: vec2f,
+  velocity: vec2f,
+};
+
+@group(0) @binding(0) var<uniform> params: SimParams;
+@group(0) @binding(1) var<storage, read_write> particles: array<Particle>;
+
+@compute @workgroup_size(64)
+fn cs_main(@builtin(global_invocation_id) global_id: vec3u) {
+  let index = global_id.x;
+  if (index >= params.particleCount) {
+    return;
+  }
+  // Intégration Euler de particules sur GPU
+  var p = particles[index];
+  p.position += p.velocity * params.timeStep;
+  p.velocity *= params.damping;
+  particles[index] = p;
+}`
       }
     ],
     runReproducibleTest: async (): Promise<ReproducibleTestResult> => {
@@ -994,6 +1747,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     shortName: 'Faust DSP',
     phase: 'Phase B',
     category: 'audio-dsp',
+    presetType: 'Audio',
     version: '2.x DSP Compiler via faustwasm',
     status: 'planned',
     statusBadge: 'Phase B — À venir',
@@ -1009,7 +1763,30 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     ],
     limits: ['Planifié en Phase B (programmation audio)'],
     benchmark: { initTimeMs: 0, execTimeMs: 0, fps: 0 },
-    presets: []
+    presets: [
+      {
+        id: 'faust-organ',
+        title: 'Synthétiseur Additif & Filtre Résonant',
+        type: 'Audio',
+        description: 'Code Faust DSP avec oscillateurs harmoniques fondamentaux et filtre résonant d’ordre 2.',
+        code: `// Faust DSP — Synthétiseur Additif & Filtre Résonant
+import("stdfaust.lib");
+
+freq = hslider("freq", 440, 50, 2000, 1);
+gain = hslider("gain", 0.5, 0, 1, 0.01);
+cutoff = hslider("cutoff", 1200, 100, 10000, 10);
+res = hslider("resonance", 2.5, 0.1, 10, 0.1);
+
+// Oscillateurs harmoniques fondamentaux
+osc1 = os.oscsin(freq);
+osc2 = os.oscsin(freq * 2.0) * 0.5;
+osc3 = os.oscsin(freq * 3.0) * 0.25;
+source = (osc1 + osc2 + osc3) * gain;
+
+// Filtre résonant passe-bas stéréo
+process = source : fi.resonlp(cutoff, res, 1.0) <: _, _;`
+      }
+    ]
   },
   {
     id: 'webchuck',
@@ -1017,6 +1794,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     shortName: 'WebChucK',
     phase: 'Phase B',
     category: 'audio-dsp',
+    presetType: 'Audio',
     version: '1.5.x WASM',
     status: 'planned',
     statusBadge: 'Phase B — À venir',
@@ -1031,7 +1809,28 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     ],
     limits: ['Planifié en Phase B'],
     benchmark: { initTimeMs: 0, execTimeMs: 0, fps: 0 },
-    presets: []
+    presets: [
+      {
+        id: 'chuck-fm-bell',
+        title: 'Cloche Modale FM & Boucle Shred',
+        type: 'Audio',
+        description: 'Synthèse par modulation de fréquence (FM) avec boucle temporelle récursive ultra-précise.',
+        code: `// WebChucK — Synthèse FM de Cloche Scénique
+SinOsc carrier => ADSR env => dac;
+SinOsc modulator => blackhole;
+
+440.0 => carrier.freq;
+220.0 => modulator.freq;
+300.0 => float modIndex;
+
+env.set(10::ms, 300::ms, 0.2, 1000::ms);
+
+while (true) {
+    modulator.last() * modIndex => carrier.freq;
+    1::ms => now;
+}`
+      }
+    ]
   },
   {
     id: 'puredata',
@@ -1039,6 +1838,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     shortName: 'Pure Data',
     phase: 'Phase B',
     category: 'audio-dsp',
+    presetType: 'Audio',
     version: 'WebPd 0.4.x / Heavy WASM',
     status: 'planned',
     statusBadge: 'Phase B — À venir',
@@ -1053,7 +1853,29 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     ],
     limits: ['Planifié en Phase B'],
     benchmark: { initTimeMs: 0, execTimeMs: 0, fps: 0 },
-    presets: []
+    presets: [
+      {
+        id: 'pd-subtractive',
+        title: 'Patch Soustractif Modulaire & Delay Stéréo',
+        type: 'Audio',
+        description: 'Graphe de synthèse soustractive avec générateur de bruit filtré et ligne de retard.',
+        code: `#N canvas 200 150 450 300 10;
+#X obj 50 40 osc~ 220;
+#X obj 120 40 noise~;
+#X obj 80 80 +~;
+#X obj 80 120 vcf~ 800 3;
+#X obj 80 160 delwrite~ delayLine 500;
+#X obj 80 200 delread~ delayLine 250;
+#X obj 80 240 dac~;
+#X connect 0 0 2 0;
+#X connect 1 0 2 1;
+#X connect 2 0 3 0;
+#X connect 3 0 4 0;
+#X connect 4 0 5 0;
+#X connect 5 0 6 0;
+#X connect 5 0 6 1;`
+      }
+    ]
   },
   {
     id: 'wasm-cpp',
@@ -1061,6 +1883,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     shortName: 'WASM C++/Rust',
     phase: 'Phase C',
     category: 'compute',
+    presetType: 'Data',
     version: 'Wasm MVP / SIMD',
     status: 'planned',
     statusBadge: 'Phase C — Prospective',
@@ -1075,7 +1898,28 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     ],
     limits: ['Planifié en Phase C'],
     benchmark: { initTimeMs: 0, execTimeMs: 0, fps: 0 },
-    presets: []
+    presets: [
+      {
+        id: 'wasm-fft',
+        title: 'Calcul Matriciel & FFT Parallèle SIMD',
+        type: 'Data',
+        description: 'Module C++ compilé en WebAssembly pour traitement de signal ultra-rapide.',
+        code: `// C++ / WebAssembly — Fast Fourier Transform & Matrix Math
+#include <emscripten.h>
+#include <cmath>
+#include <vector>
+
+extern "C" {
+  EMSCRIPTEN_KEEPALIVE
+  void computeHarmonics(float* input, float* output, int size, float frequency) {
+    for (int i = 0; i < size; ++i) {
+      float t = (float)i / size;
+      output[i] = std::sin(2.0f * M_PI * frequency * t) * input[i];
+    }
+  }
+}`
+      }
+    ]
   },
   {
     id: 'cablesgl',
@@ -1083,6 +1927,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     shortName: 'cables.gl',
     phase: 'Phase D',
     category: 'graph-nodes',
+    presetType: 'Visual',
     version: 'cables standalone engine',
     status: 'planned',
     statusBadge: 'Phase D — Évaluation',
@@ -1097,7 +1942,22 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     ],
     limits: ['Planifié en Phase D'],
     benchmark: { initTimeMs: 0, execTimeMs: 0, fps: 0 },
-    presets: []
+    presets: [
+      {
+        id: 'cables-volumetric',
+        title: 'Scène 3D & Éclairage Volumétrique cables.gl',
+        type: 'Visual',
+        description: 'Arborescence modulaire JSON de patch de rendu visuel 3D temps réel.',
+        code: `{
+  "ops": [
+    { "type": "Ops.Gl.MainLoop", "name": "MainLoop" },
+    { "type": "Ops.Gl.Shader.PhongShader", "name": "Shader" },
+    { "type": "Ops.Gl.Meshes.Cube", "name": "Geometry" },
+    { "type": "Ops.Gl.Matrix.Rotate", "name": "Rotation", "speed": 1.2 }
+  ]
+}`
+      }
+    ]
   },
   {
     id: 'litegraph',
@@ -1105,6 +1965,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     shortName: 'LiteGraph / Rete',
     phase: 'Phase D',
     category: 'graph-nodes',
+    presetType: 'Data',
     version: 'LG 0.7.x / Rete 2.x',
     status: 'planned',
     statusBadge: 'Phase D — Évaluation',
@@ -1119,7 +1980,22 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     ],
     limits: ['Planifié en Phase D'],
     benchmark: { initTimeMs: 0, execTimeMs: 0, fps: 0 },
-    presets: []
+    presets: [
+      {
+        id: 'litegraph-dataflow',
+        title: 'Flux Nodal de Traitement de Données',
+        type: 'Data',
+        description: 'Graphe acyclique dirigé pour le routage de signaux de capteurs scéniques.',
+        code: `{
+  "nodes": [
+    { "id": 1, "type": "sensor/input", "title": "Sensor OSC / Gyro", "pos": [100, 150] },
+    { "id": 2, "type": "math/filter", "title": "LowPass Kalman", "pos": [300, 150] },
+    { "id": 3, "type": "visual/uniform", "title": "Target Uniform", "pos": [500, 150] }
+  ],
+  "links": [[1, 0, 2, 0], [2, 0, 3, 0]]
+}`
+      }
+    ]
   },
   {
     id: 'touchdesigner-bridge',
@@ -1127,6 +2003,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     shortName: 'Passerelles TD/Max',
     phase: 'Phase E',
     category: 'bridge',
+    presetType: 'Data',
     version: 'WebSockets / WebRTC / WebMIDI',
     status: 'planned',
     statusBadge: 'Phase E — Passerelles',
@@ -1141,6 +2018,24 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     ],
     limits: ['Planifié en Phase E — Requiert un serveur relais WebSocket ou interface MIDI physique'],
     benchmark: { initTimeMs: 0, execTimeMs: 0, fps: 0 },
-    presets: []
+    presets: [
+      {
+        id: 'td-osc-packet',
+        title: 'Passerelle OSC / Télémétrie TouchDesigner',
+        type: 'Data',
+        description: 'Trame de synchronisation bidirectionnelle TouchDesigner, Resolume et Max/MSP.',
+        code: `// Télémétrie Scénique No[co]de ➔ TouchDesigner
+{
+  "address": "/live/scenography/uniforms",
+  "args": [
+    { "type": "f", "value": 0.85, "name": "speed" },
+    { "type": "f", "value": 1.20, "name": "intensity" },
+    { "type": "s", "value": "Scene_01_Ouverture", "name": "cue" }
+  ],
+  "transport": "WebSocket-to-UDP-Bridge",
+  "port": 9000
+}`
+      }
+    ]
   }
 ];
