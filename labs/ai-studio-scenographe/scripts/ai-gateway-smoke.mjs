@@ -63,6 +63,10 @@ try {
   assert.equal(result.origin, 'ai');
   assert.equal(result.model, 'mock-no-code-model');
   assert.match(result.glslCode, /gl_FragColor/);
+  const denied = await fetch(base + '/api/ai/generate', { method:'POST',
+    headers:{'content-type':'application/json', 'x-forwarded-for':'198.51.100.2'},
+    body:JSON.stringify({prompt:'Crée des vagues'}) });
+  assert.equal(denied.status, 403, 'accès distant sans autorisation bloqué');
   const invalid = await fetch(base + '/api/ai/generate', { method:'POST',
     headers:{'content-type':'application/json'},body: JSON.stringify({ prompt:'' }) });
   assert.equal(invalid.status, 400);

@@ -455,6 +455,13 @@ async function startServer() {
   const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
 
   app.post('/api/ai/generate', async (req: Request, res: Response) => {
+    // Ne jamais exposer une passerelle payante sur l'interface publique sans contrôle d'accès.
+    const peer = String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+    const isLocalRequest = ['127.0.0.1', '::1'].includes(peer) && !req.headers['x-forwarded-for'];
+    const remoteToken = process.env.NOCODE_AI_REMOTE_TOKEN || '';
+    if (!isLocalRequest && (!remoteToken || req.headers.authorization !== `Bearer ${remoteToken}`)) {
+      return res.status(403).json({ error: 'Génération IA distante interdite sans authentification serveur.' });
+    }
     if (!AI_BASE_URL || !AI_MODEL) {
       return res.status(503).json({ error: 'Aucun modèle IA configuré côté serveur (NOCODE_AI_BASE_URL / NOCODE_AI_MODEL)' });
     }

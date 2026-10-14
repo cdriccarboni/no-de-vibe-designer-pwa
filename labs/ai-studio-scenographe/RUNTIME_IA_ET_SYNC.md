@@ -21,7 +21,7 @@ Exemple uniquement pour un serveur local **déjà opérationnel** :
 
 La présence de variables d'environnement n'est **pas** une preuve de fonctionnement : seul un appel de génération valide le modèle.
 L'application statique hébergée chez Google AI Studio ne peut pas appeler directement le `127.0.0.1` du Mac : elle doit utiliser un serveur de confiance disposant du modèle ou une API de génération distante protégée.
-Ne jamais publier un service local sans authentification / contrôle d'accès.
+Ne jamais publier un service local sans authentification / contrôle d'accès. Le serveur refuse par défaut les requêtes de génération non locales ; `NOCODE_AI_REMOTE_TOKEN` protège l'accès distant (jeton transmis en Authorization Bearer par un proxy de confiance, jamais dans le navigateur public).
 
 ## Vérifications
 
