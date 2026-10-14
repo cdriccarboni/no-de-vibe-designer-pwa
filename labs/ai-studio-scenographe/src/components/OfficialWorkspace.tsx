@@ -204,6 +204,7 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
   // Créateur Vibe + CX Prompt
   const [vibePrompt, setVibePrompt] = useState('Crée une mer phosphorescente qui réagit au son.');
   const [vibeResult, setVibeResult] = useState<CreativePromptResult | null>(null);
+  const [vibeError, setVibeError] = useState<string | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
 
   // Patch Canvases Multiples en Onglets
@@ -436,9 +437,16 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
   const handleSendVibePrompt = async () => {
     if (!vibePrompt.trim()) return;
     setIsSynthesizing(true);
-    const res = await localAiEngine.interpretCreativePrompt(vibePrompt);
-    setVibeResult(res);
-    setIsSynthesizing(false);
+    setVibeResult(null);
+    setVibeError(null);
+    try {
+      const res = await localAiEngine.interpretCreativePrompt(vibePrompt);
+      setVibeResult(res);
+    } catch (error: any) {
+      setVibeError(error?.message || 'Génération impossible.');
+    } finally {
+      setIsSynthesizing(false);
+    }
   };
 
   const handleApplyVibeResult = (inNewTab = false) => {
@@ -997,11 +1005,14 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
             </button>
           </div>
 
+          {vibeError && <div role="alert" className="text-xs border border-red-500/50 rounded p-2 text-red-300 bg-[#241518]">{vibeError}</div>}
           {/* Résultat de la synthèse avec confirmation Appliquer / Annuler */}
           {vibeResult && (
             <div className="bg-[#1d2126] border border-[#d7b86a]/60 rounded-md p-2.5 flex flex-col gap-2 text-xs animate-in fade-in">
               <div className="flex items-start justify-between gap-3">
                 <div className="leading-tight">
+                  <div className="font-bold text-[10px] text-[#8fa79d] mb-1">{vibeResult.origin === 'ai' ? `Modèle appelé · ${vibeResult.model || 'modèle externe'} · rendu à vérifier` : 'PRESET PROCÉDURAL · sans génération IA'}</div>
+                  {vibeResult.warning && <div className="text-amber-300 mb-1">IA indisponible : {vibeResult.warning}. Preset de secours sélectionné.</div>}
                   <span className="font-bold text-[#d7b86a]">{vibeResult.title} : </span>
                   <span className="text-zinc-200">{vibeResult.explanation}</span>
                 </div>
@@ -1043,7 +1054,7 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
                       </span>
                     ))}
                   </div>
-                  <span className="text-emerald-400 font-medium ml-auto">✓ Rendu 100% autonome</span>
+                  <span className="text-amber-300 font-medium ml-auto">Aperçu à valider avant la régie</span>
                 </div>
               )}
             </div>

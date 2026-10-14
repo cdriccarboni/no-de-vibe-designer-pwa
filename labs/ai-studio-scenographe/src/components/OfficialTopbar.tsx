@@ -344,7 +344,7 @@ export const OfficialTopbar: React.FC<OfficialTopbarProps> = ({
           >
             <Bot className="w-3 h-3 text-[#d7b86a]" />
             <span className="uppercase font-bold">
-              {aiMode === 'auto' ? 'IA AUTO' : aiMode === 'local' ? 'IA LOCALE (Ollama)' : aiMode === 'connected' ? 'IA CONNECTÉE' : 'SANS IA'}
+              {aiMode === 'auto' ? 'AUTO · IA / PRESETS' : aiMode === 'local' ? 'IA LOCALE · PASSERELLE' : aiMode === 'connected' ? 'IA CONNECTÉE' : 'PRESETS · SANS IA'}
             </span>
             <ChevronDown className="w-2.5 h-2.5 text-[#9ba4ae]" />
           </button>
@@ -359,14 +359,14 @@ export const OfficialTopbar: React.FC<OfficialTopbarProps> = ({
                 className={`w-full text-left px-2 py-1 rounded text-zinc-200 flex items-center justify-between ${aiMode === 'auto' ? 'bg-[#1d2126] text-[#d7b86a] font-bold' : 'hover:bg-[#1d2126]'}`}
               >
                 <span>AUTO</span>
-                <span className="text-[9px] text-[#9ba4ae]">Meilleur moteur</span>
+                <span className="text-[9px] text-[#9ba4ae]">IA ou preset signalé</span>
               </button>
               <button
                 onClick={() => { localAiEngine.setMode('local'); setAiMenuOpen(false); }}
                 className={`w-full text-left px-2 py-1 rounded text-zinc-200 flex items-center justify-between ${aiMode === 'local' ? 'bg-[#1d2126] text-[#8fa79d] font-bold' : 'hover:bg-[#1d2126]'}`}
               >
-                <span>LOCAL (Sans Internet)</span>
-                <span className="text-[9px] text-[#8fa79d]">Ollama / Mac 16Go</span>
+                <span>PASSERELLE LOCALE</span>
+                <span className="text-[9px] text-[#8fa79d]">OmniRoute si configuré</span>
               </button>
               <button
                 onClick={() => { localAiEngine.setMode('sans_ia'); setAiMenuOpen(false); }}
