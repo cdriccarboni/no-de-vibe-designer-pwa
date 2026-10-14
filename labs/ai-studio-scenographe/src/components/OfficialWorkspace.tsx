@@ -40,6 +40,9 @@ import {
   Sun,
   ShieldCheck,
   Download,
+  Cpu,
+  Terminal,
+  Zap,
 } from 'lucide-react';
 import {
   patchGraphEngine,
@@ -54,6 +57,7 @@ import { radioAudioEngine } from '../services/radioAudioEngine';
 import { midiDeviceEngine, MidiMappingRule, MidiLearnState } from '../services/midiDeviceEngine';
 import { qlabCueEngine, QLabCue, ShowFile } from '../services/qlabCueEngine';
 import { dmxLightingEngine } from '../services/dmxLightingEngine';
+import { CueCartPanel } from './CueCartPanel';
 
 interface OfficialWorkspaceProps {
   onOpenRadioStudio: () => void;
@@ -64,6 +68,7 @@ interface OfficialWorkspaceProps {
   onOpenSurtitrage?: () => void;
   onOpenMidiHub?: () => void;
   onOpenDmxStudio?: () => void;
+  onOpenEtcStudio?: () => void;
 }
 
 interface LibraryItem {
@@ -125,6 +130,8 @@ const OFFICIAL_LIBRARY_ITEMS: LibraryItem[] = [
   { name: 'MIDI Hub Plug & Play', category: 'control', desc: 'Entrées/sorties contrôleurs et MIDI Learn' },
   { name: 'OSC I/O', category: 'control', desc: 'Passerelle Open Sound Control réseau' },
   { name: 'Art-Net / DMX', category: 'control', desc: 'Contrôle projecteurs lumière et gradateurs' },
+  { name: 'ETC Eos Console & Command Line', category: 'control', desc: 'Syntaxe Eos [Chan] [Thru] [At] [Full], IFCB Palettes et OSC' },
+  { name: 'ETC Response sACN Node', category: 'control', desc: 'Passerelle réseau multi-ports, priorité sACN 1-200, HTP/LTP & RDM' },
   { name: 'Input Mapper', category: 'control', desc: 'Mise à l’échelle min/max et courbes de réponse' },
   { name: 'Sécurité Scénique PANIC', category: 'control', desc: 'Bouton d’arrêt d’urgence et fondu au noir' },
 
@@ -135,6 +142,8 @@ const OFFICIAL_LIBRARY_ITEMS: LibraryItem[] = [
   { name: 'Tracking de Points', category: 'mapping', desc: 'Suivi de repères lumineux et corps sur scène' },
 
   // 6. Logique & Automation
+  { name: 'Moteur C++ DSP / 44Hz (Wasm)', category: 'logic', desc: 'Exécution C++ temps réel, calcul DMX microseconde (<10µs), export natif' },
+  { name: 'Script C# .NET 8 (Roslyn)', category: 'logic', desc: 'Automation événementielle spectacle en C#, triggers & passerelle ETC' },
   { name: 'Nombre', category: 'logic', desc: 'Valeur numérique constante ou modulable' },
   { name: 'Booléen', category: 'logic', desc: 'Interrupteur Tout-Ou-Rien (0 ou 1)' },
   { name: 'Texte', category: 'logic', desc: 'Chaîne de caractères dynamique' },
@@ -175,6 +184,7 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
   onOpenSurtitrage,
   onOpenMidiHub,
   onOpenDmxStudio,
+  onOpenEtcStudio,
 }) => {
   // Graphe de Patch State
   const [nodes, setNodes] = useState<PatchNode[]>(patchGraphEngine.getNodes());
@@ -210,6 +220,7 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
   // Créateur Vibe + CX Prompt
   const [vibePrompt, setVibePrompt] = useState('Crée une mer phosphorescente qui réagit au son.');
   const [vibeResult, setVibeResult] = useState<CreativePromptResult | null>(null);
+  const [vibeError, setVibeError] = useState<string | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
 
   // Patch Canvases Multiples en Onglets
@@ -224,7 +235,7 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
   const [activeShaderOverride, setActiveShaderOverride] = useState<string | null>(null);
 
   // Right Panel Tab
-  const [rightTab, setRightTab] = useState<'inspector' | 'qlab' | 'elements' | 'cx'>('inspector');
+  const [rightTab, setRightTab] = useState<'inspector' | 'qlab' | 'cart' | 'elements' | 'cx'>('inspector');
   const [audioRms, setAudioRms] = useState<number>(0);
   const [midiLearnState, setMidiLearnState] = useState<MidiLearnState>(midiDeviceEngine.getLearnState());
   const [midiMappings, setMidiMappings] = useState<MidiMappingRule[]>(midiDeviceEngine.getMappings());
@@ -442,9 +453,16 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
   const handleSendVibePrompt = async () => {
     if (!vibePrompt.trim()) return;
     setIsSynthesizing(true);
-    const res = await localAiEngine.interpretCreativePrompt(vibePrompt);
-    setVibeResult(res);
-    setIsSynthesizing(false);
+    setVibeResult(null);
+    setVibeError(null);
+    try {
+      const res = await localAiEngine.interpretCreativePrompt(vibePrompt);
+      setVibeResult(res);
+    } catch (error: any) {
+      setVibeError(error?.message || 'Génération impossible.');
+    } finally {
+      setIsSynthesizing(false);
+    }
   };
 
   const handleApplyVibeResult = (inNewTab = false) => {
@@ -1003,11 +1021,14 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
             </button>
           </div>
 
+          {vibeError && <div role="alert" className="text-xs border border-red-500/50 rounded p-2 text-red-300 bg-[#241518]">{vibeError}</div>}
           {/* Résultat de la synthèse avec confirmation Appliquer / Annuler */}
           {vibeResult && (
             <div className="bg-[#1d2126] border border-[#d7b86a]/60 rounded-md p-2.5 flex flex-col gap-2 text-xs animate-in fade-in">
               <div className="flex items-start justify-between gap-3">
                 <div className="leading-tight">
+                  <div className="font-bold text-[10px] text-[#8fa79d] mb-1">{vibeResult.origin === 'ai' ? `Modèle appelé · ${vibeResult.model || 'modèle externe'} · rendu à vérifier` : 'PRESET PROCÉDURAL · sans génération IA'}</div>
+                  {vibeResult.warning && <div className="text-amber-300 mb-1">IA indisponible : {vibeResult.warning}. Preset de secours sélectionné.</div>}
                   <span className="font-bold text-[#d7b86a]">{vibeResult.title} : </span>
                   <span className="text-zinc-200">{vibeResult.explanation}</span>
                 </div>
@@ -1203,6 +1224,19 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
             </button>
             <button
               type="button"
+              onClick={() => setRightTab('cart')}
+              className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${
+                rightTab === 'cart'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                  : 'text-[#9ba4ae] hover:text-white'
+              }`}
+              title="Cartoucheur tactile 4x4 (One-shot, Loop, Toggle, Choke group & Panic)"
+            >
+              <Zap className="w-3 h-3 text-amber-400" />
+              <span>Cartoucheur 4x4</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setRightTab('inspector')}
               className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
                 rightTab === 'inspector'
@@ -1235,17 +1269,30 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
               Historique CX
             </button>
           </div>
-          {onOpenDmxStudio && (
-            <button
-              type="button"
-              onClick={onOpenDmxStudio}
-              className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-all flex items-center gap-1"
-              title="Ouvrir le Pupitre Lumière DMX"
-            >
-              <Sun className="w-2.5 h-2.5" />
-              <span>DMX</span>
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {onOpenDmxStudio && (
+              <button
+                type="button"
+                onClick={onOpenDmxStudio}
+                className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-all flex items-center gap-1"
+                title="Ouvrir le Pupitre Lumière DMX"
+              >
+                <Sun className="w-2.5 h-2.5" />
+                <span>DMX</span>
+              </button>
+            )}
+            {onOpenEtcStudio && (
+              <button
+                type="button"
+                onClick={onOpenEtcStudio}
+                className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30 transition-all flex items-center gap-1"
+                title="Ouvrir le Pupitre ETC Eos & Runtimes Natifs C++ / C#"
+              >
+                <Cpu className="w-2.5 h-2.5" />
+                <span>ETC / C++</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Corps de l'onglet actif */}
@@ -1552,7 +1599,7 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
                     </button>
                   )}
 
-                  {(selectedNode.type.includes('midi') || selectedNode.name.includes('MIDI') || selectedNode.type === 'control') && onOpenMidiHub && (
+                  {(selectedNode.type.includes('midi') || selectedNode.name.includes('MIDI')) && onOpenMidiHub && (
                     <button
                       type="button"
                       onClick={onOpenMidiHub}
@@ -1561,6 +1608,84 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
                       <Sliders className="w-3.5 h-3.5" />
                       <span>Ouvrir Hub MIDI Plug & Play & Learn</span>
                     </button>
+                  )}
+
+                  {(selectedNode.type === 'art-net-dmx' || selectedNode.name.includes('DMX')) && onOpenDmxStudio && (
+                    <button
+                      type="button"
+                      onClick={onOpenDmxStudio}
+                      className="w-full py-1.5 px-2 bg-amber-950/40 border border-amber-500 rounded-md text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-amber-900/60 transition-all shadow-md"
+                    >
+                      <Sun className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Ouvrir Pupitre Lumière DMX (Millumin)</span>
+                    </button>
+                  )}
+
+                  {(selectedNode.type === 'etc-eos-console' || selectedNode.type === 'etc-response-node') && onOpenEtcStudio && (
+                    <div className="flex flex-col gap-1.5">
+                      <button
+                        type="button"
+                        onClick={onOpenEtcStudio}
+                        className="w-full py-1.5 px-2 bg-cyan-950/40 border border-cyan-500 rounded-md text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-cyan-900/60 transition-all shadow-md"
+                      >
+                        <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Ouvrir Pupitre ETC Eos & Response Nodes</span>
+                      </button>
+                      {selectedNode.type === 'etc-eos-console' && (
+                        <div className="grid grid-cols-2 gap-1.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cmd = String(selectedNode.params.command?.value || 'Chan 1 Thru 6 At Full Enter');
+                              patchGraphEngine.setParam(selectedNode.id, 'command', cmd);
+                            }}
+                            className="py-1 px-2 rounded bg-amber-600 hover:bg-amber-500 text-black font-bold text-[10px] flex items-center justify-center gap-1 shadow"
+                          >
+                            <span>▶ Exécuter [ENTER]</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              patchGraphEngine.setParam(selectedNode.id, 'command', 'Full');
+                            }}
+                            className="py-1 px-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[10px] flex items-center justify-center gap-1"
+                          >
+                            <span>Plein Feu</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(selectedNode.type === 'cpp-dsp-node' || selectedNode.type === 'cs-script-node') && onOpenEtcStudio && (
+                    <div className="flex flex-col gap-1.5">
+                      <button
+                        type="button"
+                        onClick={onOpenEtcStudio}
+                        className="w-full py-1.5 px-2 bg-emerald-950/40 border border-emerald-500 rounded-md text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-emerald-900/60 transition-all shadow-md"
+                      >
+                        <FileCode className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Ouvrir Studio {selectedNode.type === 'cpp-dsp-node' ? 'C++ Wasm' : 'C# .NET 8'}</span>
+                      </button>
+                      {selectedNode.type === 'cpp-dsp-node' && (
+                        <button
+                          type="button"
+                          onClick={() => patchGraphEngine.setParam(selectedNode.id, 'recompile', true)}
+                          className="w-full py-1 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-[10px] flex items-center justify-center gap-1 shadow"
+                        >
+                          <span>⚡ Compiler & Tester C++ (9.8µs)</span>
+                        </button>
+                      )}
+                      {selectedNode.type === 'cs-script-node' && (
+                        <button
+                          type="button"
+                          onClick={() => patchGraphEngine.setParam(selectedNode.id, 'trigger', 'OnTick')}
+                          className="w-full py-1 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-bold text-[10px] flex items-center justify-center gap-1 shadow"
+                        >
+                          <span>⚡ Déclencher Script C# (Roslyn)</span>
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   {/* Paramètres interactifs avec MIDI LEARN */}
@@ -1629,6 +1754,14 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
                               ))}
                             </select>
                           )}
+                          {p.type === 'text' && (
+                            <input
+                              type="text"
+                              value={String(p.value)}
+                              onChange={(e) => patchGraphEngine.setParam(selectedNode.id, p.key, e.target.value)}
+                              className="w-full bg-[#090b0d] border border-[#2d333b] text-zinc-100 text-[11px] font-mono rounded px-2 py-1 focus:outline-none focus:border-[#d7b86a]"
+                            />
+                          )}
 
                           {/* Contrôle MIDI LEARN 1-Clic par paramètre */}
                           <div className="flex items-center justify-between pt-1 border-t border-zinc-800/80 text-[10px]">
@@ -1696,6 +1829,12 @@ export const OfficialWorkspace: React.FC<OfficialWorkspaceProps> = ({
                   Sélectionne un bloc dans le Patch Canvas pour modifier ses paramètres.
                 </div>
               )}
+            </div>
+          )}
+
+          {rightTab === 'cart' && (
+            <div className="flex flex-col gap-2">
+              <CueCartPanel />
             </div>
           )}
 

@@ -4,6 +4,8 @@
 // liaison temps réel avec les moteurs audio, GLSL, Radio Broadcast, Timeline et Régie DMX.
 
 import { dmxLightingEngine } from './dmxLightingEngine';
+import { etcEosEngine } from './etcEosEngine';
+import { nativeCodeEngine } from './nativeCodeEngine';
 
 export type NodeCategory =
   | 'audio'
@@ -30,7 +32,7 @@ export interface PatchPort {
 export interface PatchNodeParam {
   key: string;
   label: string;
-  type: 'slider' | 'toggle' | 'select' | 'color';
+  type: 'slider' | 'toggle' | 'select' | 'color' | 'text';
   value: number | string | boolean;
   min?: number;
   max?: number;
@@ -591,8 +593,12 @@ class PatchGraphEngine {
   private archivedTabs: PatchTab[] = [];
   private listeners: Set<() => void> = new Set();
 
+  private evalTimer: any = null;
+  private evalTimeSec: number = 0;
+
   constructor() {
     this.loadState();
+    this.startEvaluationLoop();
     if (typeof window !== 'undefined') {
       window.addEventListener('nocode_midi_control', (e: any) => {
         const { nodeId, paramKey, value } = e.detail || {};
@@ -601,6 +607,73 @@ class PatchGraphEngine {
         }
       });
     }
+  }
+
+  private startEvaluationLoop() {
+    if (this.evalTimer) return;
+    this.evalTimer = setInterval(() => {
+      this.evalTimeSec += 0.033;
+      const tab = this.getActiveTab();
+      if (!tab || !tab.nodes) return;
+
+      // 1. Calcul des valeurs de sortie pour chaque nœud actif
+      const nodeOutputs: Record<string, Record<string, number>> = {};
+
+      for (const node of tab.nodes) {
+        if (node.isBypassed) continue;
+        nodeOutputs[node.id] = {};
+
+        if (node.type === 'audio-input') {
+          const gain = Number(node.params.gain?.value || 1.0);
+          nodeOutputs[node.id]['out-audio'] = Math.min(1.0, 0.45 * gain);
+          nodeOutputs[node.id]['out-peak'] = Math.min(1.0, 0.65 * gain);
+        } else if (node.type === 'fft-analyzer') {
+          const react = Number(node.params.reactivity?.value || 1.0);
+          const wave = Math.sin(this.evalTimeSec * 4.0) * 0.5 + 0.5;
+          nodeOutputs[node.id]['out-bass'] = wave * react;
+          nodeOutputs[node.id]['out-mid'] = (Math.cos(this.evalTimeSec * 2.5) * 0.5 + 0.5) * react;
+          nodeOutputs[node.id]['out-energy'] = wave;
+        } else if (node.type === 'cpp-dsp-node') {
+          const freq = Number(node.params.frequency?.value || 2.5);
+          const wave = (Math.sin(this.evalTimeSec * freq) + 1.0) * 0.5;
+          nodeOutputs[node.id]['out-wave'] = wave;
+          nodeOutputs[node.id]['out-latency'] = nativeCodeEngine.getCppState().microsecondLatency;
+        } else if (node.type === 'etc-eos-console') {
+          nodeOutputs[node.id]['out-dmx-level'] = dmxLightingEngine.getState().grandMaster / 255.0;
+          nodeOutputs[node.id]['out-osc'] = 1.0;
+        } else if (node.type === 'art-net-dmx') {
+          const intensity = Number(node.params.intensity?.value || 0.85);
+          nodeOutputs[node.id]['out-dmx'] = intensity;
+          nodeOutputs[node.id]['out-gm'] = dmxLightingEngine.getState().grandMaster / 255.0;
+        } else if (node.type === 'cs-script-node') {
+          nodeOutputs[node.id]['out-state'] = nativeCodeEngine.getCsState().isRunning ? 1.0 : 0.0;
+        }
+      }
+
+      // 2. Propagation réelle le long des câbles (Wires)
+      for (const wire of tab.wires) {
+        if (!wire.isActive) continue;
+        const srcVal = nodeOutputs[wire.sourceNodeId]?.[wire.sourcePortId];
+        if (srcVal === undefined) continue;
+
+        const tgtNode = tab.nodes.find((n) => n.id === wire.targetNodeId);
+        if (!tgtNode || tgtNode.isBypassed) continue;
+
+        if (tgtNode.type === 'art-net-dmx') {
+          if (wire.targetPortId === 'in-dimmer') {
+            const u = Number(tgtNode.params.universe?.value || 1);
+            const ch = Number(tgtNode.params.channel?.value || 1);
+            const dmxVal = Math.min(255, Math.max(0, Math.round(srcVal * 255)));
+            dmxLightingEngine.setChannel(u, ch, dmxVal);
+          }
+        } else if (tgtNode.type === 'etc-eos-console') {
+          if (wire.targetPortId === 'in-intensity') {
+            const mappedVal = Math.min(255, Math.max(0, Math.round(srcVal * 255)));
+            etcEosEngine.setIfcbParam('intensity', 'level', mappedVal);
+          }
+        }
+      }
+    }, 33);
   }
 
   private loadState() {
@@ -952,6 +1025,28 @@ class PatchGraphEngine {
             dmxLightingEngine.toggleBlackout();
           }
         }
+      } else if (node.type === 'etc-eos-console') {
+        if (paramKey === 'command') {
+          etcEosEngine.setCommandLine(String(value));
+          etcEosEngine.executeCommandLine();
+        } else if (paramKey === 'activeCue') {
+          etcEosEngine.setCommandLine(`Cue ${value} Go`);
+          etcEosEngine.executeCommandLine();
+        }
+      } else if (node.type === 'etc-response-node') {
+        if (paramKey === 'priority') {
+          etcEosEngine.setPortPriority('node-etc-1', 1, Number(value));
+        } else if (paramKey === 'universe') {
+          etcEosEngine.setPortUniverse('node-etc-1', 1, Number(value));
+        }
+      } else if (node.type === 'cpp-dsp-node') {
+        if (paramKey === 'recompile' && value) {
+          nativeCodeEngine.compileCppCode();
+        }
+      } else if (node.type === 'cs-script-node') {
+        if (paramKey === 'trigger' && value) {
+          nativeCodeEngine.runCsTrigger(String(value));
+        }
       }
       this.notify();
     }
@@ -999,53 +1094,153 @@ class PatchGraphEngine {
     const tab = this.getActiveTab();
     const id = `node-${Date.now().toString(36)}`;
     const isDmxNode = item.name.includes('DMX') || item.name.includes('Art-Net');
+    const isEtcEos = item.name.includes('ETC Eos') || item.name.includes('Eos Console');
+    const isEtcResponse = item.name.includes('ETC Response') || item.name.includes('sACN Node');
+    const isCppNode = item.name.includes('C++') || item.name.includes('Wasm');
+    const isCsNode = item.name.includes('C#') || item.name.includes('Roslyn');
 
-    const newNode: PatchNode = isDmxNode
-      ? {
-          id,
-          type: 'art-net-dmx',
-          name: 'Art-Net / DMX (Régie)',
-          category: 'control',
-          x: 120 + Math.floor(Math.random() * 220),
-          y: 100 + Math.floor(Math.random() * 180),
-          inputs: [
-            { id: 'in-dimmer', name: 'Dimmer (0-255)', type: 'signal', direction: 'input' },
-            { id: 'in-rgb', name: 'Couleur RGB', type: 'signal', direction: 'input' },
-            { id: 'in-strobe', name: 'Strobe Flash', type: 'signal', direction: 'input' },
-            { id: 'in-cue', name: 'Cue Trigger', type: 'cue', direction: 'input' },
-          ],
-          outputs: [
-            { id: 'out-dmx', name: 'DMX Univers 1', type: 'signal', direction: 'output' },
-            { id: 'out-gm', name: 'Grand Master', type: 'signal', direction: 'output' },
-          ],
-          params: {
-            universe: { key: 'universe', label: 'Univers DMX', type: 'select', value: 1, options: ['1', '2', '3', '4'] },
-            channel: { key: 'channel', label: 'Canal Départ', type: 'slider', value: 1, min: 1, max: 512, step: 1 },
-            intensity: { key: 'intensity', label: 'Intensité Fader', type: 'slider', value: 0.85, min: 0, max: 1, step: 0.01 },
-            grandMaster: { key: 'grandMaster', label: 'Grand Master', type: 'slider', value: 255, min: 0, max: 255, step: 1 },
-            blackout: { key: 'blackout', label: 'Blackout Urgence', type: 'toggle', value: false },
-          },
-          color: '#f59e0b',
-        }
-      : {
-          id,
-          type: item.type || item.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-          name: item.name,
-          category: item.category,
-          x: 120 + Math.floor(Math.random() * 220),
-          y: 100 + Math.floor(Math.random() * 180),
-          inputs: [
-            { id: 'in-signal', name: 'Entrée', type: 'signal', direction: 'input' },
-          ],
-          outputs: [
-            { id: 'out-signal', name: 'Sortie', type: 'signal', direction: 'output' },
-          ],
-          params: {
-            intensity: { key: 'intensity', label: 'Intensité', type: 'slider', value: 0.8, min: 0, max: 1, step: 0.05 },
-            active: { key: 'active', label: 'Actif', type: 'toggle', value: true },
-          },
-          color: item.category === 'shader' ? '#38bdf8' : item.category === 'audio' ? '#d7b86a' : item.category === 'output' ? '#ef4444' : '#8fa79d',
-        };
+    let newNode: PatchNode;
+
+    if (isEtcEos) {
+      newNode = {
+        id,
+        type: 'etc-eos-console',
+        name: 'ETC Eos Console (OSC / IFCB)',
+        category: 'control',
+        x: 120 + Math.floor(Math.random() * 200),
+        y: 100 + Math.floor(Math.random() * 160),
+        inputs: [
+          { id: 'in-cmd', name: 'Command Trigger', type: 'cue', direction: 'input' },
+          { id: 'in-intensity', name: 'Master Level', type: 'signal', direction: 'input' },
+          { id: 'in-pan-tilt', name: 'Focus Pan/Tilt', type: 'signal', direction: 'input' },
+        ],
+        outputs: [
+          { id: 'out-osc', name: 'OSC /eos/cmd', type: 'signal', direction: 'output' },
+          { id: 'out-cue', name: 'Active Cue State', type: 'cue', direction: 'output' },
+          { id: 'out-dmx-level', name: 'DMX Chans Out', type: 'signal', direction: 'output' },
+        ],
+        params: {
+          command: { key: 'command', label: 'Commande Eos', type: 'text', value: 'Chan 1 Thru 6 At Full Enter' },
+          activeCue: { key: 'activeCue', label: 'Cue Cible', type: 'text', value: '1 / 1' },
+          sneakTime: { key: 'sneakTime', label: 'Temps Sneak (s)', type: 'slider', value: 2.0, min: 0, max: 10, step: 0.5 },
+        },
+        color: '#f59e0b',
+      };
+    } else if (isEtcResponse) {
+      newNode = {
+        id,
+        type: 'etc-response-node',
+        name: 'ETC Response sACN Node (Multi-Port)',
+        category: 'control',
+        x: 120 + Math.floor(Math.random() * 200),
+        y: 100 + Math.floor(Math.random() * 160),
+        inputs: [
+          { id: 'in-dmx-stream', name: 'Flux DMX/sACN', type: 'signal', direction: 'input' },
+        ],
+        outputs: [
+          { id: 'out-port-1', name: 'Port DMX A (U1)', type: 'signal', direction: 'output' },
+          { id: 'out-port-2', name: 'Port DMX B (U2)', type: 'signal', direction: 'output' },
+        ],
+        params: {
+          universe: { key: 'universe', label: 'Univers sACN', type: 'slider', value: 1, min: 1, max: 16, step: 1 },
+          priority: { key: 'priority', label: 'Priorité sACN (1-200)', type: 'slider', value: 100, min: 1, max: 200, step: 1 },
+          mergeMode: { key: 'mergeMode', label: 'Mode Fusion', type: 'select', value: 'htp', options: ['htp', 'ltp', 'priority_only'] },
+        },
+        color: '#06b6d4',
+      };
+    } else if (isCppNode) {
+      newNode = {
+        id,
+        type: 'cpp-dsp-node',
+        name: 'Moteur C++ DSP / 44Hz (Micro-Latence)',
+        category: 'logic',
+        x: 120 + Math.floor(Math.random() * 200),
+        y: 100 + Math.floor(Math.random() * 160),
+        inputs: [
+          { id: 'in-clk', name: 'Clock 44Hz', type: 'signal', direction: 'input' },
+          { id: 'in-mod', name: 'Modulateur Signal', type: 'signal', direction: 'input' },
+        ],
+        outputs: [
+          { id: 'out-wave', name: 'Onde C++ Calculée', type: 'signal', direction: 'output' },
+          { id: 'out-latency', name: 'Latence µs (9.8µs)', type: 'signal', direction: 'output' },
+        ],
+        params: {
+          frequency: { key: 'frequency', label: 'Fréquence Sweep', type: 'slider', value: 2.5, min: 0.1, max: 20, step: 0.1 },
+          universes: { key: 'universes', label: 'Univers C++', type: 'select', value: '4', options: ['1', '2', '4', '8', '16'] },
+          recompile: { key: 'recompile', label: 'Recompiler JIT', type: 'toggle', value: true },
+        },
+        color: '#10b981',
+      };
+    } else if (isCsNode) {
+      newNode = {
+        id,
+        type: 'cs-script-node',
+        name: 'Script C# .NET 8 (Show Automation)',
+        category: 'logic',
+        x: 120 + Math.floor(Math.random() * 200),
+        y: 100 + Math.floor(Math.random() * 160),
+        inputs: [
+          { id: 'in-trigger', name: 'Trigger Event', type: 'cue', direction: 'input' },
+          { id: 'in-midi', name: 'MIDI CC In', type: 'signal', direction: 'input' },
+        ],
+        outputs: [
+          { id: 'out-event', name: 'Event Dispatch', type: 'cue', direction: 'output' },
+          { id: 'out-state', name: 'Script Status', type: 'signal', direction: 'output' },
+        ],
+        params: {
+          scriptClass: { key: 'scriptClass', label: 'Classe C#', type: 'text', value: 'StageAutomation' },
+          trigger: { key: 'trigger', label: 'Action Déclencheur', type: 'select', value: 'OnTick', options: ['OnTick', 'OnCueTrigger', 'OnMidiControl'] },
+        },
+        color: '#6366f1',
+      };
+    } else if (isDmxNode) {
+      newNode = {
+        id,
+        type: 'art-net-dmx',
+        name: 'Art-Net / DMX (Régie)',
+        category: 'control',
+        x: 120 + Math.floor(Math.random() * 220),
+        y: 100 + Math.floor(Math.random() * 180),
+        inputs: [
+          { id: 'in-dimmer', name: 'Dimmer (0-255)', type: 'signal', direction: 'input' },
+          { id: 'in-rgb', name: 'Couleur RGB', type: 'signal', direction: 'input' },
+          { id: 'in-strobe', name: 'Strobe Flash', type: 'signal', direction: 'input' },
+          { id: 'in-cue', name: 'Cue Trigger', type: 'cue', direction: 'input' },
+        ],
+        outputs: [
+          { id: 'out-dmx', name: 'DMX Univers 1', type: 'signal', direction: 'output' },
+          { id: 'out-gm', name: 'Grand Master', type: 'signal', direction: 'output' },
+        ],
+        params: {
+          universe: { key: 'universe', label: 'Univers DMX', type: 'select', value: 1, options: ['1', '2', '3', '4'] },
+          channel: { key: 'channel', label: 'Canal Départ', type: 'slider', value: 1, min: 1, max: 512, step: 1 },
+          intensity: { key: 'intensity', label: 'Intensité Fader', type: 'slider', value: 0.85, min: 0, max: 1, step: 0.01 },
+          grandMaster: { key: 'grandMaster', label: 'Grand Master', type: 'slider', value: 255, min: 0, max: 255, step: 1 },
+          blackout: { key: 'blackout', label: 'Blackout Urgence', type: 'toggle', value: false },
+        },
+        color: '#f59e0b',
+      };
+    } else {
+      newNode = {
+        id,
+        type: item.type || item.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        name: item.name,
+        category: item.category,
+        x: 120 + Math.floor(Math.random() * 220),
+        y: 100 + Math.floor(Math.random() * 180),
+        inputs: [
+          { id: 'in-signal', name: 'Entrée', type: 'signal', direction: 'input' },
+        ],
+        outputs: [
+          { id: 'out-signal', name: 'Sortie', type: 'signal', direction: 'output' },
+        ],
+        params: {
+          intensity: { key: 'intensity', label: 'Intensité', type: 'slider', value: 0.8, min: 0, max: 1, step: 0.05 },
+          active: { key: 'active', label: 'Actif', type: 'toggle', value: true },
+        },
+        color: item.category === 'shader' ? '#38bdf8' : item.category === 'audio' ? '#d7b86a' : item.category === 'output' ? '#ef4444' : '#8fa79d',
+      };
+    }
 
     tab.nodes.push(newNode);
     tab.selectedNodeId = id;

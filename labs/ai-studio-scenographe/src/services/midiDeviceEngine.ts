@@ -34,6 +34,7 @@ interface InternalMidiPort {
   name?: string;
   manufacturer?: string;
   state: string;
+  send?: (data: Uint8Array | number[], timestamp?: number) => void;
   onmidimessage?: ((event: { data: Uint8Array | number[] }) => void) | null;
 }
 
@@ -47,6 +48,19 @@ interface InternalMidiAccess {
   onstatechange?: ((e: { port: InternalMidiPort }) => void) | null;
 }
 
+export interface RawMidiMessage {
+  type: 'note' | 'cc' | 'pitchbend';
+  number: number;
+  channel: number;
+  velocity: number;
+}
+
+export function getMidiNoteName(noteNumber: number): string {
+  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const octave = Math.floor(noteNumber / 12) - 1; // Note 60 = C4, Note 36 = C1
+  return `${noteNames[noteNumber % 12]}${octave}`;
+}
+
 class MidiDeviceEngine {
   private midiAccess: InternalMidiAccess | null = null;
   private isSupported = false;
@@ -54,6 +68,7 @@ class MidiDeviceEngine {
   private mappings: MidiMappingRule[] = [];
   private learnState: MidiLearnState = { isActive: false };
   private listeners: Set<() => void> = new Set();
+  private rawMessageListeners: Set<(msg: RawMidiMessage) => void> = new Set();
   private lastActivityText = 'Prêt à connecter';
 
   constructor() {
@@ -83,6 +98,21 @@ class MidiDeviceEngine {
   public subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  public onRawMessage(listener: (msg: RawMidiMessage) => void): () => void {
+    this.rawMessageListeners.add(listener);
+    return () => this.rawMessageListeners.delete(listener);
+  }
+
+  private dispatchRawMessage(msg: RawMidiMessage) {
+    this.rawMessageListeners.forEach((l) => {
+      try {
+        l(msg);
+      } catch (err) {
+        console.error('Erreur dans le listener MIDI brut:', err);
+      }
+    });
   }
 
   private notify() {
@@ -175,6 +205,9 @@ class MidiDeviceEngine {
       const normalized = ccValue / 127;
       this.lastActivityText = `CC ${ccNumber} : ${ccValue} (Ch ${channel})`;
 
+      // Notifier les écouteurs de messages bruts (ex: CueCartPanel MIDI Learn)
+      this.dispatchRawMessage({ type: 'cc', number: ccNumber, channel, velocity: normalized });
+
       // Mode MIDI Learn actif ?
       if (this.learnState.isActive && this.learnState.targetNodeId && this.learnState.targetParamKey) {
         this.assignLearnMapping({
@@ -198,6 +231,9 @@ class MidiDeviceEngine {
       const noteNumber = data1;
       const velocity = data2 / 127;
       this.lastActivityText = `Note On ${noteNumber} (Ch ${channel})`;
+
+      // Notifier les écouteurs de messages bruts (ex: CueCartPanel MIDI Learn)
+      this.dispatchRawMessage({ type: 'note', number: noteNumber, channel, velocity });
 
       if (this.learnState.isActive && this.learnState.targetNodeId && this.learnState.targetParamKey) {
         this.assignLearnMapping({
@@ -290,6 +326,112 @@ class MidiDeviceEngine {
     return this.devices.filter((d) => d.type === 'input' && d.state === 'connected').length;
   }
 
+  public getConnectedOutputsCount(): number {
+    return this.devices.filter((d) => d.type === 'output' && d.state === 'connected').length;
+  }
+
+  public getOutputDevices(): MidiDevice[] {
+    return this.devices.filter((d) => d.type === 'output');
+  }
+
+  /**
+   * Envoie un message Control Change (CC) sur les sorties MIDI connectées
+   * @param channel Canal MIDI (1 à 16)
+   * @param ccNumber Numéro CC (0 à 127)
+   * @param value Valeur CC (0 à 127)
+   * @param deviceId ID optionnel de la sortie cible (ou 'all' pour diffuser partout)
+   */
+  public sendControlChange(channel: number, ccNumber: number, value: number, deviceId?: string): boolean {
+    const safeChannel = Math.max(1, Math.min(16, channel));
+    const safeCc = Math.max(0, Math.min(127, Math.round(ccNumber)));
+    const safeVal = Math.max(0, Math.min(127, Math.round(value)));
+    const statusByte = 0xB0 + (safeChannel - 1);
+    const bytes = [statusByte, safeCc, safeVal];
+
+    let sent = false;
+    if (this.midiAccess) {
+      this.midiAccess.outputs.forEach((output: InternalMidiPort) => {
+        if (!deviceId || deviceId === 'all' || output.id === deviceId) {
+          if (typeof output.send === 'function') {
+            try {
+              output.send(bytes);
+              sent = true;
+            } catch (err) {
+              console.warn('[MidiDeviceEngine] Erreur envoi CC:', err);
+            }
+          }
+        }
+      });
+    }
+
+    this.lastActivityText = `SORTIE MIDI : CC ${safeCc} = ${safeVal} (Canal ${safeChannel})${sent ? ' [Envoyé matériel]' : ' [Simulé virtuel]'}`;
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('nocode_midi_out', {
+          detail: {
+            type: 'control_change',
+            channel: safeChannel,
+            number: safeCc,
+            value: safeVal,
+            bytes,
+            sentToHardware: sent
+          }
+        })
+      );
+    }
+    this.notify();
+    return sent;
+  }
+
+  /**
+   * Envoie un message Program Change (PC) sur les sorties MIDI connectées
+   * Utilisé pour rappeler des scènes de consoles d'éclairage ou des presets d'effets (réverbe, delay)
+   * @param channel Canal MIDI (1 à 16)
+   * @param programNumber Numéro de Programme (0 à 127)
+   * @param deviceId ID optionnel de la sortie cible (ou 'all')
+   */
+  public sendProgramChange(channel: number, programNumber: number, deviceId?: string): boolean {
+    const safeChannel = Math.max(1, Math.min(16, channel));
+    const safeProg = Math.max(0, Math.min(127, Math.round(programNumber)));
+    const statusByte = 0xC0 + (safeChannel - 1);
+    const bytes = [statusByte, safeProg];
+
+    let sent = false;
+    if (this.midiAccess) {
+      this.midiAccess.outputs.forEach((output: InternalMidiPort) => {
+        if (!deviceId || deviceId === 'all' || output.id === deviceId) {
+          if (typeof output.send === 'function') {
+            try {
+              output.send(bytes);
+              sent = true;
+            } catch (err) {
+              console.warn('[MidiDeviceEngine] Erreur envoi Program Change:', err);
+            }
+          }
+        }
+      });
+    }
+
+    this.lastActivityText = `SORTIE MIDI : Program Change #${safeProg} (Canal ${safeChannel})${sent ? ' [Envoyé matériel]' : ' [Simulé virtuel]'}`;
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('nocode_midi_out', {
+          detail: {
+            type: 'program_change',
+            channel: safeChannel,
+            number: safeProg,
+            bytes,
+            sentToHardware: sent
+          }
+        })
+      );
+    }
+    this.notify();
+    return sent;
+  }
+
   public getMappings(): MidiMappingRule[] {
     return this.mappings;
   }
@@ -310,6 +452,8 @@ class MidiDeviceEngine {
   public simulateMidiMessage(type: 'cc' | 'note', number: number, normalizedValue: number, channel = 1) {
     const rawVal = Math.round(normalizedValue * 127);
     this.lastActivityText = `${type.toUpperCase()} ${number} : ${rawVal} (Ch ${channel}) [Simulé]`;
+
+    this.dispatchRawMessage({ type, number, channel, velocity: normalizedValue });
 
     if (this.learnState.isActive && this.learnState.targetNodeId && this.learnState.targetParamKey) {
       this.assignLearnMapping({

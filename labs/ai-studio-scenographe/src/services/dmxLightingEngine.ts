@@ -741,6 +741,24 @@ export class DmxLightingEngine {
     }
   }
 
+  public updateFixtureChannel(fixtureId: string, channelOffset: number, value: number) {
+    const fix = this.fixtures.find((f) => f.id === fixtureId);
+    if (fix && channelOffset >= 0 && channelOffset < fix.channels.length) {
+      const val = Math.max(0, Math.min(255, Math.round(value)));
+      fix.channels[channelOffset] = val;
+      this.setChannel(fix.universe, fix.startChannel + channelOffset, val);
+      this.notify();
+    }
+  }
+
+  public updateFixturePosition(fixtureId: string, position: DmxFixture['stagePosition']) {
+    const fix = this.fixtures.find((f) => f.id === fixtureId);
+    if (fix) {
+      fix.stagePosition = { ...position };
+      this.notify();
+    }
+  }
+
   public setSubmasterValue(submasterId: string, value: number) {
     const sub = this.submasters.find((s) => s.id === submasterId);
     if (!sub) return;

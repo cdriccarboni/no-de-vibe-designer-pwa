@@ -22,11 +22,13 @@ import {
   Trash2,
   ArrowRight,
   ShieldAlert,
-  Grid
+  Grid,
+  Cpu
 } from 'lucide-react';
 import {
   dmxLightingEngine
 } from '../services/dmxLightingEngine';
+import { CueCartPanel } from './CueCartPanel';
 import {
   DmxProtocol,
   DmxFixture,
@@ -40,12 +42,14 @@ interface DmxStudioModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSendCueToQlab?: (cue: DmxLightCue) => void;
+  onOpenEtcStudio?: () => void;
 }
 
 export const DmxStudioModal: React.FC<DmxStudioModalProps> = ({
   isOpen,
   onClose,
   onSendCueToQlab,
+  onOpenEtcStudio,
 }) => {
   const [engineState, setEngineState] = useState<DmxEngineState>(dmxLightingEngine.getState());
   const [fixtures, setFixtures] = useState<DmxFixture[]>(dmxLightingEngine.getFixtures());
@@ -496,6 +500,20 @@ export const DmxStudioModal: React.FC<DmxStudioModalProps> = ({
             >
               <Sliders className="w-3.5 h-3.5" /> Patch DMX 512
             </button>
+
+            {onOpenEtcStudio && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenEtcStudio();
+                }}
+                className="px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 bg-cyan-950/40 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-900/50 transition-colors ml-2"
+                title="Basculer vers le Pupitre ETC Eos & Runtimes C++ / C#"
+              >
+                <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+                <span>ETC Eos & C++/C#</span>
+              </button>
+            )}
           </div>
 
           {/* Crossfade Bar en continu */}
@@ -835,12 +853,15 @@ export const DmxStudioModal: React.FC<DmxStudioModalProps> = ({
             </div>
           )}
 
-          {/* 4. CARTOUCHEUR DIRECT (CUE CART PADS) */}
+          {/* 4. CARTOUCHEUR DIRECT (CUE CART PADS 4x4) */}
           {activeTab === 'cart' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              {/* Le Cartoucheur Tactile 4x4 Professionnel */}
+              <CueCartPanel />
+
+              <div className="flex items-center justify-between pt-2 border-t border-zinc-800">
                 <p className="text-xs text-zinc-400">
-                  Cartoucheur tactile façon TouchOSC / StreamDeck : déclenchement immédiat de scènes lumineuses et flashes d'urgence au doigt et à la souris.
+                  Pads d'accès rapide DMX & Cues Lumière spécifiques du plateau :
                 </p>
                 <button
                   onClick={() => dmxLightingEngine.toggleBlackout()}

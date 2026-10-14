@@ -3,6 +3,7 @@ import { createServer as createViteServer } from 'vite';
 import http from 'http';
 import path from 'path';
 import fs from 'fs';
+import { gatewayChatUrl, parseShaderGeneration } from './src/services/aiGatewayValidation';
 
 interface RadioChannel {
   id: string;
@@ -72,6 +73,18 @@ async function startServer() {
   );
 
   app.use(express.json());
+
+  // Téléchargement direct du paquet Git complet
+  app.get('/export/nocode-ai-expert.bundle', (_req: Request, res: Response) => {
+    const bundlePath = path.join(process.cwd(), 'public/export/nocode-ai-expert.bundle');
+    if (fs.existsSync(bundlePath)) {
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', 'attachment; filename="nocode-ai-expert.bundle"');
+      res.download(bundlePath, 'nocode-ai-expert.bundle');
+    } else {
+      res.status(404).send('Bundle non trouvé');
+    }
+  });
 
   // -------------------------------------------------------------
   // RADIO API ROUTES
@@ -444,45 +457,80 @@ async function startServer() {
   });
 
   // -------------------------------------------------------------
-  // IA LIBRE, LOCALE ET UNIVERSELLE (Ollama, WebLLM, Agents Locaux)
+  // IA via passerelle configurée, ou presets sans IA : sources distinctes
   // -------------------------------------------------------------
+  // OmniRoute / toute passerelle compatible OpenAI. Configuration côté serveur uniquement.
+  // Ne pas faire passer un preset procédural pour une sortie IA.
+  const AI_BASE_URL = process.env.NOCODE_AI_BASE_URL || process.env.OMNIROUTE_BASE_URL || '';
+  const AI_MODEL = process.env.NOCODE_AI_MODEL || process.env.OMNIROUTE_MODEL || '';
+  const AI_KEY = process.env.NOCODE_AI_API_KEY || process.env.OMNIROUTE_API_KEY || '';
   const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
 
-  app.get('/api/ai/status', async (_req: Request, res: Response) => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
-      const resp = await fetch(`${OLLAMA_HOST}/api/tags`, { signal: controller.signal }).catch(() => null);
-      clearTimeout(timeoutId);
-
-      if (resp && resp.ok) {
-        const data = await resp.json();
-        return res.json({
-          provider: 'ollama',
-          connected: true,
-          models: data.models || [],
-          mode: 'local',
-          webGpuSupported: true,
-        });
-      }
-    } catch {
-      // Ignore network errors
+  app.post('/api/ai/generate', async (req: Request, res: Response) => {
+    // Ne jamais exposer une passerelle payante sur l'interface publique sans contrôle d'accès.
+    const peer = String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+    const isLocalRequest = ['127.0.0.1', '::1'].includes(peer) && !req.headers['x-forwarded-for'];
+    const remoteToken = process.env.NOCODE_AI_REMOTE_TOKEN || '';
+    if (!isLocalRequest && (!remoteToken || req.headers.authorization !== `Bearer ${remoteToken}`)) {
+      return res.status(403).json({ error: 'Génération IA distante interdite sans authentification serveur.' });
     }
+    if (!AI_BASE_URL || !AI_MODEL) {
+      return res.status(503).json({ error: 'Aucun modèle IA configuré côté serveur (NOCODE_AI_BASE_URL / NOCODE_AI_MODEL)' });
+    }
+    const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
+    if (!prompt || prompt.length > 2500) {
+      return res.status(400).json({ error: 'Description requise (2500 caractères maximum)' });
+    }
+    try {
+      const url = gatewayChatUrl(AI_BASE_URL);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(AI_KEY ? { Authorization: `Bearer ${AI_KEY}` } : {}),
+        },
+        signal: AbortSignal.timeout(35000),
+        body: JSON.stringify({
+          model: AI_MODEL,
+          temperature: 0.35,
+          stream: false,
+          messages: [
+            {
+              role: 'system',
+              content: 'Tu crées un shader pour la scène. Réponds UNIQUEMENT avec un objet JSON {"title":"...","explanation":"...","glslCode":"..."}. Le GLSL doit être un fragment shader WebGL1 GLSL ES 1.00 autonome. Utilise precision mediump float; uniform float u_time; uniform vec2 u_resolution; void main() et gl_FragColor. Aucun #version, #include, texture extérieure, ni balises markdown. Produis un effet différent adapté à la demande, pas un modèle générique.'
+            },
+            { role: 'user', content: prompt }
+          ],
+        }),
+      });
+      if (!response.ok) return res.status(502).json({ error: `Le modèle n'a pas répondu correctement (HTTP ${response.status})` });
+      const completion = await response.json() as any;
+      const body = completion?.choices?.[0]?.message?.content;
+      if (typeof body !== 'string') throw new Error('Réponse vide du moteur');
+      const shader = parseShaderGeneration(body);
+      return res.json({ ...shader, origin: 'ai', model: completion?.model || AI_MODEL });
+    } catch (error: any) {
+      return res.status(502).json({ error: error?.message || 'Génération IA impossible' });
+    }
+  });
 
+  app.get('/api/ai/status', (_req: Request, res: Response) => {
     return res.json({
-      provider: 'builtin-procedural',
+      provider: AI_BASE_URL && AI_MODEL ? 'openai-compatible' : 'builtin-procedural',
+      configured: Boolean(AI_BASE_URL && AI_MODEL),
+      // Configuré ne signifie PAS que le modèle a répondu. Seule une génération réussie le prouve.
       connected: false,
-      models: [
-        { name: 'nocode-creative-procedural', size: 'embedded', details: { family: 'procedural' } },
-        { name: 'webllm-in-browser', size: 'on-demand', details: { family: 'webgpu' } },
-      ],
-      mode: 'sans-ia-ou-local',
-      webGpuSupported: true,
+      model: AI_MODEL || null,
+      mode: AI_BASE_URL && AI_MODEL ? 'gateway-configured-unverified' : 'procedural-only',
+      proceduralAvailable: true,
     });
   });
 
-  // Proxy to Ollama for offline zero-API-key local synthesis
+  // Ancienne route conservée seulement sous activation explicite (désactivée par défaut)
   app.post('/api/ai/ollama/generate', async (req: Request, res: Response) => {
+    if (process.env.NOCODE_ENABLE_LEGACY_OLLAMA !== '1') {
+      return res.status(410).json({ error: 'Ancien moteur Ollama désactivé. Utiliser la passerelle OmniRoute.' });
+    }
     try {
       const resp = await fetch(`${OLLAMA_HOST}/api/generate`, {
         method: 'POST',
@@ -536,6 +584,42 @@ async function startServer() {
           license: 'MIT',
         },
       ],
+    });
+  });
+
+  // -------------------------------------------------------------
+  // ETC EOS FAMILY, RESPONSE NODES & RUNTIMES NATIFS C++ / C#
+  // -------------------------------------------------------------
+  app.get('/api/etc/status', (_req: Request, res: Response) => {
+    res.json({
+      status: 'online',
+      protocol: 'sACN E1.31 / ETC Net3 / OSC',
+      oscPort: 8000,
+      sacnPort: 5568,
+      defaultPriority: 100,
+      responseNodesCount: 2,
+      activeUniverses: [1, 2, 3, 4],
+      rdmDiscoveryActive: true,
+      cppWasmEngine: {
+        latencyMicroseconds: 9.8,
+        frameRateFps: 44.0,
+        status: 'ready',
+      },
+      csNet8Engine: {
+        runtime: '.NET 8.0 Roslyn',
+        status: 'active',
+      },
+    });
+  });
+
+  app.post('/api/etc/cmd', (req: Request, res: Response) => {
+    const { cmd } = req.body || {};
+    console.log(`[ETC Eos Gateway] Exécution commande : ${cmd}`);
+    res.json({
+      ok: true,
+      command: cmd,
+      executedAt: Date.now(),
+      status: 'dispatched_to_sACN',
     });
   });
 

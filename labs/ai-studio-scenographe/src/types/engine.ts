@@ -22,6 +22,8 @@ export type EngineId =
 
 export type EngineCategory = 'web-visual' | 'audio-dsp' | 'compute' | 'graph-nodes' | 'bridge';
 
+export type PresetCategoryType = 'Visual' | 'Audio' | 'Data';
+
 export type EngineStatus = 'functional' | 'partial' | 'hardware-dependent' | 'experimental' | 'planned';
 
 export interface CodePreset {
@@ -29,6 +31,7 @@ export interface CodePreset {
   title: string;
   description: string;
   code: string;
+  type?: PresetCategoryType; // 'Visual' | 'Audio' | 'Data'
   secondaryCode?: string; // For hybrid pipelines or dual code
   secondaryTitle?: string;
   defaultUniforms?: Record<string, number>;
@@ -56,6 +59,7 @@ export interface EngineAdapter {
   shortName: string;
   phase: 'Phase A' | 'Phase B' | 'Phase C' | 'Phase D' | 'Phase E';
   category: EngineCategory;
+  presetType?: PresetCategoryType;
   version: string;
   status: EngineStatus;
   statusBadge: string;

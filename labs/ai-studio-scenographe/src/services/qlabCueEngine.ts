@@ -11,6 +11,7 @@ import { patchGraphEngine } from './patchGraphEngine';
 import { radioAudioEngine } from './radioAudioEngine';
 import { midiDeviceEngine } from './midiDeviceEngine';
 import { dmxLightingEngine } from './dmxLightingEngine';
+import { nativeCodeEngine } from './nativeCodeEngine';
 
 export type CueType = 'group' | 'patch' | 'audio' | 'video' | 'shader' | 'osc' | 'midi' | 'top' | 'panic' | 'dmx';
 export type GroupMode = 'start_all' | 'start_first_and_go_next';
@@ -467,6 +468,9 @@ class QLabCueEngine {
     if (cue.type === 'dmx' || cue.targetDmxCueId) {
       dmxLightingEngine.fireLightCue(cue.targetDmxCueId || 'cue-dmx-01', cue.durationSec);
     }
+
+    // 5. Relai au contrôleur C# .NET 8 et journal de spectacle
+    nativeCodeEngine.handleShowCueFired(cue.id, cue.name);
 
     // 4. Émettre un signal global OSC / TOP pour régie
     if (typeof window !== 'undefined') {

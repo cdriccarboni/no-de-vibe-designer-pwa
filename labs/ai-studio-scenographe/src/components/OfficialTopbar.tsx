@@ -20,7 +20,9 @@ import {
   ChevronDown,
   Type,
   Download,
-  Sun
+  Sun,
+  Cpu,
+  Zap,
 } from 'lucide-react';
 import { radioAudioEngine, RadioTelemetry } from '../services/radioAudioEngine';
 import { companionBridge, CompanionState } from '../services/companionBridge';
@@ -36,6 +38,8 @@ interface OfficialTopbarProps {
   onOpenMidiHub?: () => void;
   onOpenSurtitrage: () => void;
   onOpenDmxStudio?: () => void;
+  onOpenEtcStudio?: () => void;
+  onOpenCueCart?: () => void;
   onOpenInstallPage?: () => void;
   onOpenThemeModal: () => void;
   onOpenDocModal: () => void;
@@ -53,6 +57,8 @@ export const OfficialTopbar: React.FC<OfficialTopbarProps> = ({
   onOpenMidiHub,
   onOpenSurtitrage,
   onOpenDmxStudio,
+  onOpenEtcStudio,
+  onOpenCueCart,
   onOpenInstallPage,
   onOpenThemeModal,
   onOpenDocModal,
@@ -344,6 +350,32 @@ export const OfficialTopbar: React.FC<OfficialTopbarProps> = ({
           <Sun className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
           <span>Lumière DMX</span>
         </button>
+
+        {/* ETC Eos & Runtimes Natifs C++ / C# */}
+        {onOpenEtcStudio && (
+          <button
+            type="button"
+            onClick={onOpenEtcStudio}
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#1d2126] border border-[#2d333b] hover:border-cyan-400 text-zinc-300 hover:text-white transition-all text-[11px]"
+            title="ETC Eos Family, Response Nodes & Runtimes Natifs C++ / C# .NET 8"
+          >
+            <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+            <span>ETC Eos & C++/C#</span>
+          </button>
+        )}
+
+        {/* Cartoucheur Tactile 4x4 (Pads & Panic) */}
+        {onOpenCueCart && (
+          <button
+            type="button"
+            onClick={onOpenCueCart}
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#1d2126] border border-amber-500/40 hover:border-amber-400 text-amber-300 hover:text-white transition-all text-[11px]"
+            title="Cartoucheur Tactile 4x4 (One-shot, Loop, Toggle, Choke group & Arrêt d'Urgence Panic)"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span>Cartoucheur 4x4</span>
+          </button>
+        )}
       </div>
 
       {/* Zone 3: SÉLECTEUR DE MODE IA, THÈME & WORKSPACE */}
@@ -358,7 +390,7 @@ export const OfficialTopbar: React.FC<OfficialTopbarProps> = ({
           >
             <Bot className="w-3 h-3 text-[#d7b86a]" />
             <span className="uppercase font-bold">
-              {aiMode === 'auto' ? 'IA AUTO' : aiMode === 'local' ? 'IA LOCALE (Ollama)' : aiMode === 'connected' ? 'IA CONNECTÉE' : 'SANS IA'}
+              {aiMode === 'auto' ? 'AUTO · IA / PRESETS' : aiMode === 'local' ? 'IA LOCALE · PASSERELLE' : aiMode === 'connected' ? 'IA CONNECTÉE' : 'PRESETS · SANS IA'}
             </span>
             <ChevronDown className="w-2.5 h-2.5 text-[#9ba4ae]" />
           </button>
@@ -373,14 +405,14 @@ export const OfficialTopbar: React.FC<OfficialTopbarProps> = ({
                 className={`w-full text-left px-2 py-1 rounded text-zinc-200 flex items-center justify-between ${aiMode === 'auto' ? 'bg-[#1d2126] text-[#d7b86a] font-bold' : 'hover:bg-[#1d2126]'}`}
               >
                 <span>AUTO</span>
-                <span className="text-[9px] text-[#9ba4ae]">Meilleur moteur</span>
+                <span className="text-[9px] text-[#9ba4ae]">IA ou preset signalé</span>
               </button>
               <button
                 onClick={() => { localAiEngine.setMode('local'); setAiMenuOpen(false); }}
                 className={`w-full text-left px-2 py-1 rounded text-zinc-200 flex items-center justify-between ${aiMode === 'local' ? 'bg-[#1d2126] text-[#8fa79d] font-bold' : 'hover:bg-[#1d2126]'}`}
               >
-                <span>LOCAL (Sans Internet)</span>
-                <span className="text-[9px] text-[#8fa79d]">Ollama / Mac 16Go</span>
+                <span>PASSERELLE LOCALE</span>
+                <span className="text-[9px] text-[#8fa79d]">OmniRoute si configuré</span>
               </button>
               <button
                 onClick={() => { localAiEngine.setMode('sans_ia'); setAiMenuOpen(false); }}

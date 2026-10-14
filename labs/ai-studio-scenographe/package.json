@@ -9,7 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:ai": "node --import tsx --test src/services/aiGatewayValidation.test.mts && node scripts/ai-gateway-smoke.mjs",
+    "test": "npm run test:ai && node --require ./scripts/shim.cjs --import tsx scripts/test-unified-engines.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -328,6 +328,15 @@ export const ArtisticStudioView: React.FC<ArtisticStudioViewProps> = ({
     setCues((prev) => [...prev, newCue]);
   }, [cues.length, currentTimeSec]);
 
+  const handlePushCuesToStage = useCallback((newCues: CueItem[], fadeDurationSec: number) => {
+    setCues(newCues);
+    try {
+      localStorage.setItem('nocode_timeline_cues', JSON.stringify(newCues));
+    } catch {}
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
+  }, []);
+
   // 7. INSERTION D'UN ÉLÉMENT DEPUIS LA BIBLIOTHÈQUE
   const handleInsertFromLibrary = useCallback((element: ReusableScenicElement, trackId: string) => {
     const newClip = createClipFromLibraryElement(element, trackId, currentTimeSec);
@@ -731,6 +740,13 @@ export const ArtisticStudioView: React.FC<ArtisticStudioViewProps> = ({
             }}
             onTriggerCue={handleTriggerCue}
             onAddCueAtCurrentTime={handleAddCueAtCurrentTime}
+            onPushToStage={handlePushCuesToStage}
+            onUpdateCues={(newCues) => {
+              setCues(newCues);
+              try {
+                localStorage.setItem('nocode_timeline_cues', JSON.stringify(newCues));
+              } catch {}
+            }}
             onAddClipToTrack={(trackId) => {
               const matching = library.find((e) => e.defaultTrackId === trackId) || library[0];
               if (matching) handleInsertFromLibrary(matching, trackId);

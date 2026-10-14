@@ -27,6 +27,9 @@ import { AbletonLiveStudioModal } from './components/AbletonLiveStudioModal';
 import { SurtitrageStudioModal } from './components/SurtitrageStudioModal';
 import { MidiHubStudioModal } from './components/MidiHubStudioModal';
 import { DmxStudioModal } from './components/DmxStudioModal';
+import { EtcNativeStudioModal } from './components/EtcNativeStudioModal';
+import { CueCartPanel } from './components/CueCartPanel';
+import { Zap, X } from 'lucide-react';
 import { InstallHubView } from './components/InstallHubView';
 import { OfficialTopbar } from './components/OfficialTopbar';
 import { OfficialWorkspace } from './components/OfficialWorkspace';
@@ -123,6 +126,24 @@ export default function App() {
   const [isMidiHubOpen, setIsMidiHubOpen] = useState(false);
   const [isSurtitrageOpen, setIsSurtitrageOpen] = useState(false);
   const [isDmxModalOpen, setIsDmxModalOpen] = useState(false);
+  const [isEtcModalOpen, setIsEtcModalOpen] = useState(false);
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
+
+  // Raccourci global de régie : Alt+C ou F8 pour basculer le Cartoucheur 4x4 instantanément
+  useEffect(() => {
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return;
+      }
+      if ((e.altKey && (e.key === 'c' || e.key === 'C')) || e.key === 'F8') {
+        e.preventDefault();
+        setIsCartModalOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+  }, []);
 
   // Sync scene change
   const handleSceneChange = useCallback((newScene: ArtisticScene) => {
@@ -538,6 +559,8 @@ export default function App() {
         onOpenMidiHub={() => setIsMidiHubOpen(true)}
         onOpenSurtitrage={() => setIsSurtitrageOpen(true)}
         onOpenDmxStudio={() => setIsDmxModalOpen(true)}
+        onOpenEtcStudio={() => setIsEtcModalOpen(true)}
+        onOpenCueCart={() => setIsCartModalOpen(true)}
         onOpenInstallPage={() => {
           window.history.pushState({}, '', '/install');
           setRoutePath('/install');
@@ -561,6 +584,7 @@ export default function App() {
             onOpenMidiHub={() => setIsMidiHubOpen(true)}
             onOpenSurtitrage={() => setIsSurtitrageOpen(true)}
             onOpenDmxStudio={() => setIsDmxModalOpen(true)}
+            onOpenEtcStudio={() => setIsEtcModalOpen(true)}
           />
         ) : viewMode === 'studio' ? (
           <ArtisticStudioView
@@ -702,7 +726,47 @@ export default function App() {
       <DmxStudioModal
         isOpen={isDmxModalOpen}
         onClose={() => setIsDmxModalOpen(false)}
+        onOpenEtcStudio={() => setIsEtcModalOpen(true)}
       />
+
+      <EtcNativeStudioModal
+        isOpen={isEtcModalOpen}
+        onClose={() => setIsEtcModalOpen(false)}
+      />
+
+      {/* Cartoucheur Tactile 4x4 (Cue Cart QLab / StreamDeck) Flottant Régie */}
+      {isCartModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="relative w-full max-w-5xl max-h-[94vh] bg-[#0f1318] border border-amber-500/50 rounded-2xl shadow-2xl shadow-amber-950/40 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 bg-[#161c24] border-b border-[#2d3748]">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Zap className="w-5 h-5" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-extrabold text-white tracking-wider flex items-center gap-2">
+                    CARTOUCHEUR TACTILE 4x4 · RÉGIE LIVE
+                  </h2>
+                  <p className="text-[11px] text-zinc-400">
+                    One-shot, Loop, Toggle, Choke Groups (G1/G2/G3) & Bouton PANIC / STOP ALL (Touche Échap)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCartModalOpen(false)}
+                className="p-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-all border border-zinc-700"
+                title="Fermer la fenêtre (les boucles en cours continuent)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 bg-[#0a0d12]">
+              <CueCartPanel />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
