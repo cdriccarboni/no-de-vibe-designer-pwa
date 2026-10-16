@@ -112,3 +112,7 @@ secret, keystore ou AAB dans ce dépôt public. Pas de Google Play production. T
   Patch CI fusionné dans la PR 3.3.18 (une seule version publiée, pas de rebuild 3.3.17 au contenu différent).
 - Suite : double-clic sur l'app 3.3.18 et accepter l'invite « réseau local » ; mDNS OSCQuery ; timeline/conduite (P0 de l'audit) ;
   synchronisation privée (voir ci-dessous).
+- **En attente d'une fusion humaine (garde-fou de la session Claude : pas de fusion sans relecture)** :
+  PR publique #30 (3.3.18, CI verte, fusionnable) ; PR du dépôt privé #3 (sync 3.3.17, tests privés 5/5).
+  Après fusion de #30 : rejouer `scripts/private/sync-from-public.sh` en local dans le dépôt privé (Actions bloquées), pousser
+  `sync/public-<sha>`, ouvrir la PR privée.
