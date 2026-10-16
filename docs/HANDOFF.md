@@ -94,4 +94,8 @@ secret, keystore ou AAB dans ce dépôt public. Pas de Google Play production. T
   4. Matrice d'audit des logiciels de référence (TouchDesigner, Millumin, QLab…) : sources publiques uniquement.
 - **REA** : serveur MCP joignable depuis la session (98 outils, réponse structurée vérifiée) ; aucune analyse réalisée faute de
   binaire maison installé sur le Mac ; ne pas l'employer pour décompiler des logiciels propriétaires.
+- **Bloqué côté agent (19 h 55)** : la fusion de la PR #29 (CI verte) et la synchronisation manuelle vers le dépôt privé ont été
+  refusées par les garde-fous de la session Claude (fusion sans relecture humaine) → à faire par Cédric ou Hermès.
+- **Dépôt privé** : ses GitHub Actions ne démarrent pas (« paiements récents en échec / limite de dépenses ») ;
+  la synchronisation quotidienne automatique ne tourne donc pas. Décision de facturation requise (Settings → Billing).
 - **Risques** : pare-feu macOS au premier lancement du pont ; port 4174 déjà pris (le desktop essaie 4175→4178).
