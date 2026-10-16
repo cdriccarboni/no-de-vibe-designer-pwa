@@ -13,6 +13,8 @@ permissions:
 
 jobs:
   verify:
+    # Dépôt public uniquement : jamais exécuté (ni facturé) dans un dépôt privé dérivé.
+    if: github.repository == 'cdriccarboni/no-de-vibe-designer-pwa'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,6 +43,8 @@ jobs:
 
   android:
     needs: verify
+    # Dépôt public uniquement : jamais exécuté (ni facturé) dans un dépôt privé dérivé.
+    if: github.repository == 'cdriccarboni/no-de-vibe-designer-pwa'
     runs-on: ubuntu-latest
     env:
       PLAY_UPLOAD_KEYSTORE_B64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_B64 }}
@@ -118,6 +122,8 @@ jobs:
 
   macos:
     needs: verify
+    # Dépôt public uniquement : jamais exécuté (ni facturé) dans un dépôt privé dérivé.
+    if: github.repository == 'cdriccarboni/no-de-vibe-designer-pwa'
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -222,6 +228,8 @@ jobs:
 
   windows:
     needs: verify
+    # Dépôt public uniquement : jamais exécuté (ni facturé) dans un dépôt privé dérivé.
+    if: github.repository == 'cdriccarboni/no-de-vibe-designer-pwa'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -275,6 +283,8 @@ jobs:
 
   linux:
     needs: verify
+    # Dépôt public uniquement : jamais exécuté (ni facturé) dans un dépôt privé dérivé.
+    if: github.repository == 'cdriccarboni/no-de-vibe-designer-pwa'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -329,6 +339,8 @@ jobs:
 
   release:
     needs: [android, macos, windows, linux]
+    # Dépôt public uniquement : jamais exécuté (ni facturé) dans un dépôt privé dérivé.
+    if: github.repository == 'cdriccarboni/no-de-vibe-designer-pwa'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}

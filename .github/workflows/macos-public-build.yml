@@ -21,6 +21,8 @@ permissions:
 
 jobs:
   macos-arm64:
+    # Dépôt public uniquement : jamais exécuté (ni facturé) dans un dépôt privé dérivé.
+    if: github.repository == 'cdriccarboni/no-de-vibe-designer-pwa'
     runs-on: macos-14
     env:
       APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
