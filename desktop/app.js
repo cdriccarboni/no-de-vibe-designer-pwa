@@ -740,6 +740,14 @@ function setLibraryDrawer(open) {
   document.body.classList.toggle("library-open", Boolean(open));
   $("#libraryToggle")?.setAttribute("aria-expanded", open ? "true" : "false");
 }
+/* Hauteur réelle de l'en-tête (il peut passer sur 2 lignes en fenêtre étroite) : le tiroir Library s'aligne dessous. */
+{
+  const topbar = document.querySelector(".topbar");
+  const syncTopbarHeight = () => { if (topbar) document.documentElement.style.setProperty("--nvd-topbar-h", `${Math.ceil(topbar.getBoundingClientRect().height)}px`); };
+  syncTopbarHeight();
+  if (topbar && "ResizeObserver" in window) new ResizeObserver(syncTopbarHeight).observe(topbar);
+  window.addEventListener("resize", syncTopbarHeight);
+}
 $("#libraryToggle")?.addEventListener("click", () => setLibraryDrawer(!document.body.classList.contains("library-open")));
 document.addEventListener("keydown", e => { if (e.key === "Escape" && document.body.classList.contains("library-open")) setLibraryDrawer(false); });
 
