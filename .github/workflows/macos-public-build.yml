@@ -77,8 +77,10 @@ jobs:
               "appId": "fr.acousmatic.nodevibedesigner",
               "productName": "No[co]de Vibe Designer",
               "asar": true,
+              "asarUnpack": ["bridge/**", "shared/**"],
               "files": [
                 "electron/**/*",
+                "bridge/**/*",
                 "desktop/**/*",
                 "shared/**/*",
                 "mobile/**/*",
@@ -104,7 +106,7 @@ jobs:
           JSON
 
           mkdir -p electron
-          cat > electron/main.cjs <<'JS'
+          cat > electron/main.inline.cjs <<'JS'
           const { app, BrowserWindow, shell, session } = require("electron");
           const http = require("http");
           const fs = require("fs");
@@ -214,6 +216,7 @@ jobs:
             app.quit();
           });
           JS
+          [ -f electron/main.cjs ] || mv electron/main.inline.cjs electron/main.cjs; rm -f electron/main.inline.cjs
 
           npm install --no-audit --no-fund
 
