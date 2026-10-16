@@ -1,5 +1,6 @@
-// GÉNÉRÉ par scripts/import-ai-studio-library.mjs depuis labs/ai-studio-scenographe — ne pas éditer à la main.
-export const SCENIC_PACK_VERSION = 1;
+// Pack scénique de DÉMONSTRATION générique (public). Ne contient aucune donnée de spectacle.
+// Une version privée peut remplacer ce fichier (voir docs/PUBLIC_PRIVE.md).
+export const SCENIC_PACK_VERSION = 2;
 export const SCENIC_LIBRARY = [
  {
   "id": "elem-foley-vibrating-sea",
@@ -31,16 +32,16 @@ export const SCENIC_LIBRARY = [
    "reactiveToSteps": false,
    "synthPreset": "water_droplet"
   },
-  "createdAt": "Didascalies Pirates Paillettes"
+  "createdAt": "Préréglage Scénographe"
  },
  {
-  "id": "elem-pirate-shadow",
-  "name": "L'Ombre du Pirate",
+  "id": "elem-shadow-double",
+  "name": "L'Ombre du Comédien",
   "category": "Personnages & Ombres",
   "type": "performer_shadow",
-  "characterTitle": "L'Ombre du Pirate (Comédien à Jardin)",
-  "description": "Silhouette vivante isolée avec costume complet : chapeau tricorne à plumes, sabre d'abordage et redingote. Mode miroir ou danse autonome.",
-  "iconType": "pirate",
+  "characterTitle": "Ombre portée de l'interprète (côté jardin)",
+  "description": "Silhouette vivante isolée d'après la caméra. Mode miroir ou danse autonome.",
+  "iconType": "silhouette",
   "defaultTrackId": "track-1-shadows",
   "defaultDuration": 14,
   "color": "#d7b86a",
@@ -53,15 +54,8 @@ export const SCENIC_LIBRARY = [
    "flipHorizontal": true
   },
   "animationMode": "mirror",
-  "motionStyle": "pirate_dance",
+  "motionStyle": "free_dance",
   "motionSpeed": 1,
-  "costume": {
-   "hatType": "tricorn",
-   "hasSashBelt": true,
-   "hasCutlassSabre": true,
-   "hasCoatFlaps": true,
-   "featherAngle": -25
-  },
   "visualFx": "none",
   "fxIntensity": 0.5,
   "audioConfig": {
@@ -73,11 +67,11 @@ export const SCENIC_LIBRARY = [
   "createdAt": "Préréglage Scénographe"
  },
  {
-  "id": "elem-light-cat",
-  "name": "Le Chat de lumière",
+  "id": "elem-light-creature",
+  "name": "La Créature de lumière",
   "category": "Lumière & Créatures",
   "type": "light_creature",
-  "characterTitle": "Chat de lumière néon agrandi",
+  "characterTitle": "Créature de lumière néon agrandie",
   "description": "Félin néon agrandi avec cinématique des 4 pattes, positionnement libre X/Y, auto-cadrage et traînées de lumière dorée/cyan.",
   "iconType": "cat",
   "defaultTrackId": "track-2-creatures",
@@ -489,12 +483,12 @@ export const SCENIC_LIBRARY = [
   "createdAt": "Préréglage Matières"
  },
  {
-  "id": "elem-compound-pirate-echo",
-  "name": "Bloc Composé : Pirate & Écho Spectral",
+  "id": "elem-compound-shadow-echo",
+  "name": "Bloc Composé : Ombre & Écho Spectral",
   "category": "Blocs Composés",
   "type": "compound_block",
   "characterTitle": "Ensemble : Silhouette + Slit-Scan + Audio",
-  "description": "Regroupement pré-synchronisé : Ombre du Pirate en danse autonome, effet Slit-Scan et pulsation audio synchrone.",
+  "description": "Regroupement pré-synchronisé : ombre de l'interprète en danse autonome, effet Slit-Scan et pulsation audio synchrone.",
   "iconType": "compound",
   "defaultTrackId": "track-1-shadows",
   "defaultDuration": 15,
@@ -508,15 +502,8 @@ export const SCENIC_LIBRARY = [
    "flipHorizontal": false
   },
   "animationMode": "hybrid",
-  "motionStyle": "pirate_dance",
+  "motionStyle": "free_dance",
   "motionSpeed": 1.1,
-  "costume": {
-   "hatType": "tricorn",
-   "hasSashBelt": true,
-   "hasCutlassSabre": true,
-   "hasCoatFlaps": true,
-   "featherAngle": -25
-  },
   "visualFx": "slit_scan",
   "fxIntensity": 0.75,
   "audioConfig": {
@@ -528,7 +515,7 @@ export const SCENIC_LIBRARY = [
   "isCompound": true,
   "compoundSubElements": [
    {
-    "elementId": "elem-pirate-shadow",
+    "elementId": "elem-shadow-double",
     "relativeStartTime": 0,
     "duration": 15,
     "opacity": 1
@@ -1041,43 +1028,43 @@ export const SCENIC_CUES = [
  {
   "id": "cue-1",
   "cueNumber": 1,
-  "label": "TOP 1 — Entrée comédien à jardin",
+  "label": "Démo 1 — Silhouette miroir",
   "timeSec": 0,
   "action": "jump_and_play",
   "oscAddress": "/cue/1",
-  "description": "Le comédien entre en scène à jardin. Silhouette miroir prête."
+  "description": "Un interprète entre côté jardin ; sa silhouette est reprise en miroir."
  },
  {
   "id": "cue-2",
   "cueNumber": 2,
-  "label": "TOP 2 — Détachement de l’ombre (Autonome)",
+  "label": "Démo 2 — Ombre autonome",
   "timeSec": 4.5,
   "action": "switch_mode",
   "oscAddress": "/cue/2",
-  "description": "L’ombre se détache du comédien et avance seule vers le centre du plateau."
+  "description": "L'ombre se détache de l'interprète et se déplace seule vers le centre."
  },
  {
   "id": "cue-3",
   "cueNumber": 3,
-  "label": "TOP 3 — Danse du pirate & Slit-Scan temporel",
+  "label": "Démo 3 — Danse de l'ombre & écho Slit-Scan",
   "timeSec": 10,
   "action": "jump_and_play",
   "oscAddress": "/cue/3",
-  "description": "L’ombre entame sa danse avec sabre et redingote. Activation de l’écho slit-scan."
+  "description": "L'ombre danse ; l'écho Slit-Scan temporel s'active."
  },
  {
   "id": "cue-4",
   "cueNumber": 4,
-  "label": "TOP 4 — Entrée du Chat de lumière (Duo)",
+  "label": "Démo 4 — Duo avec la créature de lumière",
   "timeSec": 16,
   "action": "jump_and_play",
   "oscAddress": "/cue/4",
-  "description": "Le Chat de lumière entre à cour et accompagne les pas du pirate."
+  "description": "La créature de lumière entre côté cour et accompagne l'ombre."
  },
  {
   "id": "cue-5",
   "cueNumber": 5,
-  "label": "TOP 5 — Fondu scénique final",
+  "label": "Démo 5 — Fondu au noir",
   "timeSec": 25,
   "action": "fade_black",
   "oscAddress": "/cue/5",

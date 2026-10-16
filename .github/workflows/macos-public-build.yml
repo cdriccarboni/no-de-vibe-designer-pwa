@@ -30,6 +30,11 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
+      - name: Garde-fou confidentialité (avant build public)
+        shell: bash
+        run: |
+          test ! -f .nocode-private || { echo "::error::version privée détectée"; exit 1; }
+          node qa/privacy-guard.mjs
 
       - uses: actions/setup-node@v4
         with:
