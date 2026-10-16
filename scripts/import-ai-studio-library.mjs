@@ -1,8 +1,13 @@
-// Génère shared/scenic/scenic-pack.js depuis le lab AI Studio (labs/ai-studio-scenographe).
-// Usage : node scripts/import-ai-studio-library.mjs   (nécessite npm install dans le lab)
+// Génère shared/scenic/scenic-pack.js depuis un lab AI Studio Scénographe.
+// Le lab n'est PAS dans le dépôt public : il vit dans le dépôt privé.
+// Usage (dépôt privé uniquement) : NVD_LAB_DIR=/chemin/vers/le/lab node scripts/import-ai-studio-library.mjs
+// Le pack généré peut contenir des données de spectacle : ne jamais l'importer dans le dépôt public
+// (qa/privacy-guard.mjs le bloque).
 import fs from "node:fs";
 import { createRequire } from "node:module";
-const labDir = new URL("../labs/ai-studio-scenographe/", import.meta.url);
+import { pathToFileURL } from "node:url";
+if (!process.env.NVD_LAB_DIR) { console.error("NVD_LAB_DIR requis (chemin du lab Scénographe, dépôt privé)."); process.exit(2); }
+const labDir = pathToFileURL(process.env.NVD_LAB_DIR.replace(/\/?$/, "/"));
 const require = createRequire(new URL("package.json", labDir));
 const { transform } = require("sucrase");
 const src = fs.readFileSync(new URL("src/services/timelineEngine.ts", labDir), "utf8");
@@ -16,7 +21,7 @@ const mod = await import(tmp.href);
 fs.unlinkSync(tmp);
 const lib = mod.INITIAL_REUSABLE_LIBRARY, tracks = mod.INITIAL_TIMELINE_TRACKS, cues = mod.INITIAL_CUE_LIST;
 if (!Array.isArray(lib) || !lib.length) throw new Error("Bibliothèque du lab introuvable");
-const out = `// GÉNÉRÉ par scripts/import-ai-studio-library.mjs depuis labs/ai-studio-scenographe — ne pas éditer à la main.
+const out = `// GÉNÉRÉ par scripts/import-ai-studio-library.mjs depuis le lab Scénographe — ne pas éditer à la main.
 export const SCENIC_PACK_VERSION = 1;
 export const SCENIC_LIBRARY = ${JSON.stringify(lib, null, 1)};
 export const SCENIC_TRACKS = ${JSON.stringify(tracks, null, 1)};

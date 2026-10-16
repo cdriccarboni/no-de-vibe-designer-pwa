@@ -1,16 +1,13 @@
 /**
- * Private, device-local publisher for the three public Radio Paillettes
- * title states. This module intentionally owns no project data and does not
+ * Private, device-local publisher for the public Radio Paillettes
+ * title states (shared/live-title-presets.js). This module intentionally owns no project data and does not
  * issue a request unless a caller explicitly invokes publishLiveTitle().
  */
 
 export const LIVE_TITLE_PREFERENCE_KEY = "nvd.live-title.control-address";
 
-export const LIVE_TITLE_PRESETS = Object.freeze([
-  Object.freeze({ id: "radio", label: "RADIO PAILLETTES" }),
-  Object.freeze({ id: "pirates", label: "PIRATES PAILLETTES" }),
-  Object.freeze({ id: "radio-pirate", label: "RADIO PIRATE PAILLETTES" })
-]);
+import { LIVE_TITLE_PRESETS } from "./live-title-presets.js";
+export { LIVE_TITLE_PRESETS };
 
 const LIVE_TITLE_IDS = new Set(LIVE_TITLE_PRESETS.map(preset => preset.id));
 const CONTROL_PATH = "/api/radio-paillettes-live";

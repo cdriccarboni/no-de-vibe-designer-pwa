@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.12-multi-unified-20261015";
+const CACHE = "nvd-3.3.12-multi-privacy-20261016";
 const ASSETS = [
   "./companion/companion.css",
   "./companion/companion.js",
@@ -100,6 +100,7 @@ const ASSETS = [
   "./shared/isf-agent.js",
   "./shared/libpd-runtime.js",
   "./shared/live-title-broadcast.js",
+  "./shared/live-title-presets.js",
   "./shared/local-agent-registry.js",
   "./shared/local-ai-core.js",
   "./shared/local-ai-diagnostic.js",
@@ -152,7 +153,6 @@ const ASSETS = [
   "./shared/version.js",
   "./shared/broadcast-engine.js",
   "./radio/index.html",
-  "./labs/ai-studio-scenographe/dist/index.html",
   "./shared/vibe-out.js",
   "./shared/vibe-planner.js",
   "./shared/vibe-recipes.js",

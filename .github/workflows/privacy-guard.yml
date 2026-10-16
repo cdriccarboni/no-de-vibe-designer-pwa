@@ -1,0 +1,33 @@
+name: Garde-fou confidentialité
+
+# Bloque toute fusion ou tout déploiement public contenant des données privées
+# de spectacle, des fichiers personnels ou des secrets. À déclarer comme
+# « required status check » dans la protection de la branche main.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  privacy-guard:
+    # Dépôt public uniquement : jamais exécuté (ni facturé) dans un dépôt privé dérivé.
+    if: github.repository == 'cdriccarboni/no-de-vibe-designer-pwa'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Refuser un dépôt marqué privé
+        run: |
+          if [ -f .nocode-private ]; then
+            echo "::error::Ce contenu porte le marqueur .nocode-private : la version privée ne doit jamais être publiée."
+            exit 1
+          fi
+      - name: Termes privés, chemins personnels et secrets
+        run: node qa/privacy-guard.mjs

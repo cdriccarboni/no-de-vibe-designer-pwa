@@ -1,0 +1,29 @@
+{
+ "note": "Empreintes SHA-256 (sel + terme normalisé) des termes privés de spectacle. Les termes en clair ne sont jamais versionnés ici ; la liste source est conservée dans le dépôt privé.",
+ "salt": "a808822b969427f129d87cfc",
+ "maxWords": 4,
+ "allow": [
+  "<i>Pirate(s), Paillettes !</i>"
+ ],
+ "sha256": [
+  "011bed6cf4b4fe8eafbecdebd49a3d75d41f9ac15edf271b5bc2463e081f90c2",
+  "0c9de080b1925b9cdfc2efa20a0b7d6eecf4a6e492d001f214fa199a9b482527",
+  "0e81e9f2f8fa045f6fa0d70e881b2c03cab9ddd85dab4d44788ec71cc3c7de37",
+  "28994f4ea50f1dd8b36380820bdf4bf16dbc3e3cf92f017687fbf6b06709ed16",
+  "2fa6b4caf2715276821a61205789be106f058a6c116906c7adcd3fca809a96a5",
+  "3de5d647e4a838797ad5b6a821526f8b77dc4c99216e7a616d0f29c55c3628f3",
+  "47bda39e41e4f4b577988aa0473f0871cc59076692a58a7437113d5efdac58a3",
+  "65539adc2c0fb5b369f68db3b626f1b23d99ad2b07a8ffb3fadc725bc32500a6",
+  "6fb8cbbd2de5fb433731ce1caa1c115b92444e62c7ab19bff138dec7bf092124",
+  "82f29ebd2208d65cc4c045eb52ff54890ea31d0d98f7cd669a90e61ab4e294bc",
+  "8364bdeb3f6095bd6b26985e1bc63defb8f2d487ceecb61236763a80b742c03f",
+  "8e7e9e96bd074638ee01b5595acf015899c2f44f7edd3d2367810169a9d497ea",
+  "9b5b4cae8b695dcd4d99e0adf44efd8b78e43110a8b9726f9d6f8645c27468cd",
+  "afccc163c8c87aad4d7fb5a855ad7bf43f425790db1cb0b394124f544075b40f",
+  "d29ac663bb0fdcb37bc18176b655d624768990b744aba80854f1eeccffff11c9",
+  "d7afeaf9d1e9f86a053150e2c99154a1c829ecee2dafa9c68f7063681e3b6d6e",
+  "db4739b41d908ce3cb7e1838881e2bdd1bdc962907c5e39caa68a03e6c1ddc88",
+  "de1e3694dfdab55b78c9e48ae4fd4471f9a60edfb94f270bbf682b5158e469c4",
+  "fb6c9358293ac8ebe83fba7cb995de82975830146dde04d7a3622d826c8ea497"
+ ]
+}

@@ -21,6 +21,8 @@ permissions:
 
 jobs:
   macos-arm64:
+    # Dépôt public uniquement : jamais exécuté (ni facturé) dans un dépôt privé dérivé.
+    if: github.repository == 'cdriccarboni/no-de-vibe-designer-pwa'
     runs-on: macos-14
     env:
       APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
@@ -30,6 +32,11 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
+      - name: Garde-fou confidentialité (avant build public)
+        shell: bash
+        run: |
+          test ! -f .nocode-private || { echo "::error::version privée détectée"; exit 1; }
+          node qa/privacy-guard.mjs
 
       - uses: actions/setup-node@v4
         with:
