@@ -240,6 +240,13 @@ $("addKey").onclick = () => {
 };
 
 $("liveTitleAddress").addEventListener("change", () => { rememberLiveTitleAddress(); });
+// Boutons générés depuis les préréglages (public : générique ; privé : les siens).
+document.querySelector(".live-title-actions")?.replaceChildren(...LIVE_TITLE_PRESETS.map(preset => {
+  const button = document.createElement("button");
+  button.type = "button"; button.dataset.liveTitle = preset.id; button.setAttribute("aria-pressed", "false");
+  button.textContent = preset.label.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+  return button;
+}));
 document.querySelectorAll("[data-live-title]").forEach(button => button.addEventListener("click", () => { void publishSelectedLiveTitle(button.dataset.liveTitle); }));
 
 timer = setInterval(() => {

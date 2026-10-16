@@ -100,6 +100,7 @@ const ASSETS = [
   "./shared/isf-agent.js",
   "./shared/libpd-runtime.js",
   "./shared/live-title-broadcast.js",
+  "./shared/live-title-presets.js",
   "./shared/local-agent-registry.js",
   "./shared/local-ai-core.js",
   "./shared/local-ai-diagnostic.js",
