@@ -40,6 +40,8 @@ concurrency:
 
 jobs:
   android:
+    # Dépôt public uniquement : jamais exécuté (ni facturé) dans un dépôt privé dérivé.
+    if: github.repository == 'cdriccarboni/no-de-vibe-designer-pwa'
     runs-on: ubuntu-latest
     env:
       PACKAGE_NAME: "fr.acousmatic.nodevibedesigner"
