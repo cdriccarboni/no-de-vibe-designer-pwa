@@ -110,6 +110,8 @@ const ASSETS = [
   "./shared/node-processors.js",
   "./shared/node-specs.js",
   "./shared/optional-links.js",
+  "./shared/remote-camera/qr.js",
+  "./shared/vendor/qrcode/qrcode-generator.js",
   "./shared/ports.js",
   "./shared/project-migrate.js",
   "./shared/project-store.js",

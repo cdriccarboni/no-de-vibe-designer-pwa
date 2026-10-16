@@ -412,3 +412,6 @@ body.show-locked .nh,body.show-locked .port-dot{cursor:not-allowed}
   .library-toggle{display:inline-flex;align-items:center;white-space:nowrap}
   body.library-open .library{display:flex;flex-direction:column;position:fixed;top:50px;left:0;bottom:0;width:min(320px,86vw);z-index:140;box-shadow:12px 0 40px #000a;background:var(--panel)}
 }
+
+/* Remote Camera : QR lisible (fond blanc, taille fixe, jamais rogné) */
+.rc-qr{display:inline-block;background:#fff;padding:6px;border-radius:8px;margin:6px 0;line-height:0}.rc-qr svg{width:180px;height:180px;max-width:100%}
