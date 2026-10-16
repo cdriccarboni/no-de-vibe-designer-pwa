@@ -31,7 +31,9 @@ for (const [label, opts] of [["desktop", { viewport: { width: 1440, height: 900 
     page.on("pageerror", e => errs.push(String(e.message || e)));
     // Les liens optionnels (data-optional-link) sont sondés en HEAD : un 404 y est attendu et les garde masqués.
     const probed = u => /\/labs\/[^/]+\/dist\//.test(u || "");
-    page.on("console", m => { if (m.type() === "error" && !IGNORE.some(rx => rx.test(m.text())) && !probed(m.location()?.url)) errs.push(`${m.text()} (${(m.location()?.url || "").replace(base, "")})`); });
+    // La release GitHub v<version> est créée par le workflow Android APRÈS la publication : son 404 transitoire n'est pas une erreur de la page.
+    const releaseApi = u => /^https:\/\/api\.github\.com\/repos\/[^/]+\/[^/]+\/releases\//.test(u || "");
+    page.on("console", m => { if (m.type() === "error" && !IGNORE.some(rx => rx.test(m.text())) && !probed(m.location()?.url) && !releaseApi(m.location()?.url)) errs.push(`${m.text()} (${(m.location()?.url || "").replace(base, "")})`); });
     page.on("response", res => { if (res.status() === 404 && res.url().startsWith(base) && !(res.request().method() === "HEAD" && probed(res.url()))) missing.add(res.url().slice(base.length)); });
     page.wrongNameSample = () => page.evaluate(() => ((document.title + " " + document.body.innerText).match(/.{0,40}(\bNo-de\b|\bNode Vibe\b|NoCode Vibe|No\[code\]).{0,40}/) || [""])[0]);
     try { await page.goto(base + url, { waitUntil: "load", timeout: 20000 }); await page.waitForTimeout(1500); }

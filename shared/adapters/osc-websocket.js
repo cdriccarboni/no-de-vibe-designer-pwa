@@ -15,9 +15,10 @@ export class OscWebSocket {
     return new Promise((resolve, reject) => {
       const ws = new this.WS(this.url); this.socket = ws; ws.binaryType = "arraybuffer";
       const timer = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("Timeout OSC WebSocket")); }, timeoutMs);
-      ws.onopen = () => { clearTimeout(timer); this.onState("online"); resolve(this); };
+      let opened = false;
+      ws.onopen = () => { opened = true; clearTimeout(timer); this.onState("online"); resolve(this); };
       ws.onerror = () => { this.onState("error"); };
-      ws.onclose = () => { clearTimeout(timer); this.onState("offline"); };
+      ws.onclose = () => { clearTimeout(timer); this.onState("offline"); if (!opened) reject(new Error("connexion refusée")); };
       ws.onmessage = e => {
         if (typeof e.data === "string") return; // texte ignoré : seuls les paquets OSC binaires comptent
         try { const msg = decodeOscMessage(new Uint8Array(e.data)); this.received++; this.onMessage(msg); }

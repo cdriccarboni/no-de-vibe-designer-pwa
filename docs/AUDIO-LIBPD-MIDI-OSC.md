@@ -26,7 +26,7 @@ Test réel : `qa/libpd-audio-offline-e2e.mjs` (OfflineAudioContext, Chromium) me
   (silence compté par le worklet, jamais de son inventé). Latence ≈ 2 × 2048 trames (~93 ms).
 - Un seul patch DSP ouvert à la fois ; pas d'entrée micro vers `adc~`.
 - Le navigateur exige un geste utilisateur avant de démarrer l'AudioContext.
-- L'API n'a pas encore de bouton dans l'inspecteur du node libpd (le node affiche toujours le pic mesuré).
+- 3.3.15 : bouton « ▶ Écouter » dans l'inspecteur du node libpd (AudioContext créé au clic, niveau mesuré par un AnalyserNode et affiché). Test : `qa/libpd-listen-oscws-e2e.mjs`.
 
 ## Web MIDI
 `shared/adapters/midi.js` accepte `requestAccess` injectable (mocks) ; décode NOTE ON/OFF, CC, PC, pitch bend, clock.
@@ -38,3 +38,9 @@ WebSocket binaires. Le navigateur ne fait pas d'UDP : il faut une passerelle OSC
 Pas de bundles OSC (`#bundle`) ; types `f`, `i`, `s`.
 
 Tests : `node --test shared/midi-osc-adapters.test.mjs` (mocks, sans matériel ni réseau).
+
+### Dans le Designer (3.3.15)
+Inspecteur du node OSC : champ « Passerelle OSC WebSocket » (`ws://` ou `wss://`), bouton « Connecter la passerelle » et statut.
+Sans passerelle joignable : « passerelle requise » (jamais de faux envoi). Une fois connectée, les envois OSC du runtime et la commande
+terminal `osc <cible> <adresse> <valeurs…>` passent par la passerelle en OSC binaire ; `oscws connect <url>` / `oscws off` au terminal.
+Test : `qa/libpd-listen-oscws-e2e.mjs` (serveur WebSocket simulé qui décode le paquet OSC reçu et répond).

@@ -56,7 +56,8 @@ import { validateCompanionDocument } from "../shared/companion-studio/schema.js"
 import { DETECT_ACTIONS, formatDetectBanner, loadDetectPref, rememberDetectPref } from "../shared/companion-studio/detect.js";
 import { DEFAULT_P5_SCRIPT, DEFAULT_SKETCH_SCRIPT } from "../shared/graphics/sketch-engine.js";
 import { missingEngineOffers } from "../shared/engine-downloads.js";
-import { LIBPD_AUDIO_PATCH, LIBPD_PROBE_PATCH, runLibpdPatch } from "../shared/libpd-runtime.js";
+import { LIBPD_AUDIO_PATCH, LIBPD_PROBE_PATCH, runLibpdPatch, openLibpdStream, closeLibpdStream, LIBPD_SAMPLE_RATE } from "../shared/libpd-runtime.js";
+import { LibpdVoice } from "../shared/libpd-audio.js";
 import { applyShowManifest, showManifestSummary } from "../shared/show-importer.js";
 import { DEFAULT_FRAGMENT } from "../shared/adapters/shader-surface.js";
 import { RUDIMENTS, rudimentMeta, createRudimentNode } from "../shared/rudiments.js";
@@ -250,6 +251,8 @@ const devices = new DeviceManager(e => {
   } else if (e.type === "bridge-message") {
     log(`BRIDGE < ${typeof e.data === "string" ? e.data : JSON.stringify(e.data).slice(0, 160)}`);
   } else if (e.type === "bridge-state") log(`BRIDGE · ${e.state}`);
+  else if (e.type === "oscws-state") { paintOscWsStatus(e.state === "online" ? `connecté · ${e.url}` : `hors ligne · passerelle requise (${e.state})`, e.state === "online" ? "online" : "gateway-required"); log(`OSC WS · ${e.state}`); }
+  else if (e.type === "oscws-message") log(`OSC WS < ${e.message.address} ${JSON.stringify(e.message.args).slice(0, 120)}`);
   else if (e.type === "midi-state") {
     pnpState ||= { midi:{}, serial:{} };
     pnpState.midi = { ...(pnpState.midi || {}), connected: e.inputs.length + e.outputs.length > 0 || !!devices.midi.access, inputs:e.inputs.length, outputs:e.outputs.length };
@@ -409,6 +412,8 @@ document.addEventListener("click", event => {
 });
 
 runtime.setBridgeSend(packet => {
+  // OSC : la passerelle OSC/WebSocket binaire est prioritaire quand elle est connectée.
+  if (packet?.type === "osc" && devices.oscWsOnline()) { devices.oscWs.send(packet.address, packet.args || []); return; }
   try { devices.bridge.send(packet); }
   catch (err) { throw err; }
 });
@@ -1271,6 +1276,54 @@ function exposeChannel(node, def) {
   log(`Channel exposé · ${node.title} · ${label}`);
 }
 
+function paintOscWsStatus(text, state) {
+  const el = document.getElementById("oscWsStatus");
+  if (!el) return;
+  el.textContent = text;
+  el.dataset.state = state || (/^connecté/.test(text) ? "online" : /requise/.test(text) ? "gateway-required" : "offline");
+}
+
+/* libpd · écoute réelle : AudioContext créé au clic (geste utilisateur), AnalyserNode pour un niveau mesuré. */
+let libpdListen = null;
+async function toggleLibpdListen(n) {
+  const btn = $("#libpdListenBtn"), status = $("#libpdListenStatus");
+  if (libpdListen) {
+    const cur = libpdListen; libpdListen = null;
+    cancelAnimationFrame(cur.raf); cur.voice.stop(); await closeLibpdStream(); await cur.ctx.close().catch(() => {});
+    if (btn) { btn.textContent = "▶ Écouter"; btn.setAttribute("aria-pressed", "false"); }
+    if (status) { status.textContent = "Muet"; status.dataset.rms = "0"; }
+    log("libpd · écoute arrêtée");
+    return;
+  }
+  try {
+    if (status) status.textContent = "Démarrage de libpd…";
+    const ctx = new AudioContext({ sampleRate: LIBPD_SAMPLE_RATE });
+    await ctx.resume();
+    await openLibpdStream(n.params.patch || LIBPD_AUDIO_PATCH);
+    const analyser = new AnalyserNode(ctx, { fftSize: 2048 });
+    analyser.connect(ctx.destination);
+    const voice = await new LibpdVoice(ctx, { destination: analyser, level: 0.5 }).init();
+    await voice.pump();
+    voice.gate(true);
+    const buf = new Float32Array(analyser.fftSize);
+    const cur = { ctx, voice, analyser, raf: 0 };
+    const meter = () => {
+      analyser.getFloatTimeDomainData(buf);
+      let sum = 0; for (const x of buf) sum += x * x;
+      const rms = Math.sqrt(sum / buf.length);
+      const el = $("#libpdListenStatus");
+      if (el) { el.dataset.rms = rms.toFixed(4); el.textContent = rms > 1e-4 ? `Écoute · niveau mesuré ${rms.toFixed(3)}` : "Écoute · signal nul (patch silencieux ?)"; }
+      cur.raf = requestAnimationFrame(meter);
+    };
+    libpdListen = cur; meter();
+    if (btn) { btn.textContent = "■ Arrêter l'écoute"; btn.setAttribute("aria-pressed", "true"); }
+    log("libpd · écoute démarrée (AudioWorklet)");
+  } catch (err) {
+    if (status) { status.textContent = `libpd indisponible : ${err.message || err}`; status.dataset.rms = "0"; }
+    log(`libpd · écoute impossible · ${err.message || err}`);
+  }
+}
+
 function renderInspector(id) {
   selectNode(id);
 }
@@ -1345,6 +1398,12 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="field"><label>Host / cible</label><input id="nHost" value="${n.params.host || (n.type === "osc" ? "bridge" : "127.0.0.1")}"></div>`;
     extra += `<div class="field"><label>Adresse OSC</label><input id="nAddr" value="${n.params.address || "/nvd/value"}"></div>`;
     extra += `<div class="field"><label>Port UDP</label><input id="nPort" type="number" min="1" max="65535" value="${n.params.port || (n.type === "millumin" ? 5000 : n.type === "supercollider" ? 57120 : 9000)}"></div>`;
+    if (n.type === "osc") {
+      const wsOnline = devices.oscWs?.socket?.readyState === 1;
+      extra += `<div class="field"><label>Passerelle OSC WebSocket</label><input id="oscWsUrl" value="${htmlSafe(localStorage.getItem("nvd.oscWsUrl") || "ws://127.0.0.1:8081")}" spellcheck="false"></div>`;
+      extra += `<div class="camera-actions"><button id="oscWsConnect" type="button">${wsOnline ? "Reconnecter" : "Connecter la passerelle"}</button></div>`;
+      extra += `<p id="oscWsStatus" class="hint" role="status" data-state="${wsOnline ? "online" : "offline"}">${wsOnline ? `connecté · ${htmlSafe(devices.oscWs.url)}` : "hors ligne · passerelle requise (un navigateur n'envoie pas d'UDP : OSC passe par une passerelle WebSocket)"}</p>`;
+    }
     if (OSC_BRIDGE_TYPES.has(n.type)) extra += `<div class="field"><label>Envoi auto</label><select id="nAutoExternal"><option value="false">Non · Trigger conseillé</option><option value="true">Oui · à chaque changement</option></select></div>`;
   }
   if (n.type === "arduino" || n.type === "esp") {
@@ -1391,6 +1450,7 @@ function selectNode(id, { additive = false } = {}) {
     const patch = n.params.patch || LIBPD_AUDIO_PATCH;
     extra += `<div class="field"><label>Patch .pd</label><textarea id="nLibpdPatch" rows="8" spellcheck="false">${patch.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</textarea></div>`;
     extra += `<p class="hint">libpd est seulement le moteur audio embarqué. Un niveau sort si le buffer audio contient un échantillon réel.</p>`;
+    extra += `<div class="camera-actions"><button id="libpdListenBtn" type="button" aria-pressed="${libpdListen ? "true" : "false"}">${libpdListen ? "■ Arrêter l'écoute" : "▶ Écouter"}</button></div><p id="libpdListenStatus" class="hint" role="status" data-rms="0">${libpdListen ? "Écoute en cours" : "Muet · cliquer « Écouter » pour entendre le patch (44,1 kHz)"}</p>`;
   }
   if (n.type === "p5" || n.type === "sketch") {
     const isP5 = n.type === "p5";
@@ -1638,6 +1698,16 @@ function selectNode(id, { additive = false } = {}) {
     autosave();
     log(`IA · Run · ${n.title || n.type}`);
   };
+  if ($("#libpdListenBtn")) $("#libpdListenBtn").onclick = () => toggleLibpdListen(n);
+  if ($("#oscWsConnect")) {
+    $("#oscWsConnect").onclick = async () => {
+      const url = ($("#oscWsUrl").value || "").trim();
+      localStorage.setItem("nvd.oscWsUrl", url);
+      paintOscWsStatus("connexion…");
+      try { await devices.connectOscWs(url); }
+      catch (err) { paintOscWsStatus(`passerelle requise · aucune passerelle OSC↔WebSocket joignable sur ${url || "(URL vide)"} (${err.message || err})`); }
+    };
+  }
   if ($("#nHost")) $("#nHost").onchange = e => { n.params.host = e.target.value; autosave(); commitHistory(); };
   if ($("#nAddr")) $("#nAddr").onchange = e => { n.params.address = e.target.value; autosave(); commitHistory(); };
   if ($("#nPort")) $("#nPort").onchange = e => { n.params.port = Math.max(1, Math.min(65535, +e.target.value || 9000)); autosave(); commitHistory(); };
@@ -4734,6 +4804,7 @@ function handleCompanionStudioMessage(msg) {
         if (host !== "bridge" && typeof window.nvdDesktop?.sendOscUdp === "function") {
           return window.nvdDesktop.sendOscUdp({ host, port, address, args });
         }
+        if (devices.oscWsOnline()) return devices.oscWs.send(address, args);
         return devices.bridge.send({ type: "osc", target: host || "bridge", address, args });
       },
       sendArtNet: (message) => {

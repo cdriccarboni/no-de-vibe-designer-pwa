@@ -1,10 +1,13 @@
 import {MidiAdapter} from "./adapters/midi.js";
 import {SerialAdapter} from "./adapters/serial.js";
 import {WebSocketBridge,makeOscPacket,makeArtNetPacket} from "./adapters/websocket-bridge.js";
+import {OscWebSocket} from "./adapters/osc-websocket.js";
 
 export class DeviceManager{
-  constructor(onEvent=()=>{}){
+  constructor(onEvent=()=>{},{WebSocketImpl}={}){
     this.onEvent=onEvent;
+    this.WebSocketImpl=WebSocketImpl;
+    this.oscWs=null;
     this.midi=new MidiAdapter(e=>onEvent(e));
     this.serial=new SerialAdapter(e=>onEvent(e));
     this.bridge=new WebSocketBridge(e=>onEvent(e));
@@ -64,6 +67,20 @@ export class DeviceManager{
     return res;
   }
 
+  /** OSC 1.0 binaire via une passerelle WebSocket (le navigateur ne fait pas d'UDP). */
+  async connectOscWs(url){
+    if(!/^wss?:\/\//i.test(String(url||"")))throw new Error("URL ws:// ou wss:// attendue");
+    this.oscWs?.close();
+    const opts={url,onMessage:m=>this.onEvent({type:"oscws-message",message:m}),onState:s=>this.onEvent({type:"oscws-state",state:s,url})};
+    if(this.WebSocketImpl!==undefined)opts.WebSocketImpl=this.WebSocketImpl;
+    this.oscWs=new OscWebSocket(opts);
+    try{ await this.oscWs.connect(); }
+    catch(e){ this.oscWs=null; throw e; }
+    return this.oscWs;
+  }
+  oscWsOnline(){ return this.oscWs?.socket?.readyState===1; }
+  disconnectOscWs(){ this.oscWs?.close(); this.oscWs=null; }
+
   async connectSerial(){
     const res=await this.serial.connect();
     await this.probe({autoReconnectSerial:false,autoConnectGrantedMidi:false});
@@ -80,6 +97,9 @@ export class DeviceManager{
     if(q.startsWith("serial send "))return this.serial.send(raw.slice(12));
     if(q.startsWith("bridge connect "))return this.bridge.connect(raw.slice(15).trim());
     if(q==="bridge ping")return this.bridge.ping();
+    if(q.startsWith("oscws connect "))return this.connectOscWs(raw.slice(14).trim());
+    if(q==="oscws off"){this.disconnectOscWs();return true}
+    if(q.startsWith("osc ")&&this.oscWsOnline()){const [,,address,...args]=raw.split(/\s+/);return this.oscWs.send(address,args.map(v=>isNaN(Number(v))?v:Number(v)))}
     if(q.startsWith("osc ")){const [,target,address,...args]=raw.split(/\s+/);return this.bridge.send(makeOscPacket(target,address,args.map(v=>isNaN(Number(v))?v:Number(v))))}
     if(q.startsWith("artnet ")){const [,u,ch,v]=raw.split(/\s+/);return this.bridge.send(makeArtNetPacket(u,ch,v))}
     return false;
