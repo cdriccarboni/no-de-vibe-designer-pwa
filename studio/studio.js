@@ -685,12 +685,17 @@ $("btnConnect").onclick = async () => {
       },
       onLog: log
     });
-    transport.onStatus(({ state }) => {
-      setNetStatus(transport.statusLine());
-      if (state) log(`Transport · ${state}`);
+    let lastLogged = "";
+    transport.onStatus(({ state, error, retryInMs, reconnected }) => {
+      setNetStatus(error ? `ERROR · ${error}` : transport.statusLine());
+      const line = error ? `Transport · ${state} · ${error}`
+        : retryInMs ? `Transport · reconnexion dans ${Math.round(retryInMs / 100) / 10} s`
+        : reconnected ? "Transport · reconnecté" : state ? `Transport · ${state}` : "";
+      if (line && line !== lastLogged) { log(line); lastLogged = line; }
     });
     await transport.connect();
     localStorage.setItem("nvd.companion.ws", url);
+    try { localStorage.setItem("nvd.companion.pair", ($("pairCode").value || "").trim()); } catch { /* */ }
     setNetStatus(transport.statusLine());
     log("Connecté");
   } catch (e) {
@@ -720,10 +725,19 @@ $("btnDisconnect").onclick = () => {
   log("Déconnecté");
 };
 
+// QR de la régie : /studio/?ws=ws://<poste>:4174&pair=<code>. Le téléphone se connecte
+// seul ; sans QR, on reprend le dernier poste connu (même code tant que la régie n'a pas changé).
+const joinParams = new URLSearchParams(location.search);
+const joinWs = joinParams.get("ws") || "";
+const joinPair = (joinParams.get("pair") || "").trim();
+let autoConnect = false;
 try {
   const remembered = loadRememberedHost(localStorage);
   const saved = localStorage.getItem("nvd.companion.ws");
-  $("wsUrl").value = saved || remembered?.wsUrl || "ws://127.0.0.1:4174";
+  $("wsUrl").value = (/^wss?:\/\//i.test(joinWs) ? joinWs : "") || saved || remembered?.wsUrl || "ws://127.0.0.1:4174";
+  const savedPair = localStorage.getItem("nvd.companion.pair") || "";
+  if ($("pairCode")) $("pairCode").value = joinPair || savedPair;
+  autoConnect = /^wss?:\/\//i.test(joinWs) || (!!saved && !!savedPair && joinParams.get("embed") !== "1");
 } catch {
   $("wsUrl").value = "ws://127.0.0.1:4174";
 }
@@ -743,3 +757,11 @@ refreshSessionName();
 renderPageNav();
 renderGrid();
 log("Companion Studio prêt · Régie universelle · swipe horizontal entre pages");
+if (autoConnect) {
+  // Nettoie l'URL pour ne pas laisser le code d'appairage dans l'historique / un partage d'écran.
+  if (joinPair) {
+    try { joinParams.delete("pair"); history.replaceState(null, "", `${location.pathname}?${joinParams}`); } catch { /* */ }
+  }
+  log("Connexion automatique à la régie…");
+  $("btnConnect").click();
+}

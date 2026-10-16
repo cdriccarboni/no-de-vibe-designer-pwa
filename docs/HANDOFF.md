@@ -1,4 +1,4 @@
-# Passation — No[co]de Vibe Designer (PWA publique) · 3.3.16 · 16/10/2026
+# Passation — No[co]de Vibe Designer (PWA publique) · 3.3.17 · 16/10/2026
 
 Ce document permet de reprendre le travail (Hermès, Antigravity, ou à la main) **sans Grok Bot ni Cursor** :
 uniquement git, Node 22, Playwright et GitHub Actions.
@@ -30,6 +30,9 @@ uniquement git, Node 22, Playwright et GitHub Actions.
 | Serial / Arduino / ESP32 / GPIO / NDI | MATÉRIEL ABSENT | nodes « Test à supprimer » (test-ndi-in/out, test-arduino, test-esp32, test-gpio-in/out) = SIMULÉS, à conserver |
 | Radio / diffusion | TESTÉ (logique) | `qa/radio-broadcast-qa.mjs`, `qa/radio-ui-qa.mjs` |
 | Remote Camera QR | TESTÉ | `qa/remote-camera-qr-e2e.mjs` |
+| Régie LAN : pont appairé (code, hôte réservé, Origin) | TESTÉ | `qa/regie-bridge-qa.mjs` (32/32) · guide `docs/REGIE-LAN.md` |
+| Companion ↔ Designer (QR → connexion auto → commande → retour, reprise) | TESTÉ (Chrome, mobile émulé) · MATÉRIEL ABSENT | `qa/companion-roundtrip-e2e.mjs` (20/20) ; téléphones physiques non testés |
+| Desktop avec pont de régie (`electron/main.cjs`) | PARTIEL | logique testée avec Electron simulé (`qa/electron-main-qa.mjs`, 7/7) ; inactif dans les builds tant que `docs/ci/electron-regie-bridge.patch` n'est pas appliqué |
 | Confidentialité (aucune donnée privée) | TESTÉ | `qa/privacy-guard.mjs` + workflow `privacy-guard.yml` |
 | Garde-fou de version | TESTÉ | `qa/version-guard.mjs` (jamais inférieure à la version publiée) |
 
@@ -52,12 +55,15 @@ Laisser 1 à 3 minutes au CDN Pages ; un premier passage juste après déploieme
 Ne pas toucher `.release-trigger` sauf pour lancer volontairement le workflow Release.
 
 ## Blocages connus
+0. **Builds desktop sans pont de régie** : appliquer `git apply docs/ci/electron-regie-bridge.patch` (compte avec droit `workflow`)
+   pour que les apps macOS/Windows/Linux utilisent `electron/main.cjs` et embarquent `bridge/`. Sans cela, utiliser
+   `node bridge/nocode-host.mjs` sur le poste de régie.
 1. **Jeton sans droit `workflow`** : l'agent ne peut pas modifier `.github/workflows/*`. Étapes CI prêtes (garde-fou de version,
    gitleaks, E2E responsive) : `git apply docs/ci/runtime-qa-steps.patch` par un compte ayant ce droit ; y ajouter ensuite
    les autres E2E (`libpd-*`, `media-truth-chains`).
 2. **OSC WebSocket depuis la PWA publique** : Chromium (Local Network Access) refuse `ws://127.0.0.1`/LAN depuis github.io ;
-   l'interface affiche « passerelle requise ». Contournements : Designer servi en local, app de bureau, invite d'accès au réseau
-   local, ou passerelle `wss://` avec certificat valide.
+   l'interface affiche « passerelle requise ». Solution livrée en 3.3.17 : le pont de régie sert l'application en local
+   (`node bridge/nocode-host.mjs`, ou app de bureau une fois le patch CI appliqué).
 3. libpd : 44,1 kHz uniquement, thread principal (latence ≈ 93 ms), un seul patch audio à la fois, pas d'`adc~`.
 4. Matériel réel (micro, caméra, MIDI, Serial, ESP32, NDI, GPIO) jamais testé automatiquement.
 
@@ -70,3 +76,26 @@ Ne pas toucher `.release-trigger` sauf pour lancer volontairement le workflow Re
 ## Règles à respecter
 Nom produit exact « No[co]de Vibe Designer ». Jamais de version inférieure à la production. Aucune donnée privée/spectacle,
 secret, keystore ou AAB dans ce dépôt public. Pas de Google Play production. Travailler sur des branches dédiées, pas de force push.
+
+## Journal de reprise (dernier point de passage)
+- **Date** : 16/10/2026 ~19 h 50 (Europe/Paris) · **Agent** : Claude (session claude.ai/code) · coordinateur : Hermès.
+- **Branche** : `claude/regie-lan-companion-20261016` (basée sur `main` 1c93fa0, 3.3.16 de Grok Bot) → PR vers `main`.
+- **Fait** : pont de régie LAN appairé, Companion sans reconnexion manuelle, Designer hôte automatique, `electron/main.cjs`,
+  patch CI desktop, version 3.3.17, docs (`docs/REGIE-LAN.md`).
+- **Tests** : `qa/run-all.sh` = tout vert sauf `surfaces-smoke-e2e` et `version-guard` quand l'environnement n'a pas accès à
+  github.io / api.github.com (échecs réseau uniquement, identiques avant la modification) ; `version-guard` OK contre la version
+  publiée 3.3.16 lue depuis le Mac.
+- **Reste à faire (ordre)** :
+  1. Appliquer `docs/ci/electron-regie-bridge.patch` (droit `workflow`), relancer les builds, tester l'app macOS + un vrai téléphone.
+  2. Version privée : reporter les commits génériques de cette branche (`bridge/`, `studio/`, `shared/companion-studio/transport-ws.js`,
+     `desktop/app.js`, `electron/main.cjs`, tests associés) dans le dépôt privé par PR sélective (voir `docs/PUBLIC_PRIVE.md`).
+     par PR sélective — jamais de transfert privé → public.
+  3. Timeline/conduite : brancher les tops de la conduite sur le bouton GO du Companion (`binding.kind = "stage"`) et le prouver en E2E.
+  4. Matrice d'audit des logiciels de référence (TouchDesigner, Millumin, QLab…) : sources publiques uniquement.
+- **REA** : serveur MCP joignable depuis la session (98 outils, réponse structurée vérifiée) ; aucune analyse réalisée faute de
+  binaire maison installé sur le Mac ; ne pas l'employer pour décompiler des logiciels propriétaires.
+- **Bloqué côté agent (19 h 55)** : la fusion de la PR #29 (CI verte) et la synchronisation manuelle vers le dépôt privé ont été
+  refusées par les garde-fous de la session Claude (fusion sans relecture humaine) → à faire par Cédric ou Hermès.
+- **Dépôt privé** : ses GitHub Actions ne démarrent pas (« paiements récents en échec / limite de dépenses ») ;
+  la synchronisation quotidienne automatique ne tourne donc pas. Décision de facturation requise (Settings → Billing).
+- **Risques** : pare-feu macOS au premier lancement du pont ; port 4174 déjà pris (le desktop essaie 4175→4178).
