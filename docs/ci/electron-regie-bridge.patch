@@ -1,0 +1,99 @@
+diff --git a/.github/workflows/macos-public-build.yml b/.github/workflows/macos-public-build.yml
+index 825826e..3c79da6 100644
+--- a/.github/workflows/macos-public-build.yml
++++ b/.github/workflows/macos-public-build.yml
+@@ -77,8 +77,10 @@ jobs:
+               "appId": "fr.acousmatic.nodevibedesigner",
+               "productName": "No[co]de Vibe Designer",
+               "asar": true,
++              "asarUnpack": ["bridge/**", "shared/**"],
+               "files": [
+                 "electron/**/*",
++                "bridge/**/*",
+                 "desktop/**/*",
+                 "shared/**/*",
+                 "mobile/**/*",
+@@ -104,7 +106,7 @@ jobs:
+           JSON
+ 
+           mkdir -p electron
+-          cat > electron/main.cjs <<'JS'
++          cat > electron/main.inline.cjs <<'JS'
+           const { app, BrowserWindow, shell, session } = require("electron");
+           const http = require("http");
+           const fs = require("fs");
+@@ -214,6 +216,7 @@ jobs:
+             app.quit();
+           });
+           JS
++          [ -f electron/main.cjs ] || mv electron/main.inline.cjs electron/main.cjs; rm -f electron/main.inline.cjs
+ 
+           npm install --no-audit --no-fund
+ 
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 9eece21..f773351 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -147,10 +147,10 @@ jobs:
+         shell: bash
+         run: |
+           cat > package.json <<JSON
+-          {"name":"no-de-vibe-designer-universal","productName":"No[co]de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No[co]de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"mac":{"category":"public.app-category.graphics-design","identity":null,"target":[{"target":"dir","arch":["arm64","x64"]}]}}}
++          {"name":"no-de-vibe-designer-universal","productName":"No[co]de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No[co]de Vibe Designer","asar":true,"asarUnpack":["bridge/**","shared/**"],"files":["electron/**/*","bridge/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"mac":{"category":"public.app-category.graphics-design","identity":null,"target":[{"target":"dir","arch":["arm64","x64"]}]}}}
+           JSON
+           mkdir -p electron
+-          cat > electron/main.cjs <<'JS'
++          cat > electron/main.inline.cjs <<'JS'
+           const { app, BrowserWindow, shell, session } = require("electron");
+           const http = require("http"), fs = require("fs"), path = require("path");
+           let server;
+@@ -159,6 +159,7 @@ jobs:
+           async function create(){ const r=root(); const port=await new Promise((resolve,reject)=>{server=http.createServer((req,res)=>{let rel=decodeURIComponent((req.url||"/").split("?")[0]).replace(/^\/+/, "")||"index.html";let p=path.normalize(path.join(r,rel));if(!p.startsWith(path.normalize(r))){res.writeHead(403);return res.end("Forbidden");}try{if(fs.statSync(p).isDirectory())p=path.join(p,"index.html");}catch{}if(!fs.existsSync(p)){res.writeHead(404);return res.end("Not found");}res.writeHead(200,{"Content-Type":type(p),"Cache-Control":"no-cache"});fs.createReadStream(p).pipe(res);});server.on("error",reject);server.listen(17654,"127.0.0.1",()=>resolve(server.address().port));}); const win=new BrowserWindow({width:1440,height:930,minWidth:1024,minHeight:700,title:"No[co]de Vibe Designer",backgroundColor:"#101214",webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); session.defaultSession.setPermissionRequestHandler((_wc,p,cb)=>cb(p==="media"||p==="geolocation"||p==="notifications")); await win.loadURL("http://127.0.0.1:"+port+"/desktop/"); win.webContents.setWindowOpenHandler(({url})=>{if(url.startsWith("http://127.0.0.1:"+port+"/"))return{action:"allow"};shell.openExternal(url);return{action:"deny"};}); }
+           if(app.requestSingleInstanceLock()) app.whenReady().then(create); else app.quit(); app.on("window-all-closed",()=>{try{server?.close()}catch{};app.quit();});
+           JS
++          [ -f electron/main.cjs ] || mv electron/main.inline.cjs electron/main.cjs; rm -f electron/main.inline.cjs
+           npm install --no-audit --no-fund
+       - name: Build and ad-hoc sign macOS apps
+         shell: bash
+@@ -253,10 +254,10 @@ jobs:
+         shell: bash
+         run: |
+           cat > package.json <<JSON
+-          {"name":"no-de-vibe-designer-universal","productName":"No[co]de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No[co]de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"win":{"target":[{"target":"nsis","arch":["x64"]}],"artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Windows-x64-Setup.exe"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true,"createStartMenuShortcut":true}}}
++          {"name":"no-de-vibe-designer-universal","productName":"No[co]de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No[co]de Vibe Designer","asar":true,"asarUnpack":["bridge/**","shared/**"],"files":["electron/**/*","bridge/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"win":{"target":[{"target":"nsis","arch":["x64"]}],"artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Windows-x64-Setup.exe"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true,"createStartMenuShortcut":true}}}
+           JSON
+           mkdir -p electron
+-          cat > electron/main.cjs <<'JS'
++          cat > electron/main.inline.cjs <<'JS'
+           const { app, BrowserWindow, shell, session } = require("electron");
+           const http = require("http"), fs = require("fs"), path = require("path");
+           let server;
+@@ -265,6 +266,7 @@ jobs:
+           async function create(){ const r=root(); const port=await new Promise((resolve,reject)=>{server=http.createServer((req,res)=>{let rel=decodeURIComponent((req.url||"/").split("?")[0]).replace(/^\/+/, "")||"index.html";let p=path.normalize(path.join(r,rel));if(!p.startsWith(path.normalize(r))){res.writeHead(403);return res.end("Forbidden");}try{if(fs.statSync(p).isDirectory())p=path.join(p,"index.html");}catch{}if(!fs.existsSync(p)){res.writeHead(404);return res.end("Not found");}res.writeHead(200,{"Content-Type":type(p),"Cache-Control":"no-cache"});fs.createReadStream(p).pipe(res);});server.on("error",reject);server.listen(0,"127.0.0.1",()=>resolve(server.address().port));}); const win=new BrowserWindow({width:1440,height:930,minWidth:1024,minHeight:700,title:"No[co]de Vibe Designer",backgroundColor:"#101214",webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); session.defaultSession.setPermissionRequestHandler((_wc,p,cb)=>cb(p==="media"||p==="geolocation"||p==="notifications")); await win.loadURL("http://127.0.0.1:"+port+"/desktop/"); win.webContents.setWindowOpenHandler(({url})=>{if(url.startsWith("http://127.0.0.1:"+port+"/"))return{action:"allow"};shell.openExternal(url);return{action:"deny"};}); }
+           app.whenReady().then(create); app.on("window-all-closed",()=>{try{server?.close()}catch{};app.quit();});
+           JS
++          [ -f electron/main.cjs ] || mv electron/main.inline.cjs electron/main.cjs; rm -f electron/main.inline.cjs
+           npm install --no-audit --no-fund
+       - name: Build Windows installer and portable archive
+         shell: bash
+@@ -308,10 +310,10 @@ jobs:
+         shell: bash
+         run: |
+           cat > package.json <<JSON
+-          {"name":"no-de-vibe-designer-universal","productName":"No[co]de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No[co]de Vibe Designer","asar":true,"files":["electron/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"linux":{"target":["AppImage","deb","tar.gz"],"category":"Graphics","artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Linux-x64.\${ext}"}}}
++          {"name":"no-de-vibe-designer-universal","productName":"No[co]de Vibe Designer","version":"${APP_VERSION}","private":true,"author":{"name":"Cédric Carboni","email":"cdriccarboni@users.noreply.github.com"},"main":"electron/main.cjs","devDependencies":{"electron":"33.4.11","electron-builder":"25.1.8"},"build":{"appId":"fr.acousmatic.nodevibedesigner","productName":"No[co]de Vibe Designer","asar":true,"asarUnpack":["bridge/**","shared/**"],"files":["electron/**/*","bridge/**/*","desktop/**/*","shared/**/*","src/**/*","mobile/**/*","studio/**/*","companion/**/*","show/**/*","manuel/**/*","icons/**/*","install/**/*","index.html","manifest.webmanifest","build-info.json","package.json"],"linux":{"target":["AppImage","deb","tar.gz"],"category":"Graphics","artifactName":"No-de-Vibe-Designer-${APP_VERSION}-Linux-x64.\${ext}"}}}
+           JSON
+           mkdir -p electron
+-          cat > electron/main.cjs <<'JS'
++          cat > electron/main.inline.cjs <<'JS'
+           const { app, BrowserWindow, shell, session } = require("electron");
+           const http = require("http"), fs = require("fs"), path = require("path");
+           let server;
+@@ -320,6 +322,7 @@ jobs:
+           async function create(){ const r=root(); const port=await new Promise((resolve,reject)=>{server=http.createServer((req,res)=>{let rel=decodeURIComponent((req.url||"/").split("?")[0]).replace(/^\/+/, "")||"index.html";let p=path.normalize(path.join(r,rel));if(!p.startsWith(path.normalize(r))){res.writeHead(403);return res.end("Forbidden");}try{if(fs.statSync(p).isDirectory())p=path.join(p,"index.html");}catch{}if(!fs.existsSync(p)){res.writeHead(404);return res.end("Not found");}res.writeHead(200,{"Content-Type":type(p),"Cache-Control":"no-cache"});fs.createReadStream(p).pipe(res);});server.on("error",reject);server.listen(0,"127.0.0.1",()=>resolve(server.address().port));}); const win=new BrowserWindow({width:1440,height:930,minWidth:1024,minHeight:700,title:"No[co]de Vibe Designer",backgroundColor:"#101214",webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}}); session.defaultSession.setPermissionRequestHandler((_wc,p,cb)=>cb(p==="media"||p==="geolocation"||p==="notifications")); await win.loadURL("http://127.0.0.1:"+port+"/desktop/"); win.webContents.setWindowOpenHandler(({url})=>{if(url.startsWith("http://127.0.0.1:"+port+"/"))return{action:"allow"};shell.openExternal(url);return{action:"deny"};}); }
+           app.whenReady().then(create); app.on("window-all-closed",()=>{try{server?.close()}catch{};app.quit();});
+           JS
++          [ -f electron/main.cjs ] || mv electron/main.inline.cjs electron/main.cjs; rm -f electron/main.inline.cjs
+           npm install --no-audit --no-fund
+       - name: Build Linux packages
+         shell: bash
