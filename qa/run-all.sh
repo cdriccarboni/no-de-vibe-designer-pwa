@@ -18,5 +18,6 @@ for t in qa/*.mjs qa/*.cjs; do
   esac
   run node "$t"
 done
+for t in shared/*.test.mjs; do [ -e "$t" ] && run node --test "$t"; done
 echo "QA : $pass réussis · $fail en échec · $skip non exécutés"
 exit $((fail > 0))

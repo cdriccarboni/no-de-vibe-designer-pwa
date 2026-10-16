@@ -157,6 +157,7 @@ const ASSETS = [
   "./shared/broadcast-engine.js",
   "./radio/index.html",
   "./shared/vibe-out.js",
+  "./shared/vibeout-runtime-provider.js",
   "./shared/vibe-planner.js",
   "./shared/vibe-recipes.js",
   "./shared/vibe-safety.js",

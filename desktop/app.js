@@ -28,6 +28,7 @@ import { applyCue, listCues, nextCue, previousCue, dispatchPanicEffects, formatP
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
 import { qrSvg, defaultCompanionBase } from "../shared/remote-camera/qr.js";
 import { generateVibeOut, VIBE_OUT_TARGETS } from "../shared/vibe-out.js";
+import { vibeOutProviderPlan } from "../shared/vibeout-runtime-provider.js";
 import { createHostCard, hostCardToQrPayload } from "../shared/discovery/host-card.js";
 import { discoveryCapabilities } from "../shared/discovery/lan-beacon.js";
 import { createRemoteCameraSession, makeRoomCode } from "../shared/remote-camera/session.js";
@@ -418,7 +419,7 @@ async function requestAiForNode(options = {}) {
   if (typeof window.nvdDesktop?.aiNodeRequest === "function") {
     return window.nvdDesktop.aiNodeRequest({
       ...options,
-      apiKey: options.apiKey || cfg.apiKey || ""
+      apiKey: options.apiKey ?? cfg.apiKey ?? ""
     });
   }
   const protocol = String(options.protocol || "ollama").toLowerCase();
@@ -494,7 +495,7 @@ async function requestAiForNode(options = {}) {
   const endpoint = String(options.endpoint || cfg.endpoint || "").trim();
   if (!endpoint) throw new Error("Endpoint IA manquant");
   const headers = { "Content-Type":"application/json" };
-  const key = options.apiKey || cfg.apiKey || "";
+  const key = options.apiKey ?? cfg.apiKey ?? "";
   if (key) headers.Authorization = "Bearer " + key;
   const body = protocol === "generic"
     ? { model: options.model || cfg.model || "", prompt, input: prompt }
@@ -3092,35 +3093,25 @@ async function askVibeOutAi(prompt, provider = "auto", target = "") {
   const cfg = readAiConfig();
   const task = /glsl|isf/i.test(String(target || "")) ? "shader" : "code";
   const routed = selectLocalAgents(cfg.localAgents || [], { task, limit:1 })[0];
-  const localModel = routed?.model || cfg.localModel || "qwen2.5-coder:7b";
-  const localBaseUrl = routed?.baseUrl || cfg.localBaseUrl || "http://127.0.0.1:11434";
-  const local = () => requestAiForNode({
-    protocol:"ollama",
-    baseUrl:localBaseUrl,
-    model:localModel,
-    system:prompt.system,
-    prompt:prompt.user,
-    temperature:.12
-  }).then(r => ({ ...r, provider:"local", agent:routed?.id || "", model:r.model || localModel }));
-  const external = () => {
-    if (!cfg.enabled || !cfg.endpoint) throw new Error("Endpoint externe non configuré");
-    return requestAiForNode({
-      protocol:"openai",
-      endpoint:cfg.endpoint,
-      model:cfg.model || "gpt-4o-mini",
-      apiKey:cfg.apiKey || "",
-      system:prompt.system,
-      prompt:prompt.user,
-      temperature:.12
-    }).then(r => ({ ...r, provider:"external" }));
-  };
-  if (provider === "local") return local();
-  if (provider === "external") return external();
-  try { return await local(); }
-  catch (e) {
-    if (cfg.enabled && cfg.endpoint) return external();
-    throw e;
+  const planned = vibeOutProviderPlan(cfg, routed, provider);
+  const errors = [];
+  for (const route of planned) {
+    try {
+      const answer = await requestAiForNode({
+        ...route,
+        system:prompt.system,
+        prompt:prompt.user,
+        temperature:.12
+      });
+      if (!answer?.content?.trim()) throw new Error("Réponse vide du modèle");
+      return { ...answer, provider:route.provider, agent:route.agent,
+        model:answer.model || route.model };
+    } catch (error) {
+      errors.push(`${route.provider} : ${error?.message || error}`);
+      if (provider !== "auto") break;
+    }
   }
+  throw new Error(`Aucun modèle n'a généré de code : ${errors.join(" | ")}`);
 }
 function vibeOutFallback(target) {
   if (target === "maxpat") return exportMax(project);
