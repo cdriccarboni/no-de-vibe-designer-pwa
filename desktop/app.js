@@ -3310,7 +3310,51 @@ function showDiagnostic({ copy = false } = {}) {
 $("#runDiagnosticBtn")?.addEventListener("click", () => showDiagnostic());
 $("#copyDiagnosticBtn")?.addEventListener("click", () => showDiagnostic({ copy: true }));
 
+function escapeHtmlText(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function renderCompanionPairing() {
+  const panel = $("#hostCardPanel");
+  if (!panel) return false;
+  const info = await detectHostBridge();
+  hostBridgeInfo = info;
+  panel.hidden = false;
+  if (!info) {
+    panel.innerHTML = `<p><b>Aucun pont de régie actif.</b> Dans un navigateur (PWA en ligne), le téléphone ne peut pas se connecter directement à ce poste.</p>
+      <p class="hint">Ouvre l'application desktop No[co]de Vibe Designer, ou lance <code>node bridge/nocode-host.mjs</code> depuis le dossier de l'application, puis ouvre l'adresse « Designer » indiquée.</p>`;
+    return false;
+  }
+  const lan = info.lan || [];
+  const blocks = lan.length
+    ? lan.map(item => `<div class="host-card-qr"><div class="rc-qr">${qrSvg(item.joinUrl, { cellSize: 4, label: `QR Companion ${item.interface}` })}</div>
+        <p><b>${escapeHtmlText(item.interface)}</b> · <code>${escapeHtmlText(item.address)}:${info.port}</code><br><a href="${escapeHtmlText(item.joinUrl)}" target="_blank" rel="noopener">${escapeHtmlText(item.joinUrl)}</a></p></div>`).join("")
+    : `<p>⚠ Aucun réseau local détecté sur ce poste : connecte-le au Wi-Fi ou au réseau de régie, puis actualise.</p>`;
+  panel.innerHTML = `<p>Code d'appairage : <b class="pair-code">${escapeHtmlText(info.pairCode)}</b> · port ${info.port}</p>
+    ${blocks}
+    <p id="companionPeers" class="hint">${info.peers?.length ? "" : "Aucun appareil connecté"}</p>
+    <p class="hint">Téléphone sur le même réseau (sans Internet possible). Le code change à chaque lancement ; « Nouveau code » déconnecte les appareils distants.</p>
+    <div class="preferences-actions"><button type="button" class="smallbtn" id="pairRefresh">Actualiser</button><button type="button" class="smallbtn danger" id="pairRotate">Nouveau code</button></div>`;
+  renderBridgePeers(info.peers || []);
+  $("#pairRefresh")?.addEventListener("click", () => renderCompanionPairing());
+  $("#pairRotate")?.addEventListener("click", async () => {
+    try {
+      const res = await fetch("/__nocode/rotate-pair", { method: "POST" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      log("Companion · nouveau code d'appairage");
+      renderCompanionPairing();
+    } catch (e) {
+      log(`Companion · rotation du code impossible · ${e.message || e}`);
+    }
+  });
+  return true;
+}
+
 $("#showHostCard")?.addEventListener("click", async () => {
+  if (await renderCompanionPairing()) {
+    log("Companion · QR d'appairage affiché");
+    return;
+  }
   const out = $("#hostCardOut");
   if (!out) return;
   let card = null;
@@ -4745,6 +4789,10 @@ function showCompanionDetect(payload = {}) {
 
 function handleCompanionStudioMessage(msg) {
   if (!msg?.type) return;
+  if (msg.type === "bridge-peers") {
+    renderBridgePeers(msg.peers || []);
+    return;
+  }
   if (msg.type === STUDIO_MSG.DETECT) {
     showCompanionDetect(msg);
     log(`Companion Studio · détecté · ${msg.clientId || "?"}`);
@@ -4843,15 +4891,53 @@ function handleCompanionStudioMessage(msg) {
   }
 }
 
-function startDesktopRemoteHost() {
+// Pont de régie (bridge/remote-server.mjs) : présent quand la page est servie par
+// l'application desktop ou par `node bridge/nocode-host.mjs`. Jamais sur GitHub Pages.
+let hostBridgeInfo = null;
+async function detectHostBridge() {
+  const params = new URLSearchParams(location.search);
+  let marked = false;
+  try {
+    marked = (performance.getEntriesByType("navigation")[0]?.serverTiming || []).some(e => e.name === "nvdbridge");
+  } catch { /* navigateur sans Server-Timing */ }
+  const servedByBridge = location.protocol === "http:" && (
+    marked ||
+    location.port === String(REMOTE_PORT) ||
+    params.get("companionHost") === "1" ||
+    window.nvdDesktop?.remoteBridge === true
+  );
+  if (!servedByBridge) return null;
+  try {
+    const res = await fetch("/__nocode/host", { cache: "no-store" });
+    if (!res.ok) return null;
+    const info = await res.json();
+    return info?.schema === "nvd.bridge" ? info : null;
+  } catch {
+    return null;
+  }
+}
+
+function renderBridgePeers(peers = []) {
+  const el = $("#companionPeers");
+  if (!el) return;
+  el.textContent = peers.length
+    ? `${peers.length} appareil(s) : ${peers.map(p => `${p.id || p.role} (${p.address})`).join(", ")}`
+    : "Aucun appareil connecté";
+}
+
+async function startDesktopRemoteHost() {
   const params = new URLSearchParams(location.search);
   const query = params.get("remoteHost");
-  const electron = window.nvdDesktop?.runtime === "electron";
   const explicitCompanion = params.get("companionHost") === "1";
-  // Le desktop autonome ne tente jamais une connexion distante implicite.
-  // Une session WS n'est activée que par un paramètre explicite.
-  if (!query && !explicitCompanion) return;
-  const url = query && /^wss?:/i.test(query) ? query : `ws://127.0.0.1:${window.nvdDesktop?.remotePort || REMOTE_PORT}`;
+  hostBridgeInfo = await detectHostBridge();
+  // Le desktop autonome ne tente jamais une connexion distante implicite :
+  // soit un paramètre explicite, soit la page est servie par le pont de régie lui-même.
+  if (!query && !explicitCompanion && !hostBridgeInfo) return;
+  const url = query && /^wss?:/i.test(query)
+    ? query
+    : hostBridgeInfo
+      ? `ws://${location.host}`
+      : `ws://127.0.0.1:${window.nvdDesktop?.remotePort || REMOTE_PORT}`;
   remoteSession = connectRemote({
     url,
     role: "host",
@@ -4883,7 +4969,7 @@ function startDesktopRemoteHost() {
   });
   log(`Companion host · écoute ${url}`);
 }
-startDesktopRemoteHost();
+startDesktopRemoteHost().catch(e => log(`Companion host · ${e?.message || e}`));
 
 $("#companionDetect")?.querySelectorAll("[data-detect]").forEach((btn) => {
   btn.addEventListener("click", () => {
