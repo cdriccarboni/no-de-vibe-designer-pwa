@@ -44,3 +44,11 @@ Inspecteur du node OSC : champ « Passerelle OSC WebSocket » (`ws://` ou `wss:/
 Sans passerelle joignable : « passerelle requise » (jamais de faux envoi). Une fois connectée, les envois OSC du runtime et la commande
 terminal `osc <cible> <adresse> <valeurs…>` passent par la passerelle en OSC binaire ; `oscws connect <url>` / `oscws off` au terminal.
 Test : `qa/libpd-listen-oscws-e2e.mjs` (serveur WebSocket simulé qui décode le paquet OSC reçu et répond).
+
+### Limite constatée en production (3.3.15) : accès au réseau local
+Depuis la PWA publique (HTTPS, github.io), Chromium bloque par défaut la connexion à une passerelle `ws://127.0.0.1`
+ou `ws://192.168.…` (protection « Local Network Access » / Private Network Access) : le Designer affiche alors honnêtement
+« passerelle requise … connexion refusée ». Vérifié le 16/10/2026 : même test réussi en local (`scripts/serve.mjs`) et sur
+la PWA publique une fois cette protection désactivée dans le navigateur de test.
+Solutions : utiliser le Designer servi en local (`node scripts/serve.mjs`) ou l'app de bureau, accepter l'invite
+« accès au réseau local » quand le navigateur la propose, ou exposer la passerelle en `wss://` avec un certificat valide.
