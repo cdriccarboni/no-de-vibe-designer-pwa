@@ -100,7 +100,7 @@ export function spec(type){
     "radio-out":["Radio Out",["audio","on air","status","live"]],
     "radio-monitor":["Radio Monitor",["audio","level","status"]],
     audio:["Audio Lab",["in","process","out"]],
-    libpd:["libpd",["patch","level","status"]],
+    libpd:["libpd",["patch","level","status","audio"]],
     audiofilter:["Filtre audio",["freq","q","level"]],
     audiodelay:["Delay audio",["time","feedback","level"]],
     audiofft:["FFT audio",["level","peak","bins"]],

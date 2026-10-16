@@ -6,6 +6,7 @@ import { sharedAudio } from "./audio-engine.js";
 import { sharedBroadcast } from "./broadcast-engine.js";
 import { createMlRuntime } from "./ml-runtime.js";
 import { renderTextPlate } from "./composition.js";
+import { mediaErrorState } from "./media-errors.js";
 
 export class Runtime {
   constructor(canvas, { destination = "main-output", onGraphEvent = null } = {}) {
@@ -149,8 +150,10 @@ export class Runtime {
       await this.enableCamera(facingMode);
       return true;
     } catch (e) {
-      this.lastGraph.errors = [`Caméra : ${e.message || e}`];
-      this.onGraphEvent?.({ type: "camera-error", error: e.message || String(e) });
+      const st = mediaErrorState(e, "caméra");
+      this.cameraState = st.state;
+      this.lastGraph.errors = [`Caméra : ${st.label}`];
+      this.onGraphEvent?.({ type: "camera-error", error: st.label, state: st.state });
       return false;
     }
   }
@@ -162,6 +165,7 @@ export class Runtime {
     this.video.srcObject = this.mediaStream;
     await this.video.play();
     this.cameraWanted = true;
+    this.cameraState = "on";
     this.onGraphEvent?.({ type: "camera-state", state: "on" });
     return true;
   }
@@ -263,6 +267,13 @@ export class Runtime {
     return (this.project?.timeline || []).filter(c => this.time >= c.start && this.time <= c.start + c.duration);
   }
 
+  /** Rendu différé et regroupé (hors lecture) : les promesses audio résolues ne relancent plus render() en boucle
+   * synchrone (micro-tâches), ce qui figeait la page avec un Mixer/Gain branché sur l'arrêt. */
+  scheduleRender() {
+    if (this.playing || !this.project || this._renderTimer) return;
+    this._renderTimer = setTimeout(() => { this._renderTimer = 0; if (!this.playing && this.project) this.render(); }, 30);
+  }
+
   render() {
     if (!this.project) return;
     const c = this.ctx;
@@ -293,7 +304,7 @@ export class Runtime {
       audioEngine: this.audioEngine,
       broadcastEngine: this.broadcastEngine,
       mlRuntime: this.mlRuntime,
-      requestRender: () => { if (!this.playing && this.project) this.render(); },
+      requestRender: () => this.scheduleRender(),
       sensorBus: this.sensorBus,
       mediaElements: this.mediaElements,
       frameScratch: this.frameScratch,

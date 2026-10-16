@@ -610,7 +610,8 @@ export const EXECUTABLE_PORTS = {
   libpd: [
     { name: "patch", dir: "in", data: "text" },
     { name: "level", dir: "out", data: "number" },
-    { name: "status", dir: "out", data: "text" }
+    { name: "status", dir: "out", data: "text" },
+    { name: "audio", dir: "out", data: "audio" }
   ],
   pd: [
     { name: "value", dir: "in", data: "number" },

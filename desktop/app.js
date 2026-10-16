@@ -1450,6 +1450,7 @@ function selectNode(id, { additive = false } = {}) {
     const patch = n.params.patch || LIBPD_AUDIO_PATCH;
     extra += `<div class="field"><label>Patch .pd</label><textarea id="nLibpdPatch" rows="8" spellcheck="false">${patch.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</textarea></div>`;
     extra += `<p class="hint">libpd est seulement le moteur audio embarqué. Un niveau sort si le buffer audio contient un échantillon réel.</p>`;
+    extra += `<div class="field"><label>Sortie audio dans le graphe</label><select id="nLibpdAudioOut"><option value="false">Non</option><option value="true">Oui · vers Mixer / Gain / Monitor</option></select></div>`;
     extra += `<div class="camera-actions"><button id="libpdListenBtn" type="button" aria-pressed="${libpdListen ? "true" : "false"}">${libpdListen ? "■ Arrêter l'écoute" : "▶ Écouter"}</button></div><p id="libpdListenStatus" class="hint" role="status" data-rms="0">${libpdListen ? "Écoute en cours" : "Muet · cliquer « Écouter » pour entendre le patch (44,1 kHz)"}</p>`;
   }
   if (n.type === "p5" || n.type === "sketch") {
@@ -1699,6 +1700,10 @@ function selectNode(id, { additive = false } = {}) {
     log(`IA · Run · ${n.title || n.type}`);
   };
   if ($("#libpdListenBtn")) $("#libpdListenBtn").onclick = () => toggleLibpdListen(n);
+  if ($("#nLibpdAudioOut")) {
+    $("#nLibpdAudioOut").value = String(n.params.audioOut === true);
+    $("#nLibpdAudioOut").onchange = e => { n.params.audioOut = e.target.value === "true"; if (!n.params.audioOut) sharedAudio.release(n.id); runtime.render(); autosave(); commitHistory(); };
+  }
   if ($("#oscWsConnect")) {
     $("#oscWsConnect").onclick = async () => {
       const url = ($("#oscWsUrl").value || "").trim();

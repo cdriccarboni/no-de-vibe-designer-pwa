@@ -1,3 +1,7 @@
+import { openLibpdStream, closeLibpdStream, LIBPD_SAMPLE_RATE } from "./libpd-runtime.js";
+import { LibpdVoice } from "./libpd-audio.js";
+import { mediaErrorState } from "./media-errors.js";
+
 /**
  * Moteur audio Web Audio — démarrage/arrêt propres, pas de traitement résiduel.
  */
@@ -8,6 +12,46 @@ export class AudioEngine {
     this.nodes = new Map(); // nodeId -> { osc, gain, analyser, mic, stream, type }
     this.pending = new Map(); // nodeId -> Promise, avoids duplicate permission/graph creation per frame
     this.level = 0;
+    this.failures = new Map(); // nodeId -> { state, label, at } : pas de nouvelle demande de permission à chaque frame
+  }
+
+  /** Échec récent de capture (micro refusé, absent…) : l'appelant affiche l'état au lieu de redemander. */
+  inputFailure(nodeId, retryMs = 5000) {
+    const f = this.failures.get(nodeId);
+    if (!f) return null;
+    if (Date.now() - f.at > retryMs) { this.failures.delete(nodeId); return null; }
+    return f;
+  }
+
+  /**
+   * libpd dans le graphe partagé : libpd tourne dans son propre AudioContext à 44,1 kHz (contrainte libpd),
+   * sort en MediaStream, et ce flux entre dans le contexte partagé comme n'importe quelle source audio
+   * (mixer, gain, limiter, monitor, radio). Le navigateur rééchantillonne entre les deux contextes.
+   */
+  async ensureLibpd(nodeId, patch, { level = 0.5 } = {}) {
+    const cur = this.nodes.get(nodeId);
+    if (cur?.type === "libpd" && cur.patch === patch) { cur.voice.setLevel(level); return cur; }
+    if (this.pending.has(nodeId)) return this.pending.get(nodeId);
+    const task = (async () => {
+      await this.resume();
+      this.release(nodeId);
+      const pdCtx = new AudioContext({ sampleRate: LIBPD_SAMPLE_RATE });
+      await pdCtx.resume();
+      await openLibpdStream(patch);
+      const out = pdCtx.createMediaStreamDestination();
+      const voice = await new LibpdVoice(pdCtx, { destination: out, level }).init();
+      await voice.pump();
+      voice.gate(true);
+      const source = this.ctx.createMediaStreamSource(out.stream);
+      const analyser = this.ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      this.nodes.set(nodeId, { type: "libpd", patch, pdCtx, voice, source, analyser, stream: out.stream, ownsStream: false });
+      return this.nodes.get(nodeId);
+    })();
+    this.pending.set(nodeId, task);
+    try { return await task; }
+    finally { if (this.pending.get(nodeId) === task) this.pending.delete(nodeId); }
   }
 
   ensure() {
@@ -65,7 +109,7 @@ export class AudioEngine {
     const task = (async () => {
       await this.resume();
       this.release(nodeId);
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Entrée audio indisponible");
+      if (!navigator.mediaDevices?.getUserMedia) { const e = new Error("Entrée audio indisponible (getUserMedia)"); this.failures.set(nodeId, { ...mediaErrorState(e, "micro"), at: Date.now() }); throw e; }
 
       const audio = {
         echoCancellation: !!echoCancellation,
@@ -77,7 +121,9 @@ export class AudioEngine {
       };
       if (deviceId) audio.deviceId = { exact: deviceId };
 
-      const captureStream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
+      let captureStream;
+      try { captureStream = await navigator.mediaDevices.getUserMedia({ audio, video: false }); this.failures.delete(nodeId); }
+      catch (e) { this.failures.set(nodeId, { ...mediaErrorState(e, "micro"), at: Date.now() }); throw e; }
       const source = this.ctx.createMediaStreamSource(captureStream);
       const preGain = this.ctx.createGain();
       const highpass = this.ctx.createBiquadFilter();
@@ -395,6 +441,11 @@ export class AudioEngine {
   release(nodeId) {
     const n = this.nodes.get(nodeId);
     if (!n) return;
+    if (n.type === "libpd") {
+      try { n.voice?.stop(); } catch { /* */ }
+      try { n.pdCtx?.close(); } catch { /* */ }
+      closeLibpdStream().catch(() => {});
+    }
     try { n.osc?.stop(); } catch { /* */ }
     try { n.osc?.disconnect(); } catch { /* */ }
     try { n.mic?.disconnect(); } catch { /* */ }
