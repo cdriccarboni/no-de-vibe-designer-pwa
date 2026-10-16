@@ -415,3 +415,23 @@ body.show-locked .nh,body.show-locked .port-dot{cursor:not-allowed}
 
 /* Remote Camera : QR lisible (fond blanc, taille fixe, jamais rogné) */
 .rc-qr{display:inline-block;background:#fff;padding:6px;border-radius:8px;margin:6px 0;line-height:0}.rc-qr svg{width:180px;height:180px;max-width:100%}
+
+/* 3.3.13 · Fenêtre étroite (≤760px) : l'en-tête passe sur plusieurs lignes au lieu de faire se chevaucher
+   ses boutons (Bureau/Plateau étaient recouverts par « ＋ Objets »/Controls et ne recevaient plus les clics). */
+@media(max-width:760px){
+  #app{grid-template-rows:auto minmax(0,1fr) 100px}
+  .topbar{flex-wrap:wrap;overflow:visible;row-gap:4px;padding:4px 8px;min-height:50px}
+  .topbar>*{flex-shrink:0}
+  .topbar>.spacer{display:none}
+  .topbar .btn,.topbar .themes button,.topbar .themes a{min-height:36px}
+  body.library-open .library{top:var(--nvd-topbar-h,50px);max-height:calc(100dvh - var(--nvd-topbar-h,50px))}
+  /* Exemple : la Library ouverte (tiroir) passe au-dessus du voile et de la bannière d'Exemple au lieu d'être masquée. */
+  body.demo-mode.library-open .library{z-index:320}
+  body.demo-mode #previewPanel{max-height:calc(100dvh - 90px)!important}
+}
+/* 3.3.13 · Tablette (761–1180px) : même principe, l'en-tête passe à la ligne au lieu de pousser OUTPUT hors écran. */
+@media(min-width:761px) and (max-width:1180px){
+  #app{grid-template-rows:auto minmax(0,1fr) 118px}
+  .topbar{flex-wrap:wrap;row-gap:4px;padding:4px 12px;min-height:50px}
+  .topbar>*{flex-shrink:0}
+}
