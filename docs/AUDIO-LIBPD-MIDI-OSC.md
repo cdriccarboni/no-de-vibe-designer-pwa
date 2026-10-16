@@ -52,3 +52,17 @@ ou `ws://192.168.…` (protection « Local Network Access » / Private Network A
 la PWA publique une fois cette protection désactivée dans le navigateur de test.
 Solutions : utiliser le Designer servi en local (`node scripts/serve.mjs`) ou l'app de bureau, accepter l'invite
 « accès au réseau local » quand le navigateur la propose, ou exposer la passerelle en `wss://` avec un certificat valide.
+
+## 3.3.16 · libpd dans le graphe audio partagé, micro/caméra, chaînes de vérité
+- Node libpd, option « Sortie audio dans le graphe » : nouveau port `audio` (index 3). libpd tourne dans son propre
+  AudioContext à 44,1 kHz, sort en MediaStream, et entre dans `sharedAudio` comme les autres sources
+  (Audio Mixer, Gain, Limiter, Monitor, Radio). Le navigateur rééchantillonne entre contextes. Un seul patch libpd audio à la fois
+  (le bouton « Écouter » et la sortie graphe partagent le même flux libpd : n'en utiliser qu'un).
+- Micro (Audio In) : niveau RMS, crête, énergie FFT, enveloppe. États honnêtes (`shared/media-errors.js`) : REFUSÉ,
+  AUCUN MICRO, occupé, indisponible ; après un échec, pas de nouvelle demande de permission avant 5 s.
+- Caméra : erreurs traduites de la même façon (REFUSÉ, AUCUNE CAMÉRA…).
+- Correctif moteur : `requestRender` est maintenant différé (30 ms) ; auparavant, à l'arrêt, un Mixer/Gain branché
+  relançait `render()` en boucle de micro-tâches et figeait la page.
+- Test `qa/media-truth-chains-e2e.mjs` (Chromium, **périphériques simulés** `--use-fake-device-for-media-stream`) :
+  libpd + micro → Mixer → Gain (niveaux non nuls), micro RMS → Flow Field (énergie), caméra → Optical Flow (mouvement > 0)
+  → paramètre du Shader, et états REFUSÉ / AUCUN périphérique. **Micro et caméra physiques non testés.**

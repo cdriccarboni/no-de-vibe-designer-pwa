@@ -1349,8 +1349,25 @@ export function createNodeProcessors() {
 
 
 
-  fns.set("libpd", (node, inputs) => {
+  fns.set("libpd", (node, inputs, ctx) => {
     const patch = readText(inputs.get(0), node.params?.patch || LIBPD_AUDIO_PATCH);
+    // Sortie audio réelle dans le graphe partagé (opt-in : ouvre un AudioContext, donc sur action de l'utilisateur).
+    const audio = ctx?.audioEngine;
+    if (node.params?.audioOut === true && audio && typeof AudioContext !== "undefined") {
+      const live = audio.nodes.get(node.id);
+      if (!live || live.type !== "libpd" || live.patch !== patch) {
+        audio.ensureLibpd(node.id, patch, { level: Number(node.params?.level ?? 0.5) })
+          .then(() => ctx.requestRender?.())
+          .catch(e => ctx.warnings?.push?.(`libpd audio : ${e.message || e}`));
+        return new Map([[1, numOut(0)], [2, textOut("libpd audio · démarrage")]]);
+      }
+      const value = audio.audioValue(node.id);
+      const level = audio.readLevel(node.id);
+      const out = new Map([[1, numOut(level)], [2, textOut(level > 0.0001 ? `libpd audio · niveau ${level.toFixed(3)}` : "libpd audio · signal nul")]]);
+      if (value) out.set(3, value);
+      return out;
+    }
+    if (audio?.nodes?.get(node.id)?.type === "libpd") audio.release(node.id);
     if (!libpdResult(patch)) requestLibpd(patch);
     const found = libpdResult(patch);
     const out = new Map();
@@ -1621,6 +1638,12 @@ export function createNodeProcessors() {
       return out;
     }
     const existing = audio.nodes.get(node.id);
+    const failure = audio.inputFailure?.(node.id);
+    if ((!existing || existing.type !== "input") && failure) {
+      out.set(1, numOut(0));
+      out.set(2, textOut(failure.label));
+      return out;
+    }
     if (!existing || existing.type !== "input") {
       audio.ensureInput(node.id, audioInputOptions(node, "interaction")).then(() => ctx.requestRender?.()).catch(e => {
         ctx.errors?.push?.(`Audio In : ${e.message || e}`);
