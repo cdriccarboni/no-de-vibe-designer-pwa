@@ -1,0 +1,24 @@
+diff --git a/.github/workflows/runtime-qa.yml b/.github/workflows/runtime-qa.yml
+index d40b2f1..0b26507 100644
+--- a/.github/workflows/runtime-qa.yml
++++ b/.github/workflows/runtime-qa.yml
+@@ -69,3 +69,19 @@ jobs:
+         run: |
+           npm install --no-save --no-audit --no-fund puppeteer-core
+           CHROME="$(which google-chrome || which chromium-browser || which chromium)" PUPPETEER_PATH="$PWD/node_modules/puppeteer-core" node qa/browser-e2e-scenic.cjs; CHROME="$(which google-chrome || which chromium-browser || which chromium)" PUPPETEER_PATH="$PWD/node_modules/puppeteer-core" node qa/browser-e2e-designer.cjs
++      - name: Version guard (cohérence + jamais inférieure à la PWA publiée)
++        run: node qa/version-guard.mjs
++      - name: Privacy guard (aucun chemin/données privés)
++        run: node qa/privacy-guard.mjs
++      - name: Secret scan (gitleaks)
++        shell: bash
++        run: |
++          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar xz gitleaks
++          ./gitleaks detect --no-git --source . --redact --exit-code 1
++          rm -f gitleaks
++      - name: Responsive E2E (Playwright Chromium · 375→1440 px)
++        shell: bash
++        run: |
++          mkdir -p "$RUNNER_TEMP/pw" && npm install --prefix "$RUNNER_TEMP/pw" --no-save --no-audit --no-fund playwright
++          npx --prefix "$RUNNER_TEMP/pw" playwright install --with-deps chromium
++          PLAYWRIGHT_PATH="$RUNNER_TEMP/pw/node_modules/playwright" node qa/responsive-modes-e2e.mjs
