@@ -1,9 +1,10 @@
 export class MidiAdapter {
-  constructor(onEvent=()=>{}){ this.access=null; this.onEvent=onEvent; this.inputs=[]; this.outputs=[]; }
-  supported(){ return typeof navigator!=="undefined" && typeof navigator.requestMIDIAccess==="function"; }
+  // requestAccess injectable (tests / mocks) ; par défaut navigator.requestMIDIAccess.
+  constructor(onEvent=()=>{},{requestAccess}={}){ this.access=null; this.onEvent=onEvent; this.inputs=[]; this.outputs=[]; this.requestAccess=requestAccess||null; }
+  supported(){ return typeof this.requestAccess==="function" || typeof navigator!=="undefined" && typeof navigator.requestMIDIAccess==="function"; }
   async connect(){
     if(!this.supported()) throw new Error("Web MIDI indisponible");
-    this.access=await navigator.requestMIDIAccess({sysex:false}); this.refresh(); this.access.onstatechange=()=>this.refresh();
+    this.access=await (this.requestAccess?this.requestAccess({sysex:false}):navigator.requestMIDIAccess({sysex:false})); this.refresh(); this.access.onstatechange=()=>this.refresh();
     return {inputs:this.inputs,outputs:this.outputs};
   }
   refresh(){

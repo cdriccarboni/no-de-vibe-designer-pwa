@@ -1,10 +1,10 @@
 {
   "name": "No[co]de Vibe Designer",
-  "version": "3.3.13",
-  "sourceRevision": "387402c",
-  "builtAt": "2026-10-16T14:30:00.000Z",
+  "version": "3.3.14",
+  "sourceRevision": "ee92a06",
+  "builtAt": "2026-10-16T14:45:00.000Z",
   "files": 182,
-  "cacheRevision": "3.3.13-multi-mobile-20261016",
+  "cacheRevision": "3.3.14-multi-libpd-audio-20261016",
   "surfaces": [
     "designer",
     "show",

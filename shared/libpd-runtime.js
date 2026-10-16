@@ -203,3 +203,51 @@ export function runLibpdPatch(patch = LIBPD_PROBE_PATCH, receiver = "probe") {
 export function requestLibpd(patch = LIBPD_PROBE_PATCH, receiver = "probe") {
   return runLibpdPatch(patch, receiver);
 }
+
+/* ───────── Chemin audio réel (3.3.14) ─────────
+ * libpd tourne sur le thread principal (le wasm emscripten n'est pas chargeable tel quel dans
+ * AudioWorkletGlobalScope) et produit des blocs stéréo entrelacés ; un AudioWorklet (libpd-worklet.js)
+ * les lit depuis une file et les envoie dans le graphe Web Audio : gain → enveloppe → destination.
+ * Limites : 44,1 kHz fixe (libpd_init_audio), un seul patch DSP ouvert à la fois, latence ≈ taille de file. */
+export const LIBPD_SAMPLE_RATE = 44100;
+let streamHandle = null;
+
+/** Ouvre un patch pour le streaming (ferme tout patch DSP précédent pour ne pas mélanger les dac~). */
+export async function openLibpdStream(patch = LIBPD_AUDIO_PATCH) {
+  if (!libpdWasmAvailable()) throw new Error("runtime libpd wasm non lancé");
+  await runLibpdPatch(LIBPD_PROBE_PATCH); // initialise le module (init + hooks) par le chemin existant
+  const m = await loadModule();
+  for (const h of [m.__nvdLast, streamHandle]) { if (h) { try { m._libpd_closefile(h); } catch { /* déjà fermé */ } } }
+  m.__nvdLast = null;
+  const name = `nvd-stream-${Date.now()}.pd`;
+  m.FS.writeFile("/" + name, String(patch));
+  streamHandle = m.ccall("libpd_openfile", "number", ["string", "string"], [name, "/"]);
+  if (!streamHandle) throw new Error("patch libpd non ouvert");
+  m._libpd_start_message(1); m._libpd_add_float(1); m.__nvdFinish("pd", "dsp");
+  return { blockSize: m.__nvdBlock || 64, sampleRate: LIBPD_SAMPLE_RATE };
+}
+
+/** Calcule `frames` trames stéréo (arrondies au bloc Pd) ; renvoie [gauche, droite]. */
+export async function renderLibpdFrames(frames) {
+  const m = await loadModule();
+  if (!streamHandle) throw new Error("aucun patch libpd ouvert (openLibpdStream)");
+  const block = m.__nvdBlock || 64;
+  const ticks = Math.max(1, Math.ceil(frames / block));
+  const n = ticks * block;
+  const inPtr = m._malloc(n * 4), outPtr = m._malloc(n * 2 * 4);
+  try {
+    m.HEAPF32.fill(0, inPtr >> 2, (inPtr >> 2) + n);
+    m._libpd_process_float(ticks, inPtr, outPtr);
+    const view = m.HEAPF32.subarray(outPtr >> 2, (outPtr >> 2) + n * 2);
+    const left = new Float32Array(n), right = new Float32Array(n);
+    for (let i = 0; i < n; i++) { left[i] = view[2 * i]; right[i] = view[2 * i + 1]; }
+    return [left, right];
+  } finally { m._free(inPtr); m._free(outPtr); }
+}
+
+export async function closeLibpdStream() {
+  if (!streamHandle) return;
+  const m = await loadModule();
+  try { m._libpd_closefile(streamHandle); } catch { /* déjà fermé */ }
+  streamHandle = null;
+}
