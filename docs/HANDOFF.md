@@ -34,7 +34,7 @@ uniquement git, Node 22, Playwright et GitHub Actions.
 | Companion ↔ Designer (QR → connexion auto → commande → retour, reprise) | TESTÉ (Chrome, mobile émulé) · MATÉRIEL ABSENT | `qa/companion-roundtrip-e2e.mjs` (20/20) ; téléphones physiques non testés |
 | OSC entrant + OSCQuery (QLab, Chataigne, TD, Millumin → No[co]de) | TESTÉ (paquets réels, Designer réel) | `qa/osc-control-qa.mjs` 30/30, `qa/osc-designer-e2e.mjs` 13/13 ; logiciels tiers réels non testés |
 | Modification distante enregistrée (autosave) | TESTÉ | corrigé en 3.3.18 (perdue au rechargement avant) |
-| Desktop avec pont de régie (`electron/main.cjs`) | PARTIEL | logique testée avec Electron simulé (`qa/electron-main-qa.mjs`, 7/7) ; inactif dans les builds tant que `docs/ci/electron-regie-bridge.patch` n'est pas appliqué |
+| Desktop avec pont de régie (`electron/main.cjs`) | PARTIEL · vérifié sur Mac | build CI de branche (run 38959020653) : REA confirme `bridge/` + `electron/main.cjs` dans `app.asar` (`ev_63fd8da6a7c3a0e17afe828ee74c29eab0c2e4c38ad56aee6582b662afe81349`) ; lancement réel : le pont échouait (modules `shared/*.js` vus en CommonJS par le Node 20 d'Electron) → `shared/package.json` (`type: module`), puis pont + Designer hôte OK au lancement en terminal ; lancement par double-clic à confirmer à l'écran (invite réseau local / pare-feu probable) |
 | Confidentialité (aucune donnée privée) | TESTÉ | `qa/privacy-guard.mjs` + workflow `privacy-guard.yml` |
 | Garde-fou de version | TESTÉ | `qa/version-guard.mjs` (jamais inférieure à la version publiée) |
 
@@ -108,5 +108,7 @@ secret, keystore ou AAB dans ce dépôt public. Pas de Google Play production. T
   audit comparatif `docs/AUDIT-COMPARATIF.md` (REA : 6 evidence sur TouchDesigner, Millumin, Chataigne, Max).
 - Branche `claude/ci-electron-bridge-20261016` : patch CI appliqué + garde de release ; build macOS de test en cours.
 - REA : opérationnel pour plist/signature/Mach-O ; **analyse profonde indisponible** (Ghidra/Hopper absents) — choix assumé, pas de décompilation.
-- Suite : vérifier l'app macOS de test (lancement réel sur le Mac, pont, QR), fusionner CI puis 3.3.18 ; mDNS OSCQuery ;
-  timeline/conduite (P0 de l'audit).
+- Fait ensuite : app macOS de test lancée sur le Mac (voir tableau), défaut ESM corrigé + test rouge/vert (`qa/electron-main-qa.mjs`).
+  Patch CI fusionné dans la PR 3.3.18 (une seule version publiée, pas de rebuild 3.3.17 au contenu différent).
+- Suite : double-clic sur l'app 3.3.18 et accepter l'invite « réseau local » ; mDNS OSCQuery ; timeline/conduite (P0 de l'audit) ;
+  synchronisation privée (voir ci-dessous).
