@@ -1,5 +1,5 @@
 /**
- * Importeur de conduite JSON pour No-de Vibe Designer.
+ * Importeur de conduite JSON pour No[co]de Vibe Designer.
  * Accepte soit un projet cvd.graph, soit {name,cues:[...]}.
  * L'import est volontairement déclaratif : aucune commande externe n'est exécutée pendant l'import.
  */

@@ -685,7 +685,7 @@ export function createNodeProcessors() {
           endpoint: node.params?.endpoint || "",
           model: node.params?.model || "qwen2.5-coder:7b",
           prompt,
-          system: node.params?.system || "Tu es une IA créative connectée à No-de Vibe Designer.",
+          system: node.params?.system || "Tu es une IA créative connectée à No[co]de Vibe Designer.",
           temperature: node.params?.temperature ?? 0.2
         })).then(result => {
           const state = memory.get(key) || {};

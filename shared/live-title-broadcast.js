@@ -51,7 +51,7 @@ export function loadLiveTitleControlAddress(storage = globalThis.localStorage) {
   }
 }
 
-/** Save only to the dedicated device preference, never to a No-de project. */
+/** Save only to the dedicated device preference, never to a No[co]de project. */
 export function saveLiveTitleControlAddress(value, storage = globalThis.localStorage) {
   const parsed = parseLiveTitleControlAddress(value);
   if (!parsed.ok) return parsed;

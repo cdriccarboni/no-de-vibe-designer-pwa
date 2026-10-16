@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.12-multi-privacy-20261016";
+const CACHE = "nvd-3.3.12-multi-finalisation-20261016";
 const ASSETS = [
   "./companion/companion.css",
   "./companion/companion.js",
@@ -109,6 +109,9 @@ const ASSETS = [
   "./shared/mobile-sensors.js",
   "./shared/node-processors.js",
   "./shared/node-specs.js",
+  "./shared/optional-links.js",
+  "./shared/remote-camera/qr.js",
+  "./shared/vendor/qrcode/qrcode-generator.js",
   "./shared/ports.js",
   "./shared/project-migrate.js",
   "./shared/project-store.js",
@@ -154,6 +157,7 @@ const ASSETS = [
   "./shared/broadcast-engine.js",
   "./radio/index.html",
   "./shared/vibe-out.js",
+  "./shared/vibeout-runtime-provider.js",
   "./shared/vibe-planner.js",
   "./shared/vibe-recipes.js",
   "./shared/vibe-safety.js",
@@ -191,7 +195,12 @@ const ASSETS = [
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    await cache.addAll(ASSETS);
+    // Un seul fichier manquant faisait échouer cache.addAll : le nouveau service worker
+    // ne s'installait jamais et l'app installée restait bloquée sur l'ancienne version.
+    // Chaque ressource est donc mise en cache individuellement ; les échecs sont signalés.
+    const results = await Promise.allSettled(ASSETS.map((asset) => cache.add(asset)));
+    const failed = results.map((r, i) => (r.status === "rejected" ? ASSETS[i] : null)).filter(Boolean);
+    if (failed.length) console.warn("[No[co]de SW] ressources non mises en cache :", failed);
     await self.skipWaiting();
   })());
 });

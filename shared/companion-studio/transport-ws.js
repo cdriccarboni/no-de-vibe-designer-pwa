@@ -1,5 +1,5 @@
 /**
- * WebSocket CompanionTransport — reuses No-de remote bridge (LAN / localhost).
+ * WebSocket CompanionTransport — reuses No[co]de remote bridge (LAN / localhost).
  */
 
 import { createCompanionTransport, TRANSPORT_KINDS, TRANSPORT_STATES } from "./transport.js";

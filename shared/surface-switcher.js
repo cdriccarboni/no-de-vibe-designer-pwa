@@ -1,5 +1,5 @@
 /**
- * No-de Surface Switcher
+ * No[co]de Surface Switcher
  * Une même machine peut devenir Designer, interface mobile, régie tablette,
  * plateau ou caméra distante. Le type d'appareil n'est qu'un défaut, jamais une limite.
  */
@@ -81,7 +81,7 @@ export function installSurfaceSwitcher({current="designer",label="Interface"}={}
   wrap.className="nvd-surface-switcher";
   const currentMeta=SURFACES.find(s=>s.id===current)||SURFACES[0];
   wrap.innerHTML=`
-    <div class="nvd-surface-menu" hidden role="menu" aria-label="Choisir l’interface No-de"></div>
+    <div class="nvd-surface-menu" hidden role="menu" aria-label="Choisir l’interface No[co]de"></div>
     <button type="button" class="nvd-surface-toggle" aria-expanded="false">${label} · ${currentMeta.label} ▾</button>
   `;
   const menu=wrap.querySelector(".nvd-surface-menu");

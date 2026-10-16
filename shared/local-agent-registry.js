@@ -1,6 +1,6 @@
 /**
  * Local Agent Registry — adapté du scan d'engines de CX hub.
- * Registre local-first pour No-de Vibe Designer.
+ * Registre local-first pour No[co]de Vibe Designer.
  */
 
 export const LOCAL_AGENT_ROLES = Object.freeze([

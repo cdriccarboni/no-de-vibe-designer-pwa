@@ -43,7 +43,7 @@ export function saveAiConfig(cfg) {
   localStorage.setItem("nvd.ai", JSON.stringify(cfg));
 }
 
-/** Grok / xAI explicitement exclus de No-de Vibe Designer. */
+/** Grok / xAI explicitement exclus de No[co]de Vibe Designer. */
 export function isForbiddenAiProvider(endpoint = "", model = "") {
   const s = `${endpoint} ${model}`.toLowerCase();
   return /(?:^|\/\/|\.)x\.ai\b/.test(s)
@@ -57,7 +57,7 @@ export function assertAiProviderAllowed(cfg = {}) {
   if (isForbiddenAiProvider(cfg.endpoint, cfg.model)) {
     return {
       ok: false,
-      error: "Grok / xAI est exclu de No-de Vibe Designer. Utilisez un endpoint OpenAI-compatible autorisé, ou le moteur local."
+      error: "Grok / xAI est exclu de No[co]de Vibe Designer. Utilisez un endpoint OpenAI-compatible autorisé, ou le moteur local."
     };
   }
   return { ok: true };
@@ -249,7 +249,7 @@ async function callRemoteAi(text, project, cfg) {
         model,
         temperature:0.2,
         messages:[
-          { role:"system", content:"Tu génères des opérations de patch JSON sûres pour No-de Vibe Designer." },
+          { role:"system", content:"Tu génères des opérations de patch JSON sûres pour No[co]de Vibe Designer." },
           { role:"user", content:buildVibePrompt(text, project) }
         ],
         response_format:{ type:"json_object" }

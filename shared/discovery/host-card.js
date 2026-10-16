@@ -4,7 +4,7 @@
  */
 
 export function createHostCard({
-  name = "No-de Vibe Designer",
+  name = "No[co]de Vibe Designer",
   host = "127.0.0.1",
   port = 4174,
   httpPort = null,
@@ -54,7 +54,7 @@ export function parseHostCard(input) {
   if (data?.nvd === 1 && data.ws) {
     const url = new URL(data.ws);
     return createHostCard({
-      name: data.name || "No-de",
+      name: data.name || "No[co]de",
       host: url.hostname,
       port: Number(url.port || 4174),
       httpPort: data.http ? Number(new URL(data.http).port || 0) || null : null,

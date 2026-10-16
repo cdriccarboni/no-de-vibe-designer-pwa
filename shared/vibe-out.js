@@ -7,7 +7,7 @@ function compactProject(project = {}) {
   return {
     schema: project.schema,
     version: project.version,
-    name: project.name || "No-de patch",
+    name: project.name || "No[co]de patch",
     output: project.output || {},
     nodes: (project.nodes || []).map(n => ({
       id:n.id, type:n.type, title:n.title, x:n.x, y:n.y,

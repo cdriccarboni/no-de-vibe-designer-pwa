@@ -35,12 +35,12 @@ export class WebGPUBackend {
     return this.device;
   }
 
-  createShaderModule(code, label = "No-de WGSL") {
+  createShaderModule(code, label = "No[co]de WGSL") {
     if (!String(code || "").trim()) throw new Error("WGSL vide");
     return this.requireDevice().createShaderModule({ code: String(code), label });
   }
 
-  async compileWGSL(code, label = "No-de WGSL") {
+  async compileWGSL(code, label = "No[co]de WGSL") {
     const module = this.createShaderModule(code, label);
     if (typeof module.getCompilationInfo === "function") {
       const info = await module.getCompilationInfo();

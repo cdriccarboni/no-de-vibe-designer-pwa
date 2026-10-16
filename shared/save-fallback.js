@@ -36,7 +36,7 @@ export function planManualOpen({ hasNativeOpen = false, hasLocalSave = false } =
 
 export function saveStatusMessage(plan, fileName = "projet.cvd.json") {
   if (plan?.honest === "native") return `Projet enregistré · ${fileName}`;
-  if (plan?.honest === "local") return "Projet enregistré localement dans No-de Vibe Designer.";
+  if (plan?.honest === "local") return "Projet enregistré localement dans No[co]de Vibe Designer.";
   return `Projet exporté · ${fileName}`;
 }
 

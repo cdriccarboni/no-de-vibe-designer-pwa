@@ -805,7 +805,7 @@ function connectRemoteUi() {
     rememberHost(localStorage, createHostCard({
       host: parsed.hostname,
       port: Number(parsed.port || 4174),
-      name: "No-de hôte"
+      name: "No[co]de hôte"
     }));
   } catch {
     /* URL invalide : connectRemote échouera clairement */

@@ -50,7 +50,7 @@ export function showReleaseNotice({ version = "", appName = "No[co]de Vibe Desig
   notice.id = "nvd-release-notice";
   notice.setAttribute("role", "status");
   notice.setAttribute("aria-live", "polite");
-  notice.setAttribute("aria-label", "Mise à jour No-de");
+  notice.setAttribute("aria-label", "Mise à jour No[co]de");
 
   const head = document.createElement("div");
   head.className = "nvd-release-head";

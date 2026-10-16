@@ -1,5 +1,5 @@
 /**
- * No-de Vibe Designer · Cue Engine V2.2
+ * No[co]de Vibe Designer · Cue Engine V2.2
  * Conduite linéaire inspirée des conventions éprouvées du spectacle vivant :
  * une cue "standby" est déclenchée par GO, puis le playhead avance.
  * Le moteur reste UI-agnostique et compatible avec les anciens projets.

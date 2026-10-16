@@ -1,5 +1,5 @@
 /**
- * No-de Vibe Designer V3 — moteur de mapping.
+ * No[co]de Vibe Designer V3 — moteur de mapping.
  *
  * Coordonnées de calibration normalisées (0..1), ordre :
  * haut-gauche, haut-droite, bas-droite, bas-gauche.

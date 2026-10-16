@@ -1,5 +1,5 @@
 /**
- * No-de Rudiments — reusable, open subpatches built from No-de's own engines.
+ * No[co]de Rudiments — reusable, open subpatches built from No[co]de's own engines.
  * They are templates, never opaque binaries.
  */
 

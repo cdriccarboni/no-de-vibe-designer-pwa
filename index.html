@@ -82,5 +82,6 @@ document.querySelector("#autoLink")?.addEventListener("click",event=>{
 if(!chooser) requestAnimationFrame(()=>openInternalRoute(routes[surface]||routes.designer,{replace:true}));
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js",{scope:"./"}).catch(()=>{});
 </script>
+<script type="module" src="./shared/optional-links.js"></script>
 </body>
 </html>

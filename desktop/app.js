@@ -26,7 +26,9 @@ import { connectRemote } from "../shared/remote-client.js";
 import { REMOTE_PORT } from "../shared/remote-protocol.js";
 import { applyCue, listCues, nextCue, previousCue, dispatchPanicEffects, formatPanicResult } from "../shared/stage/cues.js";
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
+import { qrSvg, defaultCompanionBase } from "../shared/remote-camera/qr.js";
 import { generateVibeOut, VIBE_OUT_TARGETS } from "../shared/vibe-out.js";
+import { vibeOutProviderPlan } from "../shared/vibeout-runtime-provider.js";
 import { createHostCard, hostCardToQrPayload } from "../shared/discovery/host-card.js";
 import { discoveryCapabilities } from "../shared/discovery/lan-beacon.js";
 import { createRemoteCameraSession, makeRoomCode } from "../shared/remote-camera/session.js";
@@ -417,7 +419,7 @@ async function requestAiForNode(options = {}) {
   if (typeof window.nvdDesktop?.aiNodeRequest === "function") {
     return window.nvdDesktop.aiNodeRequest({
       ...options,
-      apiKey: options.apiKey || cfg.apiKey || ""
+      apiKey: options.apiKey ?? cfg.apiKey ?? ""
     });
   }
   const protocol = String(options.protocol || "ollama").toLowerCase();
@@ -444,7 +446,7 @@ async function requestAiForNode(options = {}) {
           model: modelName,
           stream: false,
           messages: [
-            { role:"system", content: options.system || "Tu es une IA créative reliée à No-de Vibe Designer." },
+            { role:"system", content: options.system || "Tu es une IA créative reliée à No[co]de Vibe Designer." },
             { role:"user", content: prompt }
           ]
         })
@@ -493,14 +495,14 @@ async function requestAiForNode(options = {}) {
   const endpoint = String(options.endpoint || cfg.endpoint || "").trim();
   if (!endpoint) throw new Error("Endpoint IA manquant");
   const headers = { "Content-Type":"application/json" };
-  const key = options.apiKey || cfg.apiKey || "";
+  const key = options.apiKey ?? cfg.apiKey ?? "";
   if (key) headers.Authorization = "Bearer " + key;
   const body = protocol === "generic"
     ? { model: options.model || cfg.model || "", prompt, input: prompt }
     : {
         model: options.model || cfg.model || "gpt-4o-mini",
         messages: [
-          { role:"system", content: options.system || "Tu es une IA créative reliée à No-de Vibe Designer." },
+          { role:"system", content: options.system || "Tu es une IA créative reliée à No[co]de Vibe Designer." },
           { role:"user", content: prompt }
         ]
       };
@@ -591,10 +593,11 @@ let expandedLibraryGroups = new Set();
 try {
   const raw = localStorage.getItem(LIBRARY_EXPANDED_KEY);
   const stored = raw == null ? null : JSON.parse(raw);
-  expandedLibraryGroups = new Set(LIB.map((_, i) => i));
-  if (Array.isArray(stored) && stored.length) {
-    for (const index of stored.map(Number).filter(Number.isInteger)) expandedLibraryGroups.add(index);
-  }
+  // Premier lancement : tout est déplié. Ensuite, on respecte les groupes repliés par l'utilisateur
+  // (avant, l'état mémorisé était ignoré). Garde-fou : une liste vide ou invalide (anciennes versions)
+  // redéplie tout, pour ne jamais présenter une Library apparemment vide.
+  const kept = Array.isArray(stored) ? stored.map(Number).filter(i => Number.isInteger(i) && i >= 0 && i < LIB.length) : [];
+  expandedLibraryGroups = new Set(kept.length ? kept : LIB.map((_, i) => i));
 } catch {
   expandedLibraryGroups = new Set(LIB.map((_, i) => i));
 }
@@ -715,7 +718,7 @@ function buildLibrary() {
     };
   });
   qall("#libraryList [data-add]").forEach(x => {
-    x.onclick = () => addNode(x.dataset.add);
+    x.onclick = () => { addNode(x.dataset.add); setLibraryDrawer(false); };
     x.addEventListener("dragstart", event => {
       const type = x.dataset.add;
       const label = x.dataset.nodeLabel || type;
@@ -731,6 +734,14 @@ function buildLibrary() {
   const mode = document.querySelector(".library-mode");
   if (mode) mode.style.display = expCount ? "flex" : "none";
 }
+
+/* Fenêtre étroite (≤760px) : la Library est un tiroir ouvert par « ＋ Objets ». Sans effet en grand écran. */
+function setLibraryDrawer(open) {
+  document.body.classList.toggle("library-open", Boolean(open));
+  $("#libraryToggle")?.setAttribute("aria-expanded", open ? "true" : "false");
+}
+$("#libraryToggle")?.addEventListener("click", () => setLibraryDrawer(!document.body.classList.contains("library-open")));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && document.body.classList.contains("library-open")) setLibraryDrawer(false); });
 
 /* Restore the node Library on first paint, before slow engine and host checks.
    Never changes the current project: only populates its existing catalogue UI. */
@@ -949,6 +960,22 @@ function moveWire(e) {
   $("#wireDraftPath").setAttribute("d", edgePath(a, b));
 }
 
+/** Port sous le pointeur, avec une tolérance de 14 px (doigt, trackpad, zoom arrière). */
+function portDotAtPoint(x, y, exclude = null) {
+  const direct = document.elementFromPoint?.(x, y)?.closest?.(".port-dot");
+  if (direct && direct !== exclude) return direct;
+  let best = null, bestDist = 14 * 14;
+  for (const dot of qall(".port-dot")) {
+    if (dot === exclude) continue;
+    const r = dot.getBoundingClientRect();
+    if (!r.width && !r.height) continue;
+    const dx = r.left + r.width / 2 - x, dy = r.top + r.height / 2 - y;
+    const d = dx * dx + dy * dy;
+    if (d < bestDist) { best = dot; bestDist = d; }
+  }
+  return best;
+}
+
 function finishWire(e) {
   if (!wireDraft) return;
   if (canvasStructurallyLocked()) {
@@ -958,7 +985,9 @@ function finishWire(e) {
     log("Show Lock · câblage bloqué · spectacle verrouillé");
     return;
   }
-  const target = e.target?.closest?.(".port-dot");
+  // setPointerCapture redirige pointerup vers le port de départ : e.target ne désigne
+  // donc jamais le port visé. On résout la cible à la position réelle du pointeur.
+  const target = portDotAtPoint(e.clientX, e.clientY, wireDraft.dot);
   const start = wireDraft;
   wireDraft = null;
   $("#wireDraftPath")?.classList.remove("active");
@@ -1048,7 +1077,7 @@ function openCompanionEditor(clientId = "") {
   const query = new URLSearchParams({ surface:"regie", embedded:"1" });
   if (clientId) query.set("client", clientId);
   frame.src = "../studio/?" + query.toString();
-  $("#companionEditorStatus").textContent = clientId ? ("Companion " + clientId + " · édition live") : "Layout Local First · synchronisation live via l’hôte No-de";
+  $("#companionEditorStatus").textContent = clientId ? ("Companion " + clientId + " · édition live") : "Layout Local First · synchronisation live via l’hôte No[co]de";
   dialog.showModal();
 }
 $("#companionEditorClose")?.addEventListener("click", () => $("#companionEditorDialog")?.close());
@@ -1270,7 +1299,7 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="field"><label>Modèle</label><input id="nAiModel" value="${htmlSafe(model)}" placeholder="${media ? "nom du modèle média" : "qwen2.5-coder:7b"}"></div>`;
     extra += `<div class="field"><label>Prompt</label><textarea id="nAiPrompt" rows="5" spellcheck="false">${htmlSafe(n.params.prompt || "")}</textarea></div>`;
     if (n.type === "ai") {
-      extra += `<div class="field"><label>Rôle / système</label><textarea id="nAiSystem" rows="3" spellcheck="false">${htmlSafe(n.params.system || "Tu es une IA créative connectée à No-de Vibe Designer.")}</textarea></div>`;
+      extra += `<div class="field"><label>Rôle / système</label><textarea id="nAiSystem" rows="3" spellcheck="false">${htmlSafe(n.params.system || "Tu es une IA créative connectée à No[co]de Vibe Designer.")}</textarea></div>`;
     }
     extra += `<div class="field"><label>Auto au changement</label><select id="nAiAuto"><option value="false">Non · Run/Trigger</option><option value="true">Oui</option></select></div>`;
     extra += `<div class="camera-actions"><button id="nAiRun" type="button">Run IA</button></div>`;
@@ -1285,7 +1314,7 @@ function selectNode(id, { additive = false } = {}) {
     const knownRoom = n.params?.room || loadRemoteCameraRoom() || "";
     extra += `<div class="camera-actions"><button id="rcHost" type="button">${knownRoom ? "Reprendre salon / QR" : "QR · démarrer hôte"}</button><button id="rcStop" class="stop" type="button">Couper / déconnecter</button></div>`;
     extra += `<p class="hint">Remote Camera · PeerJS (ART Intercom). LIVE seulement après FIRST_FRAME. État : <b id="rcState">${st}</b> · ${rcStateLabel(st)} · lien ${linkFromRemoteCamera(st)}</p>`;
-    extra += `<div id="rcQrBox" class="hint">Companion : <code>npm run serve:companion</code>${knownRoom ? ` · salon connu <code>${knownRoom}</code> (pas de nouveau QR obligatoire)` : " puis scanne le QR."}</div>`;
+    extra += `<div id="rcQrBox" class="hint">${knownRoom ? `Salon connu <code>${knownRoom}</code> · « Reprendre » réaffiche son QR.` : "« QR · démarrer hôte » affiche un QR à scanner avec le téléphone."}</div>`;
     if (runtime.remoteCamera?.room) extra += `<p class="hint">Salon actif <code>${runtime.remoteCamera.room}</code></p>`;
   }
   if (n.type === "ndi-out") {
@@ -1314,7 +1343,7 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="field"><label>Commande Serial</label><input id="nCommand" value="${n.params.command || "PING"}"></div>`;
     extra += `<div class="field"><label>Envoi auto</label><select id="nAutoExternal"><option value="false">Non · Trigger conseillé</option><option value="true">Oui · au changement</option></select></div>`;
     extra += `<div class="camera-actions"><button id="serialConnectBtn" type="button">Connecter Serial</button><button id="serialReconnectBtn" type="button">Reconnecter</button></div>`;
-    extra += `<p class="hint">Aucun ordre n'est envoyé à l'ajout du node. Le firmware reste à ta charge ; No-de transporte réellement les lignes Serial.</p>`;
+    extra += `<p class="hint">Aucun ordre n'est envoyé à l'ajout du node. Le firmware reste à ta charge ; No[co]de transporte réellement les lignes Serial.</p>`;
   }
   if (n.type === "servo") {
     extra += `<div class="field"><label>Canal</label><input id="nChannel" type="number" min="0" value="${n.params.channel ?? 0}"></div>`;
@@ -1993,12 +2022,15 @@ function selectNode(id, { additive = false } = {}) {
         onLog: (msg) => log(msg)
       });
       await rcSession.startHost();
-      const base = localStorage.getItem(COMPANION_BASE_KEY) || localStorage.getItem("nvd.companionBase") || "http://127.0.0.1:4177/";
+      // Avant : 127.0.0.1 par défaut, donc un lien inutilisable depuis un téléphone.
+      const target = defaultCompanionBase(localStorage.getItem(COMPANION_BASE_KEY) || localStorage.getItem("nvd.companionBase"));
+      const base = target.base;
       rememberRemoteCameraRoom(room, { companionBase: base, status: LINK_STATES.CONNECTING });
       const join = companionJoinUrl({ companionBase: base, room });
       const box = $("#rcQrBox");
       if (box) {
-        box.innerHTML = `<p>Salon <code>${room}</code>${known ? " · reprise" : ""}</p><p><a href="${join}" target="_blank" rel="noopener">${join}</a></p><p class="hint">Ouvre ce lien sur le téléphone (HTTPS recommandé). HTTP LAN = PLATFORM-LIMITED pour getUserMedia.</p>`;
+        const qr = target.reachable ? `<div class="rc-qr">${qrSvg(join, { cellSize: 4, label: `QR code du salon ${room}` })}</div>` : "";
+        box.innerHTML = `<p>Salon <code>${room}</code>${known ? " · reprise" : ""}</p>${qr}<p><a href="${join}" target="_blank" rel="noopener">${join}</a></p><p class="hint">${target.reachable ? "Scanne le QR avec le téléphone (même réseau non requis : liaison PeerJS)." : `⚠ ${target.reason}.`} ${/^https:/.test(join) ? "" : "HTTP : le navigateur du téléphone peut refuser la caméra (HTTPS requis)."}</p>`;
       }
       log(`Remote Camera · ${known ? "REPRISE" : "QR_OPEN"} · ${room}`);
       autosave();
@@ -3045,8 +3077,9 @@ function runExport(kind) {
   if (!run) return;
   const { result, name, mime } = run();
   downloadText(result.content, name, mime);
-  const uns = result.unsupported?.length ? ` · sans map : ${result.unsupported.join(", ")}` : "";
-  log(`Export ${kind}${uns}`);
+  const uns = result.unsupported?.length ? ` · non exportés (aucun équivalent) : ${result.unsupported.join(", ")}` : "";
+  log(`Export ${kind} · ${name}${uns}`);
+  for (const note of result.notes || []) log(`Export ${kind} · ${note}`);
 }
 
 $("#exportMaxBtn")?.addEventListener("click", () => runExport("max"));
@@ -3060,35 +3093,25 @@ async function askVibeOutAi(prompt, provider = "auto", target = "") {
   const cfg = readAiConfig();
   const task = /glsl|isf/i.test(String(target || "")) ? "shader" : "code";
   const routed = selectLocalAgents(cfg.localAgents || [], { task, limit:1 })[0];
-  const localModel = routed?.model || cfg.localModel || "qwen2.5-coder:7b";
-  const localBaseUrl = routed?.baseUrl || cfg.localBaseUrl || "http://127.0.0.1:11434";
-  const local = () => requestAiForNode({
-    protocol:"ollama",
-    baseUrl:localBaseUrl,
-    model:localModel,
-    system:prompt.system,
-    prompt:prompt.user,
-    temperature:.12
-  }).then(r => ({ ...r, provider:"local", agent:routed?.id || "", model:r.model || localModel }));
-  const external = () => {
-    if (!cfg.enabled || !cfg.endpoint) throw new Error("Endpoint externe non configuré");
-    return requestAiForNode({
-      protocol:"openai",
-      endpoint:cfg.endpoint,
-      model:cfg.model || "gpt-4o-mini",
-      apiKey:cfg.apiKey || "",
-      system:prompt.system,
-      prompt:prompt.user,
-      temperature:.12
-    }).then(r => ({ ...r, provider:"external" }));
-  };
-  if (provider === "local") return local();
-  if (provider === "external") return external();
-  try { return await local(); }
-  catch (e) {
-    if (cfg.enabled && cfg.endpoint) return external();
-    throw e;
+  const planned = vibeOutProviderPlan(cfg, routed, provider);
+  const errors = [];
+  for (const route of planned) {
+    try {
+      const answer = await requestAiForNode({
+        ...route,
+        system:prompt.system,
+        prompt:prompt.user,
+        temperature:.12
+      });
+      if (!answer?.content?.trim()) throw new Error("Réponse vide du modèle");
+      return { ...answer, provider:route.provider, agent:route.agent,
+        model:answer.model || route.model };
+    } catch (error) {
+      errors.push(`${route.provider} : ${error?.message || error}`);
+      if (provider !== "auto") break;
+    }
   }
+  throw new Error(`Aucun modèle n'a généré de code : ${errors.join(" | ")}`);
 }
 function vibeOutFallback(target) {
   if (target === "maxpat") return exportMax(project);
@@ -3682,14 +3705,27 @@ function runtimeFacts() {
   };
 }
 
+/** Ouvre un projet sans jamais détruire le projet courant si le fichier est illisible. */
 async function loadProjectText(data, label) {
-  if (refuseCanvasEdit("ouverture de projet")) return;
-  project = validateProject(JSON.parse(data));
+  if (refuseCanvasEdit("ouverture de projet")) return false;
+  let next;
+  try {
+    next = validateProject(JSON.parse(data));
+  } catch (error) {
+    log(`ERREUR · Ouverture impossible · fichier projet invalide ou illisible (${label || "fichier"}) · ${error?.message || error} · le projet courant est conservé`);
+    return false;
+  }
+  project = next;
   graphPath = [];
   redraw();
+  // Nouveau point de départ d'historique : un Undo ne doit pas ramener l'ancien projet.
+  history.clear();
+  commitHistory();
+  autosave();
   runtime.play();
   syncPlayButton();
   log("Projet chargé · " + (label || project.name));
+  return true;
 }
 
 $("#saveProject").onclick = async () => {
@@ -3748,12 +3784,9 @@ $("#loadProject").onclick = async () => {
 $("#projectFile").onchange = async e => {
   const f = e.target.files[0];
   if (!f) return;
-  if (refuseCanvasEdit("ouverture de projet")) { e.target.value = ""; return; }
-  project = validateProject(JSON.parse(await f.text()));
-  redraw();
-  runtime.play();
-  syncPlayButton();
-  log("Projet chargé · " + project.name);
+  const text = await f.text();
+  e.target.value = ""; // permet de rouvrir le même fichier
+  await loadProjectText(text, f.name);
 };
 window.addEventListener("beforeunload", () => autosave());
 

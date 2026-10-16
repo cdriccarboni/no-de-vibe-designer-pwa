@@ -54,7 +54,7 @@ function coreShowWidgets(){
 
 function coreStageWidgets(){
   return [
-    normalizeWidget({type:"button",presentation:{label:"Play / Pause",secondary:"No-de",w:2,h:1,color:"#8fa79d"},binding:{kind:"video",action:"toggle"}}),
+    normalizeWidget({type:"button",presentation:{label:"Play / Pause",secondary:"No[co]de",w:2,h:1,color:"#8fa79d"},binding:{kind:"video",action:"toggle"}}),
     normalizeWidget({type:"button",presentation:{label:"Caméra",secondary:"On / Off",w:2,h:1,color:"#8ca7c2"},binding:{kind:"camera",action:"toggle"}}),
     normalizeWidget({type:"cue-light",presentation:{label:"Cue Light",secondary:"Plateau",w:2,h:1,color:"#d7b86a"},binding:{kind:"stage",action:"go"}}),
     normalizeWidget({type:"network",presentation:{label:"Réseau",secondary:"RTT / état",w:2,h:1,color:"#6e8580"},binding:{kind:"action",action:"ping"}})

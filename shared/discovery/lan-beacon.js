@@ -15,7 +15,7 @@ export function encodeLanBeacon(card, { ttlMs = 8000 } = {}) {
   const payload = {
     schema: LAN_BEACON_SCHEMA,
     version: 1,
-    name: card.name || "No-de Vibe Designer",
+    name: card.name || "No[co]de Vibe Designer",
     host: card.host,
     port: Number(card.port),
     httpPort: card.httpPort == null ? null : Number(card.httpPort),
@@ -46,7 +46,7 @@ export function decodeLanBeacon(buf) {
   return {
     schema: LAN_BEACON_SCHEMA,
     version: 1,
-    name: data.name || "No-de",
+    name: data.name || "No[co]de",
     host: data.host,
     port: Number(data.port),
     httpPort: data.httpPort == null ? null : Number(data.httpPort),
