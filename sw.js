@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.13-multi-mobile-20261016";
+const CACHE = "nvd-3.3.14-multi-libpd-audio-20261016";
 const ASSETS = [
   "./companion/companion.css",
   "./companion/companion.js",
@@ -43,6 +43,7 @@ const ASSETS = [
   "./shared/action-intents.js",
   "./shared/adapters/midi-learn.js",
   "./shared/adapters/midi.js",
+  "./shared/adapters/osc-websocket.js",
   "./shared/adapters/serial.js",
   "./shared/adapters/shader-surface.js",
   "./shared/adapters/websocket-bridge.js",
@@ -99,6 +100,8 @@ const ASSETS = [
   "./shared/ir.js",
   "./shared/isf-agent.js",
   "./shared/libpd-runtime.js",
+  "./shared/libpd-audio.js",
+  "./shared/libpd-worklet.js",
   "./shared/live-title-broadcast.js",
   "./shared/live-title-presets.js",
   "./shared/local-agent-registry.js",
