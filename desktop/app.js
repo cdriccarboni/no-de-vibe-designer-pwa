@@ -4842,7 +4842,10 @@ function handleCompanionStudioMessage(msg) {
   if (msg.type === STUDIO_MSG.ACTION) {
     const layout = companionLayout || loadCompanionLayout() || ensureCompanionLayout();
     companionLayout = layout;
-    const widget = findWidget(layout, msg.widgetId) || {
+    // Commandes OSC (QLab, Chataigne, TouchDesigner…) : la liaison vient du pont local, seul à pouvoir la fournir
+    // (il la retire de tout message de téléphone). Sinon, le layout du poste fait foi.
+    const oscWidget = msg.via === "bridge-osc" && msg.binding ? { id: msg.widgetId, binding: msg.binding } : null;
+    const widget = oscWidget || findWidget(layout, msg.widgetId) || {
       id: msg.widgetId,
       binding: { kind: "action", action: msg.action === "press" ? "ping" : msg.action }
     };
@@ -4962,6 +4965,8 @@ async function startDesktopRemoteHost() {
         historySuspended = false;
         applyingRemote = false;
       }
+      // Une modification reçue à distance (téléphone, OSC) doit survivre à un rechargement du Designer.
+      autosave();
     },
     onStatus: (s) => log(`Distant · ${s.state}${s.detail ? " · " + s.detail : ""}`),
     onLog: (m) => log(`Distant · ${m}`),
