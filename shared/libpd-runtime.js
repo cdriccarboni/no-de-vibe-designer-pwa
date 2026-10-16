@@ -49,7 +49,10 @@ async function loadModule() {
     const imported = await import("./vendor/libpd/libpd.js");
     const factory = imported.default;
     modulePromise = factory({
-      locateFile: (file) => new URL("./vendor/libpd/" + file, import.meta.url).href
+      locateFile: (file) => new URL("./vendor/libpd/" + file, import.meta.url).href,
+      // libpd écrit sa bannière de version (pd, bonk, fiddle…) sur stderr : ce n'est pas une erreur.
+      print: (text) => console.info("[libpd]", text),
+      printErr: (text) => (/version|^pd \d/i.test(String(text)) ? console.info : console.warn)("[libpd]", text)
     });
   }
   return modulePromise;

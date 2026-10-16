@@ -949,6 +949,22 @@ function moveWire(e) {
   $("#wireDraftPath").setAttribute("d", edgePath(a, b));
 }
 
+/** Port sous le pointeur, avec une tolérance de 14 px (doigt, trackpad, zoom arrière). */
+function portDotAtPoint(x, y, exclude = null) {
+  const direct = document.elementFromPoint?.(x, y)?.closest?.(".port-dot");
+  if (direct && direct !== exclude) return direct;
+  let best = null, bestDist = 14 * 14;
+  for (const dot of qall(".port-dot")) {
+    if (dot === exclude) continue;
+    const r = dot.getBoundingClientRect();
+    if (!r.width && !r.height) continue;
+    const dx = r.left + r.width / 2 - x, dy = r.top + r.height / 2 - y;
+    const d = dx * dx + dy * dy;
+    if (d < bestDist) { best = dot; bestDist = d; }
+  }
+  return best;
+}
+
 function finishWire(e) {
   if (!wireDraft) return;
   if (canvasStructurallyLocked()) {
@@ -958,7 +974,9 @@ function finishWire(e) {
     log("Show Lock · câblage bloqué · spectacle verrouillé");
     return;
   }
-  const target = e.target?.closest?.(".port-dot");
+  // setPointerCapture redirige pointerup vers le port de départ : e.target ne désigne
+  // donc jamais le port visé. On résout la cible à la position réelle du pointeur.
+  const target = portDotAtPoint(e.clientX, e.clientY, wireDraft.dot);
   const start = wireDraft;
   wireDraft = null;
   $("#wireDraftPath")?.classList.remove("active");
@@ -3045,8 +3063,9 @@ function runExport(kind) {
   if (!run) return;
   const { result, name, mime } = run();
   downloadText(result.content, name, mime);
-  const uns = result.unsupported?.length ? ` · sans map : ${result.unsupported.join(", ")}` : "";
-  log(`Export ${kind}${uns}`);
+  const uns = result.unsupported?.length ? ` · non exportés (aucun équivalent) : ${result.unsupported.join(", ")}` : "";
+  log(`Export ${kind} · ${name}${uns}`);
+  for (const note of result.notes || []) log(`Export ${kind} · ${note}`);
 }
 
 $("#exportMaxBtn")?.addEventListener("click", () => runExport("max"));
@@ -3682,14 +3701,27 @@ function runtimeFacts() {
   };
 }
 
+/** Ouvre un projet sans jamais détruire le projet courant si le fichier est illisible. */
 async function loadProjectText(data, label) {
-  if (refuseCanvasEdit("ouverture de projet")) return;
-  project = validateProject(JSON.parse(data));
+  if (refuseCanvasEdit("ouverture de projet")) return false;
+  let next;
+  try {
+    next = validateProject(JSON.parse(data));
+  } catch (error) {
+    log(`ERREUR · Ouverture impossible · fichier projet invalide ou illisible (${label || "fichier"}) · ${error?.message || error} · le projet courant est conservé`);
+    return false;
+  }
+  project = next;
   graphPath = [];
   redraw();
+  // Nouveau point de départ d'historique : un Undo ne doit pas ramener l'ancien projet.
+  history.clear();
+  commitHistory();
+  autosave();
   runtime.play();
   syncPlayButton();
   log("Projet chargé · " + (label || project.name));
+  return true;
 }
 
 $("#saveProject").onclick = async () => {
@@ -3748,12 +3780,9 @@ $("#loadProject").onclick = async () => {
 $("#projectFile").onchange = async e => {
   const f = e.target.files[0];
   if (!f) return;
-  if (refuseCanvasEdit("ouverture de projet")) { e.target.value = ""; return; }
-  project = validateProject(JSON.parse(await f.text()));
-  redraw();
-  runtime.play();
-  syncPlayButton();
-  log("Projet chargé · " + project.name);
+  const text = await f.text();
+  e.target.value = ""; // permet de rouvrir le même fichier
+  await loadProjectText(text, f.name);
 };
 window.addEventListener("beforeunload", () => autosave());
 
