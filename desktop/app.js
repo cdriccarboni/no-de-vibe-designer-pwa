@@ -444,7 +444,7 @@ async function requestAiForNode(options = {}) {
           model: modelName,
           stream: false,
           messages: [
-            { role:"system", content: options.system || "Tu es une IA créative reliée à No-de Vibe Designer." },
+            { role:"system", content: options.system || "Tu es une IA créative reliée à No[co]de Vibe Designer." },
             { role:"user", content: prompt }
           ]
         })
@@ -500,7 +500,7 @@ async function requestAiForNode(options = {}) {
     : {
         model: options.model || cfg.model || "gpt-4o-mini",
         messages: [
-          { role:"system", content: options.system || "Tu es une IA créative reliée à No-de Vibe Designer." },
+          { role:"system", content: options.system || "Tu es une IA créative reliée à No[co]de Vibe Designer." },
           { role:"user", content: prompt }
         ]
       };
@@ -716,7 +716,7 @@ function buildLibrary() {
     };
   });
   qall("#libraryList [data-add]").forEach(x => {
-    x.onclick = () => addNode(x.dataset.add);
+    x.onclick = () => { addNode(x.dataset.add); setLibraryDrawer(false); };
     x.addEventListener("dragstart", event => {
       const type = x.dataset.add;
       const label = x.dataset.nodeLabel || type;
@@ -732,6 +732,14 @@ function buildLibrary() {
   const mode = document.querySelector(".library-mode");
   if (mode) mode.style.display = expCount ? "flex" : "none";
 }
+
+/* Fenêtre étroite (≤760px) : la Library est un tiroir ouvert par « ＋ Objets ». Sans effet en grand écran. */
+function setLibraryDrawer(open) {
+  document.body.classList.toggle("library-open", Boolean(open));
+  $("#libraryToggle")?.setAttribute("aria-expanded", open ? "true" : "false");
+}
+$("#libraryToggle")?.addEventListener("click", () => setLibraryDrawer(!document.body.classList.contains("library-open")));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && document.body.classList.contains("library-open")) setLibraryDrawer(false); });
 
 /* Restore the node Library on first paint, before slow engine and host checks.
    Never changes the current project: only populates its existing catalogue UI. */
@@ -1067,7 +1075,7 @@ function openCompanionEditor(clientId = "") {
   const query = new URLSearchParams({ surface:"regie", embedded:"1" });
   if (clientId) query.set("client", clientId);
   frame.src = "../studio/?" + query.toString();
-  $("#companionEditorStatus").textContent = clientId ? ("Companion " + clientId + " · édition live") : "Layout Local First · synchronisation live via l’hôte No-de";
+  $("#companionEditorStatus").textContent = clientId ? ("Companion " + clientId + " · édition live") : "Layout Local First · synchronisation live via l’hôte No[co]de";
   dialog.showModal();
 }
 $("#companionEditorClose")?.addEventListener("click", () => $("#companionEditorDialog")?.close());
@@ -1289,7 +1297,7 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="field"><label>Modèle</label><input id="nAiModel" value="${htmlSafe(model)}" placeholder="${media ? "nom du modèle média" : "qwen2.5-coder:7b"}"></div>`;
     extra += `<div class="field"><label>Prompt</label><textarea id="nAiPrompt" rows="5" spellcheck="false">${htmlSafe(n.params.prompt || "")}</textarea></div>`;
     if (n.type === "ai") {
-      extra += `<div class="field"><label>Rôle / système</label><textarea id="nAiSystem" rows="3" spellcheck="false">${htmlSafe(n.params.system || "Tu es une IA créative connectée à No-de Vibe Designer.")}</textarea></div>`;
+      extra += `<div class="field"><label>Rôle / système</label><textarea id="nAiSystem" rows="3" spellcheck="false">${htmlSafe(n.params.system || "Tu es une IA créative connectée à No[co]de Vibe Designer.")}</textarea></div>`;
     }
     extra += `<div class="field"><label>Auto au changement</label><select id="nAiAuto"><option value="false">Non · Run/Trigger</option><option value="true">Oui</option></select></div>`;
     extra += `<div class="camera-actions"><button id="nAiRun" type="button">Run IA</button></div>`;
@@ -1333,7 +1341,7 @@ function selectNode(id, { additive = false } = {}) {
     extra += `<div class="field"><label>Commande Serial</label><input id="nCommand" value="${n.params.command || "PING"}"></div>`;
     extra += `<div class="field"><label>Envoi auto</label><select id="nAutoExternal"><option value="false">Non · Trigger conseillé</option><option value="true">Oui · au changement</option></select></div>`;
     extra += `<div class="camera-actions"><button id="serialConnectBtn" type="button">Connecter Serial</button><button id="serialReconnectBtn" type="button">Reconnecter</button></div>`;
-    extra += `<p class="hint">Aucun ordre n'est envoyé à l'ajout du node. Le firmware reste à ta charge ; No-de transporte réellement les lignes Serial.</p>`;
+    extra += `<p class="hint">Aucun ordre n'est envoyé à l'ajout du node. Le firmware reste à ta charge ; No[co]de transporte réellement les lignes Serial.</p>`;
   }
   if (n.type === "servo") {
     extra += `<div class="field"><label>Canal</label><input id="nChannel" type="number" min="0" value="${n.params.channel ?? 0}"></div>`;

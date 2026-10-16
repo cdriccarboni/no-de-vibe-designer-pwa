@@ -34,7 +34,7 @@ export function sacnMulticastAddress(universe=1){
 }
 
 export function encodeSacnDmx({
-  universe=1,data,sequence=0,priority=100,sourceName="No-de Vibe Designer",cid=null
+  universe=1,data,sequence=0,priority=100,sourceName="No[co]de Vibe Designer",cid=null
 }={}){
   const uni=Math.max(1,Math.min(63999,Number(universe)||1));
   let payload;
@@ -56,7 +56,7 @@ export function encodeSacnDmx({
   // Framing layer
   put16(packet,38,flagsLength(packet.length-38));
   put32(packet,40,0x00000002);
-  const nameBytes=new TextEncoder().encode(String(sourceName||"No-de").slice(0,63));
+  const nameBytes=new TextEncoder().encode(String(sourceName||"No[co]de").slice(0,63));
   packet.set(nameBytes,44);
   packet[108]=Math.max(0,Math.min(200,Number(priority)||100));
   put16(packet,109,0);

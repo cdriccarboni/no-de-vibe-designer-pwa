@@ -1,6 +1,6 @@
 /**
  * Moteurs visuels interactifs offline inspirés des familles TouchDesigner
- * étudiées pour No-de : rideau de fils, flow fields, trails, fluid warp,
+ * étudiées pour No[co]de : rideau de fils, flow fields, trails, fluid warp,
  * reaction-diffusion, metaballs/SDF, point cloud, sable, swarm, ripple,
  * refraction/glass. Tous les moteurs restent locaux et déterministes.
  */

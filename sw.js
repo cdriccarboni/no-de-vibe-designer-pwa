@@ -108,6 +108,7 @@ const ASSETS = [
   "./shared/mobile-sensors.js",
   "./shared/node-processors.js",
   "./shared/node-specs.js",
+  "./shared/optional-links.js",
   "./shared/ports.js",
   "./shared/project-migrate.js",
   "./shared/project-store.js",
@@ -152,7 +153,6 @@ const ASSETS = [
   "./shared/version.js",
   "./shared/broadcast-engine.js",
   "./radio/index.html",
-  "./labs/ai-studio-scenographe/dist/index.html",
   "./shared/vibe-out.js",
   "./shared/vibe-planner.js",
   "./shared/vibe-recipes.js",
@@ -191,7 +191,12 @@ const ASSETS = [
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    await cache.addAll(ASSETS);
+    // Un seul fichier manquant faisait échouer cache.addAll : le nouveau service worker
+    // ne s'installait jamais et l'app installée restait bloquée sur l'ancienne version.
+    // Chaque ressource est donc mise en cache individuellement ; les échecs sont signalés.
+    const results = await Promise.allSettled(ASSETS.map((asset) => cache.add(asset)));
+    const failed = results.map((r, i) => (r.status === "rejected" ? ASSETS[i] : null)).filter(Boolean);
+    if (failed.length) console.warn("[No[co]de SW] ressources non mises en cache :", failed);
     await self.skipWaiting();
   })());
 });

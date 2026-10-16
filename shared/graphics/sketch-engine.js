@@ -1,5 +1,5 @@
 /**
- * Moteur de sketch génératif offline pour No-de Vibe Designer.
+ * Moteur de sketch génératif offline pour No[co]de Vibe Designer.
  * Sous-ensemble volontaire et déterministe inspiré de p5/Processing :
  * background(), fill(), circle(), rect(), line(), wave().
  * Variables: width, height, time, frameCount, mouseX, mouseY.

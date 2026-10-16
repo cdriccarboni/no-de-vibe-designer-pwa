@@ -288,7 +288,7 @@ export function exportMilluminOscMap(project) {
     }
   }
   const content = [
-    "# No-de Vibe Designer — carte OSC Millumin",
+    "# No[co]de Vibe Designer — carte OSC Millumin",
     "# Ces adresses sont déclaratives. Aucun paquet n'est envoyé par cet export.",
     ...addresses.map(a => `${a.address}  # ${a.node} → ${a.host}:${a.port}`),
     addresses.length ? "" : "# (aucun node OSC dans le projet)"

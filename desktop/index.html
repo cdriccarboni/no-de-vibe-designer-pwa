@@ -30,7 +30,7 @@
 </div>
 <dialog id="companionEditorDialog" class="companion-editor-dialog">
   <div class="companion-editor-shell">
-    <header><div><b>Éditer ce Companion</b><span id="companionEditorStatus">Layout Local First · synchronisation live via l’hôte No-de</span></div><button id="companionEditorClose" type="button" class="btn">Fermer</button></header>
+    <header><div><b>Éditer ce Companion</b><span id="companionEditorStatus">Layout Local First · synchronisation live via l’hôte No[co]de</span></div><button id="companionEditorClose" type="button" class="btn">Fermer</button></header>
     <iframe id="companionEditorFrame" title="Companion Studio"></iframe>
   </div>
 </dialog>
@@ -48,7 +48,7 @@
     <span id="showLockBadge" class="show-lock-badge" role="status" aria-live="polite" hidden>Spectacle verrouillé</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
-    <div class="themes workspace-modes"><button type="button" id="modeBureau" class="btn active">Bureau</button><button type="button" id="modePlateau" class="btn">Plateau</button><a class="active" href="./index.html">Designer</a><a href="../show/index.html">Show</a><a href="../labs/ai-studio-scenographe/dist/index.html" target="_blank" title="Scénographe Vivant · Lab AI Studio">Scénographe ↗</a><a href="../radio/index.html" target="_blank" title="Radio Paillettes · Écoute Live">Radio ↗</a></div>
+    <button type="button" id="libraryToggle" class="btn library-toggle" aria-controls="libraryList" aria-expanded="false" title="Afficher la Library des objets">＋ Objets</button><div class="themes workspace-modes"><button type="button" id="modeBureau" class="btn active">Bureau</button><button type="button" id="modePlateau" class="btn">Plateau</button><a class="active" href="./index.html">Designer</a><a href="../show/index.html">Show</a><a href="../labs/ai-studio-scenographe/dist/index.html" data-optional-link hidden target="_blank" title="Scénographe Vivant · Lab AI Studio">Scénographe ↗</a><a href="../radio/index.html" target="_blank" title="Radio Paillettes · Écoute Live">Radio ↗</a></div>
     <button id="controlsBtn" class="btn">Controls</button>
     <button id="preferencesBtn" class="btn">Préférences</button>
     <button id="saveProject" class="btn">Enregistrer</button>
@@ -231,7 +231,7 @@
         <label>Zoom par défaut <input id="prefDefaultZoom" type="range" min="50" max="150" value="100"></label>
       </div>
       <div data-pref-panel="ai" class="hidden">
-        <p class="hint"><b>IA locale prioritaire</b> : No-de utilise d’abord Ollama sur cette machine pour générer des opérations de patch JSON. Si elle est indisponible, repli automatique sur le moteur local déterministe.</p>
+        <p class="hint"><b>IA locale prioritaire</b> : No[co]de utilise d’abord Ollama sur cette machine pour générer des opérations de patch JSON. Si elle est indisponible, repli automatique sur le moteur local déterministe.</p>
         <div class="local-agents" style="margin-top:8px"><b>Agent ISF / Shader</b><p class="hint" style="margin-top:4px">Routage automatique pour les demandes ISF, GLSL interactif ou shader réaliste : le modèle spécialisé produit un node Shader avec fragment GLSL et métadonnées ISF, sans armer de périphérique.</p></div>
         <label>Activer l’IA générative locale <input id="aiLocalEnabled" type="checkbox" checked></label>
         <label class="stack">Serveur local / LAN<input id="aiLocalBase" type="url" value="http://127.0.0.1:11434" placeholder="http://192.168.1.20:11434"></label>
@@ -350,7 +350,7 @@ notamment dans le cadre de la création du spectacle
 © 2026 — Tous droits réservés.</p>
         <p class="hint"><b>PWA</b> — application web utilisable directement dans votre navigateur, sans installation obligatoire.</p>
         <p class="hint"><b>Mac</b> — application native Apple Silicon distribuée directement depuis le site lorsqu’un build est publié.</p>
-        <p class="hint"><b>Companion</b> — sur téléphone, No-de peut devenir télécommande, caméra et capteur. Les fonctions Remote Camera restent marquées expérimentales tant que la recette terrain n’est pas validée.</p>
+        <p class="hint"><b>Companion</b> — sur téléphone, No[co]de peut devenir télécommande, caméra et capteur. Les fonctions Remote Camera restent marquées expérimentales tant que la recette terrain n’est pas validée.</p>
         <p class="hint">Schéma projet <code>cvd.graph</code> · même moteur de patch entre les variantes compatibles.</p>
         <p class="hint"><a class="copyright-link" href="https://github.com/cdriccarboni" target="_blank" rel="noopener noreferrer" aria-label="GitHub de Cédric Carboni"><span class="copyright-default">© 2026 Cédric Carboni</span><span class="copyright-hover">GitHub · Cédric Carboni ↗</span></a></p>
       </div>
@@ -381,7 +381,7 @@ notamment dans le cadre de la création du spectacle
 
 <div id="controlsModal" class="preferences-modal hidden">
   <div class="preferences-card wide">
-    <div class="preferences-head"><b>Control Surface · No-de Channels</b><button id="controlsClose" type="button">×</button></div>
+    <div class="preferences-head"><b>Control Surface · No[co]de Channels</b><button id="controlsClose" type="button">×</button></div>
     <div class="controls-toolbar"><span class="hint">Expose seulement les paramètres utiles à la régie. Les valeurs restent celles des nodes du patch.</span><button id="controlsRefresh" class="smallbtn" type="button">Actualiser</button></div>
     <div id="controlSurface" class="control-surface"></div>
   </div>
@@ -417,5 +417,6 @@ notamment dans le cadre de la création du spectacle
     };
   </script>
   <script type="module" src="./app.js"></script>
+<script type="module" src="../shared/optional-links.js"></script>
 </body>
 </html>

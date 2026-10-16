@@ -116,7 +116,7 @@ export function buildLocalAiPrompt(text, project = {}) {
   const catalog = executableNodeCatalog();
   return {
     system: [
-      "Tu es Local AI Core de No-de Vibe Designer, logiciel de création/régie pour spectacle vivant.",
+      "Tu es Local AI Core de No[co]de Vibe Designer, logiciel de création/régie pour spectacle vivant.",
       "Tu travailles OFFLINE sur la machine de l'utilisateur.",
       "Ta sortie est exclusivement un objet JSON, sans markdown ni commentaire.",
       "Tu proposes un patch exécutable, léger et robuste. Tu réutilises les nodes existants quand possible.",

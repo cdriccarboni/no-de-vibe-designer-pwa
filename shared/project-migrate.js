@@ -57,7 +57,7 @@ function ensureShape(p) {
  */
 export function migrateProject(raw, { keepOriginal = true } = {}) {
   if (!raw || (raw.schema !== PROJECT_SCHEMA && raw.schema !== "cvd.graph")) {
-    throw new Error("Projet No-de Vibe Designer invalide");
+    throw new Error("Projet No[co]de Vibe Designer invalide");
   }
   const original = keepOriginal ? clone(raw) : null;
   const migratedFrom = Number(raw.version) || 1;

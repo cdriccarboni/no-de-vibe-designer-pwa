@@ -1,7 +1,7 @@
 /**
  * Image → Vibe V3.
  * Analyse locale déterministe d'une image puis génération d'un point de départ
- * exécutable pour No-de, sans prétendre faire de vision sémantique.
+ * exécutable pour No[co]de, sans prétendre faire de vision sémantique.
  */
 
 function clamp(v,a=0,b=1){v=Number(v)||0;return Math.max(a,Math.min(b,v));}
@@ -97,7 +97,7 @@ export function imageVibePrompt(userText, analysis, target="auto"){
     imageVibeSummary(analysis),
     `Cible souhaitée : ${targetLabel}.`,
     "Utilise cette palette, ce contraste et cette densité de contours comme direction visuelle.",
-    "Crée une animation interactive légère, modifiable dans No-de, sans activer de périphérique automatiquement."
+    "Crée une animation interactive légère, modifiable dans No[co]de, sans activer de périphérique automatiquement."
   ].join("\n");
 }
 

@@ -51,9 +51,9 @@ function video() {
   doc.pages=doc.pages.filter(p=>["show","video","stage"].includes(p.role));
   const p=page(doc,"video","Vidéo");
   p.widgets.unshift(
-    button("Play","No-de",{kind:"video",action:"play"},{color:"#8ca7c2"}),
-    button("Pause","No-de",{kind:"video",action:"pause"},{color:"#8ca7c2"}),
-    button("Stop","No-de",{kind:"video",action:"stop"},{type:"momentary",color:"#c97868"})
+    button("Play","No[co]de",{kind:"video",action:"play"},{color:"#8ca7c2"}),
+    button("Pause","No[co]de",{kind:"video",action:"pause"},{color:"#8ca7c2"}),
+    button("Stop","No[co]de",{kind:"video",action:"stop"},{type:"momentary",color:"#c97868"})
   );
   doc.meta.presetId="video";
   return validateCompanionDocument(doc);
@@ -115,7 +115,7 @@ export const REGIE_PRESETS=Object.freeze([
   {id:"conduite",name:"Conduite",badge:"base",description:"Cues et commandes de spectacle.",factory:conduite},
   {id:"son",name:"Son",badge:"son",description:"Page son compacte, à relier au profil de console utilisé.",factory:son},
   {id:"lumiere",name:"Lumière",badge:"lumière",description:"Page lumière compacte avec faders réseau prêts à configurer.",factory:lumiere},
-  {id:"video",name:"Vidéo",badge:"vidéo",description:"Transport No-de et page vidéo prête à compléter.",factory:video},
+  {id:"video",name:"Vidéo",badge:"vidéo",description:"Transport No[co]de et page vidéo prête à compléter.",factory:video},
   {id:"plateau",name:"Plateau",badge:"plateau",description:"Commandes plateau, caméra et état réseau.",factory:plateau},
   {id:"radio",name:"Radio / Broadcast",badge:"radio",description:"Audio In, ON AIR et STANDBY pour Radio Paillettes.",factory:radio},
   {id:"lecteurs12",name:"12 Players",badge:"audio",description:"Douze lecteurs stéréo répartis sur trois pages compactes.",factory:lecteurs12}

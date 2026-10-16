@@ -28,7 +28,8 @@ const ctx = await browser.newContext({ viewport: { width: 1600, height: 950 }, a
 const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", e => errors.push(String(e.message || e)));
-page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
+// Le lien optionnel vers un lab non publié est sondé en HEAD : son 404 est attendu (il garde le lien masqué).
+page.on("console", m => { if (m.type() === "error" && !/\/labs\/[^/]+\/dist\//.test(m.location()?.url || "")) errors.push(m.text()); });
 page.on("dialog", d => d.accept());
 const autosavedEdges = () => page.evaluate(() => JSON.parse(localStorage.getItem("cvd.autosave") || "{}").edges?.length ?? -1);
 try {
@@ -130,6 +131,18 @@ try {
   await wait(400);
   const termHas = await page.evaluate(() => /invalide|illisible|impossible/i.test(document.querySelector("#termLog")?.textContent || ""));
   check(errors.filter(e => /JSON/.test(e)).length === 0 && termHas && (await count()) === nBefore, "Fichier projet corrompu : message utile, aucun crash, projet conservé", errors.slice(0, 2).join(" | "));
+
+  // 9. Fenêtre étroite (≤760px) : la Library reste accessible via « ＋ Objets »
+  await page.setViewportSize({ width: 700, height: 900 }); await wait(300);
+  const hiddenBefore = await page.locator('#libraryList .lib-item[data-add="number"]').first().isVisible();
+  await page.locator("#libraryToggle").click(); await wait(250);
+  const shownAfter = await page.locator('#libraryList .lib-item[data-add="number"]').first().isVisible();
+  const nNarrow = await count();
+  if (shownAfter) await page.locator('#libraryList .lib-item[data-add="number"]').first().click();
+  await wait(250);
+  const closed = !(await page.evaluate(() => document.body.classList.contains("library-open")));
+  check(!hiddenBefore && shownAfter && (await count()) === nNarrow + 1 && closed, "Fenêtre étroite : Library ouverte par « ＋ Objets », ajout puis fermeture du tiroir", `masquée=${!hiddenBefore} ouverte=${shownAfter} fermée=${closed}`);
+  await page.setViewportSize({ width: 1600, height: 950 });
 } catch (e) {
   check(false, "Exécution du scénario", e.stack?.split("\n").slice(0, 3).join(" ") || String(e));
 } finally {

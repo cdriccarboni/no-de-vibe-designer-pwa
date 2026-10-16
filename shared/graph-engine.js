@@ -1,7 +1,7 @@
 import { typesCompatible, portDataType, isExecutable } from "./ports.js";
 
 /**
- * Moteur de graphe No-de Vibe Designer.
+ * Moteur de graphe No[co]de Vibe Designer.
  * Évalue les edges, valide les types, gère les cycles (feedback = frame précédente).
  */
 
