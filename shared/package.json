@@ -1,0 +1,4 @@
+{
+  "//": "Les fichiers .js de shared/ sont des modules ES (navigateur et Node). Indispensable pour Node 18/20 et le Node d Electron 33 : sans cela, le pont de régie ne démarre pas dans l application desktop.",
+  "type": "module"
+}

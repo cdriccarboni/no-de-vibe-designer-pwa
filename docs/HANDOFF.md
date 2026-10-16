@@ -1,4 +1,4 @@
-# Passation — No[co]de Vibe Designer (PWA publique) · 3.3.17 · 16/10/2026
+# Passation — No[co]de Vibe Designer (PWA publique) · 3.3.18 · 16/10/2026
 
 Ce document permet de reprendre le travail (Hermès, Antigravity, ou à la main) **sans Grok Bot ni Cursor** :
 uniquement git, Node 22, Playwright et GitHub Actions.
@@ -32,7 +32,9 @@ uniquement git, Node 22, Playwright et GitHub Actions.
 | Remote Camera QR | TESTÉ | `qa/remote-camera-qr-e2e.mjs` |
 | Régie LAN : pont appairé (code, hôte réservé, Origin) | TESTÉ | `qa/regie-bridge-qa.mjs` (32/32) · guide `docs/REGIE-LAN.md` |
 | Companion ↔ Designer (QR → connexion auto → commande → retour, reprise) | TESTÉ (Chrome, mobile émulé) · MATÉRIEL ABSENT | `qa/companion-roundtrip-e2e.mjs` (20/20) ; téléphones physiques non testés |
-| Desktop avec pont de régie (`electron/main.cjs`) | PARTIEL | logique testée avec Electron simulé (`qa/electron-main-qa.mjs`, 7/7) ; inactif dans les builds tant que `docs/ci/electron-regie-bridge.patch` n'est pas appliqué |
+| OSC entrant + OSCQuery (QLab, Chataigne, TD, Millumin → No[co]de) | TESTÉ (paquets réels, Designer réel) | `qa/osc-control-qa.mjs` 30/30, `qa/osc-designer-e2e.mjs` 13/13 ; logiciels tiers réels non testés |
+| Modification distante enregistrée (autosave) | TESTÉ | corrigé en 3.3.18 (perdue au rechargement avant) |
+| Desktop avec pont de régie (`electron/main.cjs`) | PARTIEL · vérifié sur Mac | build CI de branche (run 38959020653) : REA confirme `bridge/` + `electron/main.cjs` dans `app.asar` (`ev_63fd8da6a7c3a0e17afe828ee74c29eab0c2e4c38ad56aee6582b662afe81349`) ; lancement réel : le pont échouait (modules `shared/*.js` vus en CommonJS par le Node 20 d'Electron) → `shared/package.json` (`type: module`), puis pont + Designer hôte OK au lancement en terminal ; lancement par double-clic à confirmer à l'écran (invite réseau local / pare-feu probable) |
 | Confidentialité (aucune donnée privée) | TESTÉ | `qa/privacy-guard.mjs` + workflow `privacy-guard.yml` |
 | Garde-fou de version | TESTÉ | `qa/version-guard.mjs` (jamais inférieure à la version publiée) |
 
@@ -55,10 +57,9 @@ Laisser 1 à 3 minutes au CDN Pages ; un premier passage juste après déploieme
 Ne pas toucher `.release-trigger` sauf pour lancer volontairement le workflow Release.
 
 ## Blocages connus
-0. **Builds desktop sans pont de régie** : appliquer `git apply docs/ci/electron-regie-bridge.patch` (compte avec droit `workflow`)
-   pour que les apps macOS/Windows/Linux utilisent `electron/main.cjs` et embarquent `bridge/`. Sans cela, utiliser
-   `node bridge/nocode-host.mjs` sur le poste de régie.
-1. **Jeton sans droit `workflow`** : l'agent ne peut pas modifier `.github/workflows/*`. Étapes CI prêtes (garde-fou de version,
+0. **Builds desktop sans pont de régie** : patch appliqué sur la branche `claude/ci-electron-bridge-20261016` (le jeton de session
+   a finalement le droit `workflow`) ; build macOS de test lancé depuis cette branche, publication de release limitée à `main`.
+1. **Jeton sans droit `workflow`** (constaté pour Grok Bot ; la session Claude du 16/10 soir l'a) : l'agent ne peut pas modifier `.github/workflows/*`. Étapes CI prêtes (garde-fou de version,
    gitleaks, E2E responsive) : `git apply docs/ci/runtime-qa-steps.patch` par un compte ayant ce droit ; y ajouter ensuite
    les autres E2E (`libpd-*`, `media-truth-chains`).
 2. **OSC WebSocket depuis la PWA publique** : Chromium (Local Network Access) refuse `ws://127.0.0.1`/LAN depuis github.io ;
@@ -99,3 +100,19 @@ secret, keystore ou AAB dans ce dépôt public. Pas de Google Play production. T
 - **Dépôt privé** : ses GitHub Actions ne démarrent pas (« paiements récents en échec / limite de dépenses ») ;
   la synchronisation quotidienne automatique ne tourne donc pas. Décision de facturation requise (Settings → Billing).
 - **Risques** : pare-feu macOS au premier lancement du pont ; port 4174 déjà pris (le desktop essaie 4175→4178).
+
+## Point de passage · 16/10/2026 ~22 h 45 · Claude
+- `main` = 8c99d07 (PR #29, 3.3.17) — **publié et vérifié** : Pages sert 3.3.17, cache `nvd-3.3.17-multi-regie-lan-20261016`,
+  release v3.3.17 = APK debug + DMG/ZIP macOS (aucun AAB).
+- Branche `claude/oscquery-osc-in-20261016` (3.3.18) : OSC entrant + OSCQuery, autosave des modifications distantes,
+  audit comparatif `docs/AUDIT-COMPARATIF.md` (REA : 6 evidence sur TouchDesigner, Millumin, Chataigne, Max).
+- Branche `claude/ci-electron-bridge-20261016` : patch CI appliqué + garde de release ; build macOS de test en cours.
+- REA : opérationnel pour plist/signature/Mach-O ; **analyse profonde indisponible** (Ghidra/Hopper absents) — choix assumé, pas de décompilation.
+- Fait ensuite : app macOS de test lancée sur le Mac (voir tableau), défaut ESM corrigé + test rouge/vert (`qa/electron-main-qa.mjs`).
+  Patch CI fusionné dans la PR 3.3.18 (une seule version publiée, pas de rebuild 3.3.17 au contenu différent).
+- Suite : double-clic sur l'app 3.3.18 et accepter l'invite « réseau local » ; mDNS OSCQuery ; timeline/conduite (P0 de l'audit) ;
+  synchronisation privée (voir ci-dessous).
+- **En attente d'une fusion humaine (garde-fou de la session Claude : pas de fusion sans relecture)** :
+  PR publique #30 (3.3.18, CI verte, fusionnable) ; PR du dépôt privé #3 (sync 3.3.17, tests privés 5/5).
+  Après fusion de #30 : rejouer `scripts/private/sync-from-public.sh` en local dans le dépôt privé (Actions bloquées), pousser
+  `sync/public-<sha>`, ouvrir la PR privée.

@@ -24,6 +24,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import { applyRemoteMessage, initialRemoteState } from "../shared/remote-protocol.js";
 import { createFrameParser, encodeFrame, encodePong, encodeText, websocketAccept } from "./ws-frames.mjs";
 import { STUDIO_MSG } from "../shared/companion-studio/protocol.js";
+import { startOscControl, DEFAULT_OSC_PORT } from "./osc-control.mjs";
 
 export const DEFAULT_PORT = 4174;
 const PAIR_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -121,6 +122,7 @@ export function startRemoteServer({
   heartbeatMs = 10_000,
   name = "No[co]de Vibe Designer",
   version = "",
+  osc = false,              // false | true | numéro de port | { port, allow }
   log = () => {}
 } = {}) {
   let state = initialRemoteState(project || undefined);
@@ -129,6 +131,9 @@ export function startRemoteServer({
   const fails = new Map(); // ip → [timestamps]
   let hostClient = null;
   let boundPort = port;
+  const OSC_CLIENT_ID = "osc";
+  let oscControl = null;
+  let lastOscFeedback = null;
   const root = staticRoot ? path.resolve(staticRoot) : null;
 
   // ------------------------------------------------------------------ utilitaires
@@ -242,12 +247,15 @@ export function startRemoteServer({
         return;
       }
       if (client === hostClient) {
+        if (msg.clientId === OSC_CLIENT_ID) { lastOscFeedback = msg; return; }
         const targets = msg.clientId ? companions().filter(c => c.id === msg.clientId) : [];
         for (const c of (targets.length ? targets : companions())) send(c, msg);
         return;
       }
       if (hostClient) {
-        send(hostClient, { ...msg, clientId: client.id || msg.clientId });
+        // Un téléphone ne fournit jamais la liaison d'un bouton : c'est le layout du poste qui fait foi.
+        const { binding: _b, via: _v, ...clean } = msg;
+        send(hostClient, { ...clean, clientId: client.id || msg.clientId });
         return;
       }
       if (msg.type === STUDIO_MSG.ACTION) {
@@ -341,7 +349,14 @@ export function startRemoteServer({
       localWsUrl: `ws://127.0.0.1:${boundPort}`,
       hasHost: !!hostClient,
       peers: peersSummary(),
-      revision: state.revision
+      revision: state.revision,
+      osc: oscControl ? {
+        port: oscControl.port,
+        oscQueryUrls: lan.map(item => `http://${item.address}:${oscControl.port}/`),
+        received: oscControl.stats.received,
+        applied: oscControl.stats.applied,
+        last: oscControl.stats.last
+      } : null
     };
   }
 
@@ -511,7 +526,7 @@ export function startRemoteServer({
       const addr = server.address();
       boundPort = typeof addr === "object" && addr ? addr.port : port;
       const shownHost = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
-      resolve({
+      const finish = () => resolve({
         port: boundPort,
         host,
         url: `ws://${shownHost}:${boundPort}`,
@@ -519,12 +534,42 @@ export function startRemoteServer({
         getState: () => state,
         getPairCode: () => currentPair,
         hostInfo,
-        close() {
+        getOsc: () => oscControl,
+        getLastOscFeedback: () => lastOscFeedback,
+        async close() {
           if (heartbeat) clearInterval(heartbeat);
           for (const client of clients) { try { client.socket.destroy(); } catch { /* */ } }
           clients.clear();
+          if (oscControl) await oscControl.close().catch(() => {});
           return new Promise(res => server.close(() => res()));
         }
+      });
+      if (!osc) return finish();
+      const cfg = typeof osc === "object" ? osc : { port: typeof osc === "number" ? osc : DEFAULT_OSC_PORT };
+      startOscControl({
+        port: cfg.port ?? DEFAULT_OSC_PORT,
+        host,
+        allow: cfg.allow || null,
+        name,
+        log,
+        getProject: () => state.project,
+        dispatch: (route) => {
+          if (!hostClient) return { ok: false, error: "Régie absente (Designer fermé)" };
+          if (route.kind === "op") {
+            send(hostClient, { type: "op", baseRevision: state.revision, op: route.op, clientId: OSC_CLIENT_ID });
+            return { ok: true };
+          }
+          send(hostClient, {
+            type: STUDIO_MSG.ACTION, widgetId: route.widgetId, value: route.value,
+            binding: route.binding, via: route.binding ? "bridge-osc" : undefined,
+            clientId: OSC_CLIENT_ID, t: Date.now()
+          });
+          return { ok: true };
+        }
+      }).then((ctl) => { oscControl = ctl; finish(); }, (err) => {
+        // Port OSC occupé : le pont reste utilisable, l'échec est signalé (jamais un faux « OSC actif »).
+        log(`osc · indisponible : ${err?.code === "EADDRINUSE" ? `port ${cfg.port} occupé` : err?.message || err}`);
+        finish();
       });
     });
   });

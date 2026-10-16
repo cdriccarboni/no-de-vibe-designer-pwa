@@ -4,6 +4,7 @@
 // Limite assumée : ne prouve pas le comportement d'Electron lui-même (fenêtre, asar, signature).
 // Usage : node qa/electron-main-qa.mjs
 import net from "node:net";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import Module from "node:module";
 import { createRequire } from "node:module";
@@ -44,6 +45,15 @@ Module._load = function (request, ...rest) {
   if (request === "electron") return fake;
   return origLoad.call(this, request, ...rest);
 };
+
+// Electron 33 embarque Node 20, qui ne devine pas qu'un .js est un module ES : on rejoue ce comportement.
+try {
+  execFileSync(process.execPath, ["--no-experimental-detect-module", "--input-type=module", "-e",
+    `await import(${JSON.stringify(new URL("../bridge/remote-server.mjs", import.meta.url).href)});`], { stdio: "pipe" });
+  check(true, "pont importable sans détection automatique ESM (Node 20 / Electron 33)");
+} catch (e) {
+  check(false, "pont importable sans détection automatique ESM (Node 20 / Electron 33)", String(e.stderr || e).split("\n").find(l => /Error/.test(l)) || "");
+}
 
 try {
   require(path.join(root, "electron", "main.cjs"));
