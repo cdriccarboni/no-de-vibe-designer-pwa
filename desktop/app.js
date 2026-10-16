@@ -591,10 +591,11 @@ let expandedLibraryGroups = new Set();
 try {
   const raw = localStorage.getItem(LIBRARY_EXPANDED_KEY);
   const stored = raw == null ? null : JSON.parse(raw);
-  expandedLibraryGroups = new Set(LIB.map((_, i) => i));
-  if (Array.isArray(stored) && stored.length) {
-    for (const index of stored.map(Number).filter(Number.isInteger)) expandedLibraryGroups.add(index);
-  }
+  // Premier lancement : tout est déplié. Ensuite, on respecte les groupes repliés par l'utilisateur
+  // (avant, l'état mémorisé était ignoré). Garde-fou : une liste vide ou invalide (anciennes versions)
+  // redéplie tout, pour ne jamais présenter une Library apparemment vide.
+  const kept = Array.isArray(stored) ? stored.map(Number).filter(i => Number.isInteger(i) && i >= 0 && i < LIB.length) : [];
+  expandedLibraryGroups = new Set(kept.length ? kept : LIB.map((_, i) => i));
 } catch {
   expandedLibraryGroups = new Set(LIB.map((_, i) => i));
 }
