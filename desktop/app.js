@@ -25,6 +25,7 @@ import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { connectRemote } from "../shared/remote-client.js";
 import { REMOTE_PORT } from "../shared/remote-protocol.js";
 import { applyCue, listCues, nextCue, previousCue, dispatchPanicEffects, formatPanicResult } from "../shared/stage/cues.js";
+import { mountConduitePanel } from "../shared/stage/conduite-panel.js";
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
 import { qrSvg, defaultCompanionBase } from "../shared/remote-camera/qr.js";
 import { generateVibeOut, VIBE_OUT_TARGETS } from "../shared/vibe-out.js";
@@ -3113,6 +3114,20 @@ $("#cuePrev").onclick = () => {
   if (!cue) return log("ERREUR · pas de cue précédent");
   fireDesktopCue(cue);
 };
+// Conduite · cartouches : présentation uniquement ; GO réutilise fireDesktopCue (même exécution que la barre de transport).
+let conduitePanel = null;
+$("#conduiteOpen")?.addEventListener("click", () => {
+  if (!conduitePanel) {
+    conduitePanel = mountConduitePanel($("#conduiteHost"), {
+      getProject: () => project,
+      fire: cue => fireDesktopCue(cue),
+      onSave: () => autosave(),
+      log: msg => log(msg)
+    });
+  } else conduitePanel.render();
+  $("#conduiteDialog").showModal();
+});
+$("#conduiteClose")?.addEventListener("click", () => $("#conduiteDialog")?.close());
 $("#cuePanic").onclick = () => {
   performPanic();
 };
