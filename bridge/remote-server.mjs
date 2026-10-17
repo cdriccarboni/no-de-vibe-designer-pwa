@@ -25,6 +25,7 @@ import { applyRemoteMessage, initialRemoteState } from "../shared/remote-protoco
 import { createFrameParser, encodeFrame, encodePong, encodeText, websocketAccept } from "./ws-frames.mjs";
 import { STUDIO_MSG } from "../shared/companion-studio/protocol.js";
 import { startOscControl, DEFAULT_OSC_PORT } from "./osc-control.mjs";
+import { startMdnsAnnounce } from "./mdns-announce.mjs";
 
 export const DEFAULT_PORT = 4174;
 const PAIR_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -123,6 +124,7 @@ export function startRemoteServer({
   name = "No[co]de Vibe Designer",
   version = "",
   osc = false,              // false | true | numéro de port | { port, allow }
+  mdns = false,             // annonce DNS-SD (_oscjson._tcp, _osc._udp) sur le réseau local ; jamais en mode --local
   log = () => {}
 } = {}) {
   let state = initialRemoteState(project || undefined);
@@ -134,6 +136,7 @@ export function startRemoteServer({
   const OSC_CLIENT_ID = "osc";
   let oscControl = null;
   let lastOscFeedback = null;
+  let mdnsAnnounce = null;
   const root = staticRoot ? path.resolve(staticRoot) : null;
 
   // ------------------------------------------------------------------ utilitaires
@@ -356,7 +359,8 @@ export function startRemoteServer({
         received: oscControl.stats.received,
         applied: oscControl.stats.applied,
         last: oscControl.stats.last
-      } : null
+      } : null,
+      mdns: mdnsAnnounce?.ok ? { host: mdnsAnnounce.host, instance: mdnsAnnounce.instance, services: mdnsAnnounce.services } : (mdnsAnnounce ? { error: mdnsAnnounce.reason } : null)
     };
   }
 
@@ -540,6 +544,7 @@ export function startRemoteServer({
           if (heartbeat) clearInterval(heartbeat);
           for (const client of clients) { try { client.socket.destroy(); } catch { /* */ } }
           clients.clear();
+          if (mdnsAnnounce) await mdnsAnnounce.close().catch(() => {});
           if (oscControl) await oscControl.close().catch(() => {});
           return new Promise(res => server.close(() => res()));
         }
@@ -566,7 +571,26 @@ export function startRemoteServer({
           });
           return { ok: true };
         }
-      }).then((ctl) => { oscControl = ctl; finish(); }, (err) => {
+      }).then(async (ctl) => {
+        oscControl = ctl;
+        // Découverte automatique (Millumin, Chataigne, TouchOSC…) : uniquement si la régie écoute le réseau local.
+        if (mdns && !isLoopback(host)) {
+          const m = typeof mdns === "object" ? mdns : {};
+          mdnsAnnounce = await startMdnsAnnounce({
+            instance: m.instance || name,
+            hostname: m.hostname,
+            addresses: m.addresses,
+            multicastInterface: m.multicastInterface || null,
+            log,
+            services: [
+              { type: "_oscjson._tcp", port: ctl.port, txt: { txtvers: 1, osc: ctl.port, app: "nocode" } },
+              { type: "_osc._udp", port: ctl.port, txt: { txtvers: 1, app: "nocode" } }
+            ]
+          }).catch(e => ({ ok: false, reason: e.message, close: async () => {} }));
+          log(mdnsAnnounce.ok ? `mdns · annoncé ${mdnsAnnounce.instance} (${mdnsAnnounce.host}) : _oscjson._tcp, _osc._udp port ${ctl.port}` : `mdns · non annoncé : ${mdnsAnnounce.reason}`);
+        }
+        finish();
+      }, (err) => {
         // Port OSC occupé : le pont reste utilisable, l'échec est signalé (jamais un faux « OSC actif »).
         log(`osc · indisponible : ${err?.code === "EADDRINUSE" ? `port ${cfg.port} occupé` : err?.message || err}`);
         finish();
