@@ -56,6 +56,19 @@ export function createCartoucheStore({profile, entries, storage}) {
       const next = structuredClone(current); Object.assign(next[id], patch); commit(next);
       return this.get(id);
     },
+    // Un seul pas d'historique pour plusieurs cartouches (couleur/groupe/favori sur une sélection).
+    updateMany(idList, patch) {
+      if (!Array.isArray(idList) || !idList.length || idList.some(id => !ids.has(id))) throw new Error("Sélection invalide");
+      validPatch(patch);
+      const next = structuredClone(current); for (const id of idList) Object.assign(next[id], patch); commit(next);
+    },
+    // Réorganisation complète en un seul pas d'historique : seule la présentation change, jamais les IDs.
+    reorder(orderedIds) {
+      if (!Array.isArray(orderedIds) || orderedIds.length !== ids.size || new Set(orderedIds).size !== ids.size || orderedIds.some(id => !ids.has(id))) throw new Error("Ordre invalide");
+      const next = structuredClone(current); orderedIds.forEach((id, i) => { next[id].order = i; }); commit(next);
+    },
+    canUndo() { return past.length > 0; },
+    canRedo() { return future.length > 0; },
     reset(id) { if (!ids.has(id)) throw new Error(`Cartouche inconnue : ${id}`); const next = structuredClone(current); next[id] = {...base[id]}; commit(next); },
     undo() { if (!past.length) return false; const next = past.at(-1); storage.setItem(key, encode(next)); past.pop(); future.push(current); current = next; return true; },
     redo() { if (!future.length) return false; const next = future.at(-1); storage.setItem(key, encode(next)); future.pop(); past.push(current); current = next; return true; },
