@@ -464,3 +464,5 @@ body.show-locked .nh,body.show-locked .port-dot{cursor:not-allowed}
 .cd-preview{border:1px solid var(--line,#30363d);border-radius:8px;padding:6px 8px}.cd-preview ul{margin:4px 0;padding-left:16px}.cd-dim{color:var(--muted,#8b949e)}
 .cd-empty{padding:16px;color:var(--muted,#8b949e)}
 @media(max-width:760px){.conduite-dialog{width:100vw;height:100vh;border-radius:0}.cd-body{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}.cd-edit{border-left:0;border-top:1px solid var(--line,#30363d);max-height:45vh}}
+
+.cue-standby{font-size:10px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}.cue-standby.end{color:#e0a458}.smallbtn.go{font-weight:700;color:var(--ok,#7fd1a0)}

@@ -1,10 +1,10 @@
 {
   "name": "No[co]de Vibe Designer",
-  "version": "3.3.19",
+  "version": "3.3.20",
   "sourceRevision": "8c99d07",
-  "builtAt": "2026-10-17T07:30:00.000Z",
-  "files": 185,
-  "cacheRevision": "3.3.19-multi-conduite-cartouches-20261017",
+  "builtAt": "2026-10-17T09:00:00.000Z",
+  "files": 186,
+  "cacheRevision": "3.3.20-multi-go-mdns-20261017",
   "surfaces": [
     "designer",
     "show",

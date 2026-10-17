@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.19-multi-conduite-cartouches-20261017";
+const CACHE = "nvd-3.3.20-multi-go-mdns-20261017";
 const ASSETS = [
   "./companion/companion.css",
   "./companion/companion.js",
@@ -152,6 +152,7 @@ const ASSETS = [
   "./shared/stage/cues.js",
   "./shared/stage/cartouches.js",
   "./shared/stage/conduite-panel.js",
+  "./shared/stage/go-controller.js",
   "./shared/subpatch.js",
   "./shared/supernodes-v3.js",
   "./shared/surface-switcher.js",

@@ -69,6 +69,8 @@ jobs:
         run: |
           node qa/cartouches-qa.mjs
           node qa/routing-extra-layers-qa.mjs
+          node qa/go-controller-qa.mjs
+          node qa/mdns-announce-qa.mjs
       - name: Browser E2E (Chrome)
         run: |
           npm install --no-save --no-audit --no-fund puppeteer-core
