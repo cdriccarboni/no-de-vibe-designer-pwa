@@ -116,3 +116,19 @@ secret, keystore ou AAB dans ce dépôt public. Pas de Google Play production. T
   PR publique #30 (3.3.18, CI verte, fusionnable) ; PR du dépôt privé #3 (sync 3.3.17, tests privés 5/5).
   Après fusion de #30 : rejouer `scripts/private/sync-from-public.sh` en local dans le dépôt privé (Actions bloquées), pousser
   `sync/public-<sha>`, ouvrir la PR privée.
+
+## Point de passage · 17/10/2026 · Claude (3.3.19, branche `claude/cartouches-ui-20261017`)
+- **Cartouches branchées à la conduite** : bouton « Conduite » (barre de la timeline) → panneau modal `shared/stage/conduite-panel.js`. Édition libellé, page, groupe, notes, couleur, favori, ordre (boutons ▲▼, Alt+↑/↓, glisser-déposer), sélection multiple (Maj/Ctrl), filtres Favoris/Groupe, annuler/rétablir, export/import JSON, aperçu lecture seule des actions, GO par cartouche (même exécution que la barre de transport).
+- **Séparation présentation/exécution** : seule `project.meta.cartouches` est écrite ; IDs, libellés d'origine, temps et actions des cues ne sont jamais modifiés (testé). Présentations de cues supprimées conservées ; sauvegarde illisible jamais écrasée.
+- `shared/stage/cartouches.js` : ajout additif `reorder`, `updateMany`, `canUndo`, `canRedo` (API existante inchangée → compatible avec la version privée).
+- **Correctif** : `+ Layer` au-delà de 6 pistes levait « Cannot read properties of undefined (reading 'mode') » dans `redraw()` (route absente) → `effectiveRoute` crée la route manquante (`qa/routing-extra-layers-qa.mjs`).
+- Tests : `qa/cartouches-qa.mjs` (13), `qa/routing-extra-layers-qa.mjs` (5), `qa/cartouches-ui-e2e.mjs` (29/29, Chromium réel, non branché en CI). Mobile : non traité.
+
+## Point de passage · 17/10/2026 · Claude (3.3.20, branche `claude/rea-interop-mdns-20261017`, empilée sur #32)
+- **Passe REA 2** : 6 applications installées inspectées (Millumin 5, TouchDesigner, Chataigne, Max 9, Ableton Live 10, NDI Router) ; evidence
+  identiques à la passe 1 (reproductible). Détails et identifiants : `docs/AUDIT-COMPARATIF.md` §2 bis.
+- **Découverte Bonjour/mDNS** de la régie (`bridge/mdns-announce.mjs`) : vérifiée avec `dns-sd` sur macOS ; `--no-mdns`.
+- **Contrôleur GO unique** (`shared/stage/go-controller.js`) branché au Designer (bouton, panneau Conduite, OSC, Companion via le pont) :
+  corrige GO qui rejouait la même cue et le retour silencieux à la première cue côté OSC/Companion. « ◀ Prêt / Prêt ▶ » déplacent le standby
+  sans déclencher (changement de comportement assumé). Délai double-GO : 350 ms (clé `nvd.conduite.minGoMs`, 0–5000).
+- Architecture : `docs/ARCHITECTURE-TIMELINE-CONDUITE.md`. Restant : mobile + `bindings.js` sur le contrôleur, édition pre/post-wait, LISTEN.

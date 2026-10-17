@@ -41,6 +41,7 @@ export function setRoute(project, track, mode, destinations){
 }
 
 export function effectiveRoute(project, track){
-  ensureRouting(project);
+  // Un layer ajouté au-delà des 6 pistes d'origine doit aussi avoir une route (sinon redraw() échoue).
+  ensureRouting(project, Math.max(6, (Number(track) || 0) + 1));
   return project.routing.tracks[track];
 }

@@ -7,7 +7,7 @@
  *
  * Espace d'adresses (aucune adresse n'est inventée : les nodes/paramètres viennent du projet publié par l'hôte) :
  *   /nocode/transport/play | pause | stop | toggle
- *   /nocode/cue/go
+ *   /nocode/cue/go · /nocode/cue/next · /nocode/cue/prev · /nocode/cue/panic
  *   /nocode/widget/<widgetId> [valeur]           bouton du layout Companion du poste
  *   /nocode/node/<nodeId>/<param> <valeur>       paramètre scalaire existant d'un node
  *
@@ -143,9 +143,10 @@ export function routeOsc(address, args, project) {
     if (v === false || v === 0) return { ignored: true }; // relâchement d'un bouton (1 puis 0) : un seul déclenchement
     return { kind: "action", widgetId: `osc:transport/${a}`, binding: { kind: "video", videoAction: a, action: a }, value: true, label: `transport ${a}` };
   }
-  if (area === "cue" && a === "go" && parts.length === 2) {
+  if (area === "cue" && ["go", "next", "prev", "panic"].includes(a) && parts.length === 2) {
     if (v === false || v === 0) return { ignored: true };
-    return { kind: "action", widgetId: "osc:cue/go", binding: { kind: "stage", action: "go" }, value: true, label: "GO" };
+    const labels = { go: "GO", next: "cue en attente suivante", prev: "cue en attente précédente", panic: "PANIC" };
+    return { kind: "action", widgetId: `osc:cue/${a}`, binding: { kind: "stage", action: a }, value: true, label: labels[a] };
   }
   if (area === "widget" && a && parts.length === 2) {
     if (!SEG.test(a)) return { error: "Identifiant de bouton invalide" };
@@ -200,7 +201,12 @@ export function buildOscQueryTree(project, { name = "No[co]de Vibe Designer" } =
         DESCRIPTION: name,
         CONTENTS: {
           transport: { FULL_PATH: `${ROOT}/transport`, DESCRIPTION: "Lecture du Designer", CONTENTS: transport },
-          cue: { FULL_PATH: `${ROOT}/cue`, DESCRIPTION: "Conduite", CONTENTS: { go: leaf(`${ROOT}/cue/go`, "Top suivant (GO)") } },
+          cue: { FULL_PATH: `${ROOT}/cue`, DESCRIPTION: "Conduite", CONTENTS: {
+            go: leaf(`${ROOT}/cue/go`, "GO : déclenche la cue en attente (protection double-GO)"),
+            next: leaf(`${ROOT}/cue/next`, "Cue en attente suivante (ne déclenche rien)"),
+            prev: leaf(`${ROOT}/cue/prev`, "Cue en attente précédente (ne déclenche rien)"),
+            panic: leaf(`${ROOT}/cue/panic`, "PANIC : coupe et annule les enchaînements")
+          } },
           node: { FULL_PATH: `${ROOT}/node`, DESCRIPTION: "Paramètres des nodes du projet ouvert", CONTENTS: nodes }
         }
       }

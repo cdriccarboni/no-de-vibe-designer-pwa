@@ -21,7 +21,9 @@ Le pont écoute l'**OSC UDP sur le port 9010** et sert l'**OSCQuery** (découver
 | Adresse OSC | Effet |
 |---|---|
 | `/nocode/transport/play` · `pause` · `stop` · `toggle` | lecture du Designer (un argument `0` = relâchement, ignoré) |
-| `/nocode/cue/go` | top suivant de la conduite (comme GO du Companion) |
+| `/nocode/cue/go` | GO : déclenche la cue en attente puis avance (protection double-GO commune à toutes les sources) |
+| `/nocode/cue/next` · `/nocode/cue/prev` | déplace la cue en attente sans rien déclencher |
+| `/nocode/cue/panic` | PANIC : coupe et annule pré-attentes et enchaînements |
 | `/nocode/widget/<id> [valeur]` | bouton du layout Companion du poste |
 | `/nocode/node/<id>/<param> <valeur>` | paramètre existant d'un node (jamais créé s'il n'existe pas) |
 
@@ -29,7 +31,9 @@ Le pont écoute l'**OSC UDP sur le port 9010** et sert l'**OSCQuery** (découver
   `?HOST_INFO` donne le port OSC. L'arbre suit le projet ouvert dans le Designer.
 - Sans Designer ouvert, les commandes sont **refusées** (journal du pont), jamais exécutées à moitié.
 - Options : `--osc-port 9020`, `--no-osc`, `--osc-allow 192.168.1.20,192.168.1.21` (OSC n'a pas de mot de passe : limiter au réseau de régie).
-- Non encore fait : annonce mDNS `_oscjson._tcp` (saisir l'adresse à la main), abonnement WebSocket `LISTEN`.
+- **Découverte automatique (3.3.20)** : le poste s'annonce en Bonjour/mDNS (`_oscjson._tcp`, `_osc._udp`) sur le réseau local ;
+  `--no-mdns` pour désactiver ; jamais en mode `--local`. Vérifié avec `dns-sd` sur macOS.
+- Non encore fait : abonnement WebSocket `LISTEN` (retour d'état temps réel).
 
 ## Appairer un téléphone
 1. Designer → Préférences → **Carte hôte / QR** : QR code + code d'appairage (6 caractères) + appareils connectés.
