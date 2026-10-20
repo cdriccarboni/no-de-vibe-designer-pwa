@@ -25,6 +25,8 @@ import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { connectRemote } from "../shared/remote-client.js";
 import { REMOTE_PORT } from "../shared/remote-protocol.js";
 import { applyCue, listCues, nextCue, previousCue, dispatchPanicEffects, formatPanicResult } from "../shared/stage/cues.js";
+import { mountConduitePanel } from "../shared/stage/conduite-panel.js";
+import { createGoController } from "../shared/stage/go-controller.js";
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
 import { qrSvg, defaultCompanionBase } from "../shared/remote-camera/qr.js";
 import { generateVibeOut, VIBE_OUT_TARGETS } from "../shared/vibe-out.js";
@@ -48,7 +50,7 @@ import { LINK_STATES, linkFromRemoteCamera } from "../shared/connection-states.j
 import { buildDiagnosticSnapshot, copyDiagnostic, formatDiagnosticText } from "../shared/diagnostic.js";
 import { mediaStatusForNode, MEDIA_STATUS } from "../shared/media-status.js";
 import { createRemoteGhostDemo, createVideoMagicFxDemo, createStageOscDemo } from "../shared/demos.js";
-import { STUDIO_MSG } from "../shared/companion-studio/protocol.js";
+import { STUDIO_MSG, makeStudioFeedback } from "../shared/companion-studio/protocol.js";
 import { applyCompanionBinding, findWidget } from "../shared/companion-studio/bindings.js";
 import { loadCompanionLayout, ensureCompanionLayout, saveCompanionLayout } from "../shared/companion-studio/store.js";
 import { getShowCompanionLayout, setShowCompanionLayout } from "../shared/companion-studio/show-layout.js";
@@ -3095,29 +3097,50 @@ function fireDesktopCue(cue) {
   log(`GO · ${cue.label || cue.id}`);
 }
 
-$("#cueGo").onclick = () => {
-  const cues = listCues(project);
-  const current = project.meta?.transport?.cueId;
-  const cue = cues.find(c => c.id === current) || cues[0];
-  fireDesktopCue(cue);
-};
-$("#cueNext").onclick = () => {
-  const cues = listCues(project);
-  const cue = nextCue(cues, project.meta?.transport?.cueId);
-  if (!cue) return log("ERREUR · pas de cue suivant");
-  fireDesktopCue(cue);
-};
-$("#cuePrev").onclick = () => {
-  const cues = listCues(project);
-  const cue = previousCue(cues, project.meta?.transport?.cueId);
-  if (!cue) return log("ERREUR · pas de cue précédent");
-  fireDesktopCue(cue);
-};
-$("#cuePanic").onclick = () => {
-  performPanic();
-};
+// Contrôleur GO unique : bouton, clavier, OSC et Companion passent par le même verrou double-GO et le même standby.
+const goController = createGoController({
+  getProject: () => project,
+  fire: cue => fireDesktopCue(cue),
+  onPanic: () => performPanic({ fromController: true }),
+  onChange: entry => {
+    updateStandbyLabel();
+    if (!entry.accepted && entry.reason) log(`Conduite · ${entry.kind.toUpperCase()} refusé (${entry.source}) · ${entry.reason}`);
+    if (entry.kind === "schedule") log(`Conduite · ${entry.mode} → ${entry.label} dans ${(entry.inMs / 1000).toFixed(1)} s`);
+    if (entry.kind === "prewait") log(`Conduite · pré-attente ${(entry.inMs / 1000).toFixed(1)} s → ${entry.label}`);
+  }
+});
+try { const ms = Number(localStorage.getItem("nvd.conduite.minGoMs")); if (Number.isFinite(ms) && localStorage.getItem("nvd.conduite.minGoMs") !== null) goController.configure({ minIntervalMs: ms }); } catch { /* stockage indisponible */ }
+function updateStandbyLabel() {
+  const el = $("#cueStandby");
+  if (!el) return;
+  const cue = goController.standingBy();
+  el.textContent = cue ? `Prêt : ${cue.number ? cue.number + " · " : ""}${cue.label || cue.id}` : "Fin de conduite";
+  el.classList.toggle("end", !cue);
+  el.title = goController.pending() ? `${goController.pending()} enchaînement(s) programmé(s)` : "Cue en attente du prochain GO";
+}
+$("#cueGo").onclick = () => { goController.go({ source: "ui" }); updateStandbyLabel(); autosave(); };
+$("#cueNext").onclick = () => { goController.standby(+1); updateStandbyLabel(); autosave(); };
+$("#cuePrev").onclick = () => { goController.standby(-1); updateStandbyLabel(); autosave(); };
+$("#cuePanic").onclick = () => { goController.panic({ source: "ui" }); };
+window.addEventListener("load", () => setTimeout(updateStandbyLabel, 0));
+// Conduite · cartouches : présentation uniquement. GO d'une cartouche = la mettre en attente puis GO
+// (même verrou double-GO et même journal que la barre de transport, l'OSC et Companion).
+let conduitePanel = null;
+$("#conduiteOpen")?.addEventListener("click", () => {
+  if (!conduitePanel) {
+    conduitePanel = mountConduitePanel($("#conduiteHost"), {
+      getProject: () => project,
+      fire: cue => { goController.setStandby(cue.id, { source: "conduite" }); goController.go({ source: "conduite" }); updateStandbyLabel(); autosave(); },
+      onSave: () => autosave(),
+      log: msg => log(msg)
+    });
+  } else conduitePanel.render();
+  $("#conduiteDialog").showModal();
+});
+$("#conduiteClose")?.addEventListener("click", () => $("#conduiteDialog")?.close());
 
-async function performPanic() {
+async function performPanic({ fromController = false } = {}) {
+  if (!fromController) goController.stopChains({ source: "panic" });
   const applied = applyCue(project, null, { panic: true, layout: companionLayout });
   project = applied.project;
   if (isRootGraph()) runtime.setProject(project);
@@ -3396,7 +3419,7 @@ function togglePlay() {
   log(playing ? "Lecture" : "Pause");
 }
 $("#play").onclick = togglePlay;
-$("#stop").onclick = () => { runtime.stop(); syncPlayButton(); log("Stop"); };
+$("#stop").onclick = () => { goController.stopChains({ source: "stop" }); runtime.stop(); syncPlayButton(); log("Stop"); };
 setInterval(() => {
   $("#timecode").textContent = `00:${String(runtime.time.toFixed(1)).padStart(4, "0")}`;
   $("#playhead").style.left = `calc(92px + ${(runtime.time / 60) * 100}% * .86)`;
@@ -4849,6 +4872,19 @@ function handleCompanionStudioMessage(msg) {
       id: msg.widgetId,
       binding: { kind: "action", action: msg.action === "press" ? "ping" : msg.action }
     };
+    const stageAction = widget.binding?.kind === "stage" ? (widget.binding.action || "go") : null;
+    if (stageAction && ["go", "next", "prev", "panic"].includes(stageAction)) {
+      const source = msg.via === "bridge-osc" ? "osc" : `companion:${msg.clientId || "?"}`;
+      const r = stageAction === "go" ? goController.go({ source, requestId: msg.requestId || null })
+        : stageAction === "panic" ? goController.panic({ source })
+        : goController.standby(stageAction === "next" ? 1 : -1, { source });
+      updateStandbyLabel();
+      const standby = goController.standingBy();
+      remoteSession?.send?.({ ...makeStudioFeedback({ widgetId: widget.id || msg.widgetId || "stage", value: r.cue?.id || null, ok: r.ok, detail: r.ok ? `${stageAction.toUpperCase()} ${r.cue?.label || ""} · prêt : ${standby?.label || "fin"}` : r.reason }), clientId: msg.clientId });
+      autosave();
+      try { publishHostState(); } catch { /* hôte distant optionnel */ }
+      return;
+    }
     const feedback = applyCompanionBinding({
       widget,
       value: msg.value,

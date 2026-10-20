@@ -7,6 +7,7 @@
  *   node bridge/nocode-host.mjs --local         # ce poste seulement (pas d'appareils distants)
  *   node bridge/nocode-host.mjs --pair ABC234   # code d'appairage fixe (sinon nouveau à chaque lancement)
  *   node bridge/nocode-host.mjs --osc-port 9010 # entrée OSC UDP + OSCQuery (défaut 9010) ; --no-osc pour couper
+ *   node bridge/nocode-host.mjs --no-mdns       # ne pas annoncer la régie (Bonjour/mDNS : _oscjson._tcp, _osc._udp)
  *   node bridge/nocode-host.mjs --osc-allow 192.168.1.20,192.168.1.21   # n'accepter l'OSC que de ces postes
  *
  * Ouvre ensuite le Designer sur ce poste (adresse affichée) : il devient l'hôte.
@@ -29,6 +30,7 @@ const root = path.resolve(String(arg("root", defaultStaticRoot())));
 const local = !!arg("local", false);
 const port = Number(arg("port", process.env.NVD_REMOTE_PORT || DEFAULT_PORT));
 const noOsc = process.argv.includes("--no-osc");
+const noMdns = process.argv.includes("--no-mdns");
 const oscPort = Number(arg("osc-port", DEFAULT_OSC_PORT));
 const oscAllow = typeof arg("osc-allow") === "string" ? arg("osc-allow").split(",").map(x => x.trim()).filter(Boolean) : null;
 let version = "";
@@ -41,6 +43,7 @@ const server = await startRemoteServer({
   pairCode: typeof arg("pair") === "string" ? arg("pair") : null,
   version,
   osc: noOsc ? false : { port: oscPort, allow: oscAllow },
+  mdns: !noMdns,
   log: m => console.log(`${new Date().toLocaleTimeString("fr-FR")} ${m}`)
 }).catch(err => {
   if (err?.code === "EADDRINUSE") {
@@ -65,6 +68,8 @@ if (local) {
 if (info.osc) {
   console.log(`  OSC entrant : UDP ${info.osc.port} · adresses /nocode/transport/play, /nocode/cue/go, /nocode/node/<id>/<param>`);
   for (const u of info.osc.oscQueryUrls) console.log(`  OSCQuery : ${u}`);
+  if (info.mdns?.services) console.log(`  Découverte réseau (Bonjour) : « ${info.mdns.instance} » · ${info.mdns.services.map(s => s.type).join(", ")}`);
+  else if (info.mdns?.error) console.log(`  Découverte réseau indisponible : ${info.mdns.error}`);
   if (oscAllow) console.log(`  OSC accepté seulement depuis : ${oscAllow.join(", ")}`);
 } else if (!noOsc) {
   console.log(`  ⚠ OSC indisponible (port ${oscPort} occupé ?) : relance avec --osc-port <autre>`);

@@ -41,7 +41,7 @@ async function startBridge() {
         staticRoot: appRoot(),
         version,
         name: APP_NAME,
-        osc: { port: 9010 }, // QLab / Chataigne / TouchDesigner → No[co]de ; OSCQuery sur le même port (TCP)
+        osc: { port: 9010 }, mdns: true, // QLab / Chataigne / TouchDesigner → No[co]de ; OSCQuery sur le même port (TCP)
         log: (m) => console.log(m)
       });
     } catch (err) {

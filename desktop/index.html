@@ -34,6 +34,12 @@
     <iframe id="companionEditorFrame" title="Companion Studio"></iframe>
   </div>
 </dialog>
+<dialog id="conduiteDialog" class="conduite-dialog" aria-labelledby="conduiteTitle">
+  <div class="conduite-shell">
+    <header><div><b id="conduiteTitle">Conduite · cartouches</b><span>Présentation de la conduite : libellé, couleur, page, notes, groupe, favoris, ordre. N'altère ni les IDs ni les actions des cues.</span></div><button id="conduiteClose" type="button" class="btn">Fermer</button></header>
+    <div id="conduiteHost" class="conduite-host"></div>
+  </div>
+</dialog>
 <dialog id="shaderDialog" class="shader-dialog">
   <div class="shader-shell">
     <header><div><b>Shader Lab</b><span>GLSL fragment · Ctrl/Cmd+Entrée applique</span></div><button id="shaderClose" type="button" class="btn">Fermer</button></header>
@@ -44,7 +50,7 @@
 <div id="app">
   <header class="topbar">
     <div class="brand"><span class="brandmark" aria-hidden="true"><img src="../icons/nocode-rings.svg" alt=""></span><div><b>No<span class="co">[co]</span>de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v3.3.18</span>
+    <span class="badge">v3.3.20</span>
     <span id="showLockBadge" class="show-lock-badge" role="status" aria-live="polite" hidden>Spectacle verrouillé</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
@@ -144,9 +150,11 @@
             <label class="smallbtn timeline-media-btn" title="Importer un fichier vidéo, audio ou image depuis votre ordinateur">＋ Média<input id="timelineMediaFile" type="file" accept="video/*,audio/*,image/*" hidden multiple></label>
             <button type="button" id="timelineOpenElements" class="smallbtn" title="Ouvrir les Éléments &amp; Patchs du spectacle">Éléments &amp; Patchs</button>
             <div class="layer-add-wrap"><button id="addLayer" class="smallbtn layer-add-btn" type="button">+ Layer</button><div id="layerAddMenu" class="layer-add-menu hidden" role="menu" aria-label="Ajouter un layer"><button type="button" data-add-layer="video">Vidéo</button><button type="button" data-add-layer="effect">Effet</button><button type="button" data-add-layer="shader">Shader</button><button type="button" data-add-layer="shadow">Ombre</button><button type="button" data-add-layer="cue">Cue</button><button type="button" data-add-layer="bridge">Liaison</button></div></div>
-            <button id="cueGo" class="smallbtn">GO</button>
-            <button id="cuePrev" class="smallbtn">◀ Cue</button>
-            <button id="cueNext" class="smallbtn">Cue ▶</button>
+            <button id="conduiteOpen" class="smallbtn" type="button" title="Conduite : cartouches de cues (libellés, couleurs, groupes, ordre)">Conduite</button>
+            <span id="cueStandby" class="cue-standby" role="status" aria-live="polite">Prêt : —</span>
+            <button id="cueGo" class="smallbtn go" title="GO : déclenche la cue en attente puis avance (protection double-GO)">GO</button>
+            <button id="cuePrev" class="smallbtn" title="Cue en attente précédente (ne déclenche rien)">◀ Prêt</button>
+            <button id="cueNext" class="smallbtn" title="Cue en attente suivante (ne déclenche rien)">Prêt ▶</button>
             <button id="cuePanic" class="smallbtn danger">PANIC</button>
           </div>
           <div id="timelineBody" class="timeline-body">

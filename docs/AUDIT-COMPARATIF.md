@@ -42,6 +42,33 @@ sur le pont de régie. Espace `/nocode/transport/*`, `/nocode/cue/go`, `/nocode/
 (paramètres réels du projet ouvert, jamais inventés). Tests : `qa/osc-control-qa.mjs` 30/30, `qa/osc-designer-e2e.mjs` 13/13 (Designer réel).
 Au passage : **une modification reçue à distance n'était pas enregistrée** (perdue au rechargement) — corrigé et testé.
 
+## 2 bis. Passe REA du 17/10/2026 (3.3.20)
+**Reproductibilité** : les mêmes appels REA sur les mêmes binaires ont redonné **exactement** les mêmes identifiants d'evidence
+(Millumin `ev_e0bb…`/`ev_4390…`, TouchDesigner `ev_5837…`/`ev_9c7c…`, Chataigne Mach-O `ev_6a34…`, Max Mach-O `ev_6aaa…`) : les constats de la passe 1 sont confirmés.
+
+| Logiciel (version) | Nouvelle observation | Evidence |
+|---|---|---|
+| Max 9.1.3 | Ouvre les patchs **Pure Data** (`.pd`, rôle Viewer) ; patchers `.maxpat` = **JSON** ; presets `.maxpresets`, snippets `.maxsnip`, RNBO `.rnbopat`, schéma d'URL `c74max:` | `ev_6d6ae7ab42a51ef815694cb32da0accc51b9dea8215beff83d0e756ea5ee1cb7` (plist) |
+| Chataigne 1.9.24 | Projet `.noisette` (XML) ; usage micro déclaré | `ev_8172ff8228bfccda86734df5b125c8a7544aea678dda789de7cf0b18f9066b1b` (plist) |
+| Ableton Live 10.1.43 | Sets `.als`, clips `.alc`, devices Max for Live `.amxd`, schéma d'URL `ableton:` ; embarque `MaxAPI`/`JitterAPI` | `ev_590d6253bd40fc9a22eb25e156311bf4d77cfe5832f2bd6abf7d420cb28f911a` (plist) |
+| NDI Router 6.3.0 | Outil NDI autonome (frameworks `NDICommon`, `NTFramework`) | `ev_1e9dba375aa44336ff6c436d2631db8da6ad8125e4c0dce52f40da30bffe02c0` (plist) |
+
+Bundle (shell, pas REA) : **Syphon** est embarqué par Millumin, Chataigne **et** TouchDesigner ; `libndi` par Millumin.
+Non installés sur le Mac (donc non observables par REA) : QLab, Resolume, Isadora, vvvv, ossia score, Reaper, MadMapper, Pure Data, Bitfocus Companion.
+
+### Décisions implémentées (3.3.20)
+1. **Découverte automatique** (constat REA : Millumin lie `VVOSCQueryProtocol` ; spécification OSCQuery : annonce `_oscjson._tcp`) →
+   `bridge/mdns-announce.mjs`, répondeur DNS-SD sans dépendance (`_oscjson._tcp` + `_osc._udp`, au-revoir TTL 0, jamais en mode local).
+   **Preuve réelle** : `dns-sd -B _oscjson._tcp` / `dns-sd -B _osc._udp` / `dns-sd -L` sur le Mac (Bonjour natif d'Apple) ont découvert et résolu
+   l'instance annoncée (`… can be reached at <hôte>.local.:9876`, `txtvers=1`). Tests : `qa/mdns-announce-qa.mjs` 18/18.
+2. **Conduite : un seul contrôleur GO** (doc QLab : délai minimal entre deux GO, en secondes, appliqué au GO de l'espace de travail
+   y compris MIDI mais pas aux déclencheurs de cue — [forum officiel](https://groups.google.com/g/qlab/c/Lo008AEZ8pY)).
+   L'audit interne a montré 3 logiques GO incohérentes (bouton : rejouait la cue courante ; OSC/Companion : clé `activeCueId` et
+   **retour à la première cue après la dernière** ; mobile : 3ᵉ variante). → `shared/stage/go-controller.js` : standby unique,
+   protection double-GO **commune à toutes les sources**, requêtes rejouées ignorées, pré-attente, auto-continue/auto-follow annulables,
+   fin de conduite sans bouclage, journal. OSC : `/nocode/cue/next|prev|panic` ajoutés et exposés en OSCQuery.
+   Tests : `qa/go-controller-qa.mjs` 23/23, `qa/go-designer-e2e.mjs` 16/16 (bouton + OSC UDP réels dans le Designer).
+
 ## 3. Matrice fonctionnelle
 États No[co]de : **OK** testé automatiquement · **PARTIEL** · **SIMULÉ** (sans matériel) · **ABSENT**. Source : voir légende.
 
@@ -93,7 +120,8 @@ Au passage : **une modification reçue à distance n'était pas enregistrée** (
 | hydra-synth | Live coding | AGPL : incompatible si code fermé |
 
 ## 6. Priorités suivantes
-1. **P0** Timeline : alignement et édition de clips, liaison des tops de conduite au GO (Companion + OSC `/nocode/cue/go`).
-2. **P1** Annonce mDNS `_oscjson._tcp` (découverte sans saisir d'IP) ; pre-wait / auto-continue des cues (QLab).
+1. **P0** Timeline : alignement et édition de clips ; édition pre/post-wait et mode d'enchaînement dans le panneau Conduite ; mobile sur le contrôleur GO.
+2. **P1** OSCQuery `LISTEN` (WebSocket) pour retour d'état temps réel vers Chataigne / ossia ; import de patchs Max `.maxpat` (JSON, constat REA).
+2 bis. **P1** Vidéo inter-applications : Syphon (macOS) / Spout (Windows) / NDI depuis la version desktop (constat : Syphon embarqué par Millumin, Chataigne, TouchDesigner) — module natif à évaluer (licences, signature).
 3. **P1** Registre de nodes en plugins par famille (modèle TouchDesigner observé par REA).
 4. **P2** Import OBJ/glTF (three.js), client obs-websocket, client ComfyUI local.
