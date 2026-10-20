@@ -28,13 +28,13 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const fake = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"];
 let fail = 0; const ok = (c, m, d = "") => { console.log(`${c ? "✓" : "✗"} ${m}${d !== "" ? " · " + d : ""}`); if (!c) fail++; };
 
-async function run(args, fn, opts = {}) {
+async function run(args, fn, arg = null, opts = {}) {
   const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, headless: true, args });
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
   const errors = []; page.on("pageerror", e => errors.push(String(e.message || e)));
   await page.goto(base + "/__t.html");
-  const res = await page.evaluate(fn);
+  const res = await page.evaluate(fn, arg);
   await browser.close();
   return { res, errors };
 }
@@ -84,19 +84,19 @@ ok(b.sh > 0 && a.res.shaderFrame, "chaîne mouvement caméra → paramètre Shad
 ok(a.errors.length === 0, "aucune erreur JS", a.errors.slice(0, 2).join(" | "));
 
 // États honnêtes : permission refusée (aucune permission accordée, pas de fake-ui) et absence d'appareil.
-const state = async () => {
+const state = async (absent = false) => {
   const { sharedAudio } = await import("/shared/audio-engine.js");
   const { mediaErrorState } = await import("/shared/media-errors.js");
   let mic = "";
-  try { await sharedAudio.ensureInput("m1"); mic = "ouvert"; } catch { mic = sharedAudio.inputFailure("m1")?.label || "?"; }
+  try { await sharedAudio.ensureInput("m1", absent ? { deviceId: "__aucun__" } : {}); mic = "ouvert"; } catch { mic = sharedAudio.inputFailure("m1")?.label || "?"; }
   let cam = "";
-  try { await navigator.mediaDevices.getUserMedia({ video: true }); cam = "ouverte"; } catch (e) { cam = mediaErrorState(e, "caméra").label; }
+  try { await navigator.mediaDevices.getUserMedia(absent ? { video: { deviceId: { exact: "__aucun__" } } } : { video: true }); cam = "ouverte"; } catch (e) { cam = mediaErrorState(e, "caméra").label; }
   return { mic, cam };
 };
-const denied = await run(["--use-fake-device-for-media-stream", "--deny-permission-prompts"], state);
+const denied = await run(["--use-fake-device-for-media-stream", "--deny-permission-prompts"], state, false);
 ok(/^REFUSÉ/.test(denied.res.mic), "micro refusé → état « REFUSÉ »", denied.res.mic);
 ok(/^REFUSÉ/.test(denied.res.cam), "caméra refusée → état « REFUSÉ »", denied.res.cam);
-const none = await run(["--use-fake-ui-for-media-stream"], state);
+const none = await run(["--use-fake-ui-for-media-stream"], state, true);
 ok(/AUCUN|indisponible|REFUSÉ/.test(none.res.mic) && none.res.mic !== "ouvert", "sans périphérique simulé → jamais « ouvert » à tort", `${none.res.mic} / ${none.res.cam}`);
 server.close();
 console.log(fail ? `ÉCHEC : ${fail}` : "OK : chaînes audio/vidéo vérifiées (périphériques simulés)");
