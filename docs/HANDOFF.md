@@ -27,7 +27,7 @@ uniquement git, Node 22, Playwright et GitHub Actions.
 | Web MIDI | PARTIEL · MATÉRIEL ABSENT | décodage/envoi testés avec mocks (`shared/midi-osc-adapters.test.mjs`) ; aucun contrôleur réel |
 | OSC sur WebSocket | TESTÉ (local) · PARTIEL (public) | serveur WS simulé en local ; depuis github.io, Chromium bloque `ws://127.0.0.1` (voir blocages) |
 | OSC UDP / Art-Net / sACN | PARTIEL | octets conformes (`qa/protocols-qa.mjs`) ; UDP seulement via app de bureau ou passerelle |
-| Serial / Arduino / ESP32 / GPIO / NDI | MATÉRIEL ABSENT | nodes « Test à supprimer » (test-ndi-in/out, test-arduino, test-esp32, test-gpio-in/out) = SIMULÉS, à conserver |
+| Serial / Arduino / ESP32 / GPIO / NDI | MATÉRIEL ABSENT | nodes `ndi-in`/`ndi-out`, `arduino`, `esp`, `gpio-in`/`gpio-out` disponibles en bibliothèque, SIMULÉS sans matériel ; les nodes « Test à supprimer » ont été retirés de l'Exemple en 3.3.21 (`shared/vibe-planner-intents.test.mjs` le vérifie) |
 | Radio / diffusion | TESTÉ (logique) | `qa/radio-broadcast-qa.mjs`, `qa/radio-ui-qa.mjs` |
 | Remote Camera QR | TESTÉ | `qa/remote-camera-qr-e2e.mjs` |
 | Régie LAN : pont appairé (code, hôte réservé, Origin) | TESTÉ | `qa/regie-bridge-qa.mjs` (32/32) · guide `docs/REGIE-LAN.md` |
@@ -132,3 +132,14 @@ secret, keystore ou AAB dans ce dépôt public. Pas de Google Play production. T
   corrige GO qui rejouait la même cue et le retour silencieux à la première cue côté OSC/Companion. « ◀ Prêt / Prêt ▶ » déplacent le standby
   sans déclencher (changement de comportement assumé). Délai double-GO : 350 ms (clé `nvd.conduite.minGoMs`, 0–5000).
 - Architecture : `docs/ARCHITECTURE-TIMELINE-CONDUITE.md`. Restant : mobile + `bindings.js` sur le contrôleur, édition pre/post-wait, LISTEN.
+
+
+## Point de passage · 20/10/2026 · Antigravity (3.3.21, branche `antigravity/vibe-planner-intents-20261020`)
+- **Planner local** (`shared/vibe-planner.js`, `shapeIntentPlan`) : prompts courts FR/EN « forme + comportement + source ».
+  Formes réalisables : cercle (`sdf`), vague (`ripple`). Comportements : pulse (rayon/énergie), tourne/grossit (`transform`),
+  change de couleur (`transmute`). Sources : son/micro (`audio-in` désarmé), MIDI (CC), caméra (`camera` → `opticalflow`), sinon LFO.
+  Carré, ligne, étoile : échec clair « Combinaison non réalisable » (aucun node du catalogue ne les dessine, rien n'est inventé).
+- Prompt inconnu : toujours « Aucune intention reconnue », avec des exemples de prompts qui marchent (`VIBE_PROMPT_EXAMPLES`).
+- Démo « Exemple » : 6 nodes « Test à supprimer » retirés, ainsi que `sim-frame` (Transform sans image = erreur) et `sim-esp` ;
+  l'enveloppe ADSR est déclenchée par la vitesse de la souris.
+- Tests : `shared/vibe-planner-intents.test.mjs` (9), `qa/generation-qa.mjs`, `qa/version-guard.mjs`. Rendu navigateur non testé.
