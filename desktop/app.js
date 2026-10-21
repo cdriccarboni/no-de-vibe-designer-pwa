@@ -25,7 +25,7 @@ import { planManualSave, planManualOpen, saveStatusMessage, announceManualSave, 
 import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { connectRemote } from "../shared/remote-client.js";
 import { REMOTE_PORT } from "../shared/remote-protocol.js";
-import { applyCue, listCues, nextCue, previousCue, dispatchPanicEffects, formatPanicResult } from "../shared/stage/cues.js";
+import { applyCue, listCues, nextCue, previousCue, setCuePlayhead, dispatchPanicEffects, formatPanicResult } from "../shared/stage/cues.js";
 import { mountConduitePanel } from "../shared/stage/conduite-panel.js";
 import { createGoController } from "../shared/stage/go-controller.js";
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
@@ -2313,12 +2313,15 @@ function saveSelectedElement() {
 }
 
 function addElementTop(elementId) {
+  const wasAtEnd = !goController.standingBy();
   const clip = placeElementInTimeline(elementId);
   if (!clip) return null;
   const cueTrack = Math.max(0, (project.layers || []).findIndex(layer => layer.type === "cue"));
   const cue = addClip(cueTrack, clip.start, 0.1, `TOP · ${clip.label}`, "cue", {
     actions:[{ type:"element-instance", elementId:clip.elementId, instanceId:clip.id }]
   });
+  if (wasAtEnd) setCuePlayhead(project, cue.id);
+  updateStandbyLabel();
   autosave();
   log(`TOP · ${clip.label} prêt`);
   return cue;
@@ -2553,9 +2556,13 @@ function placeScenicInCanvas(elementId) {
   else if (cat.includes("créature") || cat.includes("creature") || cat.includes("lumière")) nodeType = "whale";
   else if (cat.includes("shader") || cat.includes("effet")) nodeType = "shader";
   else if (el.snapshot?.source === "local-file") {
-    nodeType = el.snapshot.mimeType?.startsWith("video/") ? "videofile" : el.snapshot.mimeType?.startsWith("audio/") ? "audio" : "image";
+    nodeType = el.snapshot.mimeType?.startsWith("video/") ? "videofile" : el.snapshot.mimeType?.startsWith("audio/") ? "audio" : null;
   }
 
+  if (!nodeType) {
+    log(`Canvas · Image « ${el.name} » conservée dans la Timeline · aucun node sans moteur ajouté`);
+    return null;
+  }
   const n = addNode(nodeType);
   if (n) {
     n.title = el.name;
@@ -2607,8 +2614,8 @@ function handleDroppedMediaFiles(files, targetTrack = selectedElementTrack(), cl
 
     const duration = isVideo ? 12 : isAudio ? 10 : 8;
 
-    const nodeType = isVideo ? "videofile" : isAudio ? "audio" : isImage ? "image" : "videofile";
-    const n = addNode(nodeType);
+    const nodeType = isVideo ? "videofile" : isAudio ? "audio" : null;
+    const n = nodeType ? addNode(nodeType) : null;
     if (n) {
       n.title = file.name;
       n.params.src = objectUrl;
@@ -2634,7 +2641,7 @@ function handleDroppedMediaFiles(files, targetTrack = selectedElementTrack(), cl
       }
     });
 
-    addClip(track, start, duration, file.name, isVideo ? "video" : "effect", {
+    addClip(track, start, duration, file.name, mediaType === "media" ? "effect" : mediaType, {
       elementId: element.id,
       nodeId: n?.id,
       mediaUrl: objectUrl,
@@ -3940,6 +3947,7 @@ async function loadProjectText(data, label) {
   project = next;
   graphPath = [];
   redraw();
+  updateStandbyLabel();
   // Nouveau point de départ d'historique : un Undo ne doit pas ramener l'ancien projet.
   history.clear();
   commitHistory();
@@ -4853,6 +4861,7 @@ if (!recoveredFromCrash && generalPrefs.restoreAutosave !== false && autosaved) 
   try {
     const opened = openProject(JSON.parse(autosaved));
     project = opened.project;
+    updateStandbyLabel();
     log(opened.changed ? `Autosave restaurée · migration ${opened.migratedFrom}→${opened.migratedTo}` : "Autosave restaurée");
   } catch { /* */ }
 }
