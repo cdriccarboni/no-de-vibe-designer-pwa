@@ -8,7 +8,6 @@ export const SURFACE_PREF_KEY = "nvd.surface.preference";
 
 export const SURFACES = Object.freeze([
   { id:"designer", label:"Designer", detail:"Canvas · Library · Timeline · Vibe", path:"desktop/index.html" },
-  { id:"show", label:"Show", detail:"Conduite spectacle · transport · cues", path:"show/index.html" },
   { id:"mobile", label:"Mobile", detail:"Interface compacte · capteurs · conduite", path:"mobile/index.html" },
   { id:"regie", label:"Régie", detail:"Companion Studio · pages personnalisables", path:"studio/index.html?surface=regie" },
   { id:"plateau", label:"Plateau", detail:"Companion Studio directement en mode Plateau", path:"studio/index.html?surface=plateau" },
@@ -119,7 +118,6 @@ export function installSurfaceSwitcher({current="designer",label="Interface"}={}
 export function getSurfaceList() {
   return [
     ...SURFACES.map(s => ({ id:s.id, label:s.label, url:"/" + s.path })),
-    { id:"show", label:"Show", url:"/show/index.html?surface=show" },
     { id:"auto", label:"Auto", url:"/index.html?auto=1" }
   ];
 }
@@ -130,7 +128,6 @@ export function getCurrentSurface(locationObj=globalThis.location) {
   try { explicit=new URL(href || "https://local.invalid/").searchParams.get("surface") || ""; } catch {}
   if(explicit) return explicit;
   const path=String(locationObj?.pathname||href);
-  if(path.includes("/show/")) return "show";
   if(path.includes("/mobile/")) return "mobile";
   if(path.includes("/companion/")) return "camera";
   if(path.includes("/studio/")) return "regie";

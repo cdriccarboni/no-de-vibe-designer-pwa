@@ -1,5 +1,5 @@
 /**
- * État léger du composeur Créateur partagé par Vibe et CX.
+ * État léger du composeur Créateur partagé par Vibe et le Chat IA.
  * Le brouillon survit au rechargement ; une proposition reste volontairement
  * en mémoire afin de ne jamais restaurer une action non confirmée.
  */

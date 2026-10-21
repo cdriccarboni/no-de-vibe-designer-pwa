@@ -218,7 +218,7 @@
             <button id="aiAgentsScan" class="smallbtn" type="button">↻ Détecter / actualiser</button>
           </div>
           <div id="aiAgentsList" class="local-agents-list">
-            <p class="hint">Détecte automatiquement les modèles Ollama disponibles, comme CX hub, puis choisis leur rôle.</p>
+            <p class="hint">Détecte automatiquement les modèles Ollama disponibles puis choisis leur rôle.</p>
           </div>
         </div>
         <details class="ai-legacy">

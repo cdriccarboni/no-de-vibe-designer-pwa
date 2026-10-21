@@ -7,7 +7,8 @@ import { buildLocalAiPrompt, directOllamaChat, directOllamaProbe, normalizeLocal
 import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError } from "./local-ai-diagnostic.js";
 import { selectLocalAgents } from "./local-agent-registry.js";
 import { buildIsfAgentPrompt, isIsfRequest, normalizeIsfNodeParams } from "./isf-agent.js";
-import { mergeRunnableSources } from "./cx-source.js";
+import { mergeRunnableSources } from "./runnable-source.js";
+import { chatForTask, normalizeProviderSettings, providerForTask, providerIsPwaSafe, providerRequiresEncryptedSecret } from "./ai-providers/index.js";
 
 /**
  * Vibe coding — génération structurée de patch.
@@ -23,9 +24,18 @@ export function readAiConfig() {
   } catch {
     raw = {};
   }
+  const electron = Boolean(globalThis?.nvdDesktop?.runtime === "electron");
   const local = normalizeLocalAiConfig(raw);
+  const providerSettings = normalizeProviderSettings(raw);
+  if (electron) {
+    const endpoint = providerSettings.providers.find(provider => provider.id === "endpoint");
+    if (endpoint) endpoint.apiKey = "";
+  }
+  const { apiKey: _legacyApiKey, ...safeRaw } = raw;
   return {
-    ...raw,
+    ...safeRaw,
+    providers: providerSettings.providers,
+    routes: providerSettings.routes,
     localEnabled: local.enabled,
     localBaseUrl: local.baseUrl,
     localModel: local.model,
@@ -41,26 +51,6 @@ export function readAiConfig() {
 
 export function saveAiConfig(cfg) {
   localStorage.setItem("nvd.ai", JSON.stringify(cfg));
-}
-
-/** Grok / xAI explicitement exclus de No[co]de Vibe Designer. */
-export function isForbiddenAiProvider(endpoint = "", model = "") {
-  const s = `${endpoint} ${model}`.toLowerCase();
-  return /(?:^|\/\/|\.)x\.ai\b/.test(s)
-    || s.includes("api.x.ai")
-    || s.includes("grok")
-    || s.includes("xai.com")
-    || /\bxai\b/.test(s);
-}
-
-export function assertAiProviderAllowed(cfg = {}) {
-  if (isForbiddenAiProvider(cfg.endpoint, cfg.model)) {
-    return {
-      ok: false,
-      error: "Grok / xAI est exclu de No[co]de Vibe Designer. Utilisez un endpoint OpenAI-compatible autorisé, ou le moteur local."
-    };
-  }
-  return { ok: true };
 }
 
 function norm(text) {
@@ -230,47 +220,6 @@ async function callLocalAi(text, project, cfg) {
     };
   }
 }
-async function callRemoteAi(text, project, cfg) {
-  const endpoint = (cfg.endpoint || "").trim();
-  const apiKey = (cfg.apiKey || "").trim();
-  const model = (cfg.model || "gpt-4o-mini").trim();
-  if (!endpoint) return { ok:false, unavailable:true, error:"Aucun endpoint IA distant configuré." };
-  const allowed = assertAiProviderAllowed({ endpoint, model });
-  if (!allowed.ok) return { ok:false, unavailable:true, error:allowed.error };
-
-  const headers = { "Content-Type":"application/json" };
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-  let res;
-  try {
-    res = await fetch(endpoint, {
-      method:"POST",
-      headers,
-      body:JSON.stringify({
-        model,
-        temperature:0.2,
-        messages:[
-          { role:"system", content:"Tu génères des opérations de patch JSON sûres pour No[co]de Vibe Designer." },
-          { role:"user", content:buildVibePrompt(text, project) }
-        ],
-        response_format:{ type:"json_object" }
-      })
-    });
-  } catch (e) {
-    return { ok:false, unavailable:true, error:`Moteur IA distant injoignable : ${e?.message || e}` };
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    return { ok:false, unavailable:true, error:`Moteur IA HTTP ${res.status} : ${body.slice(0,200)}` };
-  }
-  let data;
-  try { data = await res.json(); }
-  catch { return { ok:false, unavailable:true, error:"Réponse IA distante non JSON" }; }
-
-  const parsed = parseAiOps(data.choices?.[0]?.message?.content ?? data, "IA distante");
-  if (!parsed.ok) return parsed;
-  return { ok:true, engine:"ai", ops:parsed.ops, summary:parsed.summary, note:`IA distante · ${model}` };
-}
-
 export async function probeLocalAi(cfg = readAiConfig(), { fresh = false } = {}) {
   const local = normalizeLocalAiConfig(cfg);
   if (!local.enabled) return { ok:false, available:false, disabled:true, error:"Local AI Core désactivé", models:[], responded:false };
@@ -384,23 +333,57 @@ function finalizeVibeResult(result, project, source = result?.engine || "unknown
   };
 }
 
-export async function runVibe(text, project, { forceLocal = false } = {}) {
-  const cfg = readAiConfig();
-  const localGenerativeEnabled = cfg.localEnabled !== false;
-
-  if (!forceLocal && localGenerativeEnabled) {
-    const localAi = await callLocalAi(text, project, cfg);
-    if (localAi.ok) return finalizeVibeResult(augmentRunnableSources(text, localAi), project, "local-ai");
-
-    if (cfg.enabled === true && cfg.endpoint) {
-      const remote = await callRemoteAi(text, project, cfg);
-      if (remote.ok) {
-        return finalizeVibeResult(augmentRunnableSources(text, { ...remote, localAiError: localAi.error }), project, "remote-ai");
-      }
+async function callConfiguredProvider(text, project, cfg, task) {
+  const settings = normalizeProviderSettings(cfg);
+  const provider = providerForTask(settings, task);
+  if (!provider?.enabled) return { ok:false, unavailable:true, error:"Aucun fournisseur IA activé pour cette tâche" };
+  if (!globalThis?.nvdDesktop && !providerIsPwaSafe(provider)) return { ok:false, unavailable:true, error:"Ce fournisseur est disponible uniquement dans l’application Electron" };
+  if (providerRequiresEncryptedSecret(provider) && provider.configured !== true && !provider.apiKey) {
+    return { ok:false, unavailable:true, error:`${provider.label} : clé API non configurée` };
+  }
+  const prompt = buildVibePrompt(text, project);
+  const messages = [
+    { role:"system", content:"Tu génères exclusivement des opérations JSON sûres pour No[co]de Vibe Designer." },
+    { role:"user", content:prompt }
+  ];
+  try {
+    let content;
+    // Electron garde les clés et les CLI hors renderer. La PWA appelle uniquement
+    // Ollama ou l'endpoint compatible configuré par son propre utilisateur.
+    if (typeof globalThis?.nvdDesktop?.aiProviderChat === "function") {
+      const result = await globalThis.nvdDesktop.aiProviderChat({
+        providerId:provider.id,
+        baseUrl:provider.baseUrl,
+        model:provider.model,
+        messages,
+        temperature:0.2,
+        timeoutMs:120000
+      });
+      content = result?.text;
+    } else {
+      const result = await chatForTask({ settings, task, messages, timeoutMs:30000, temperature:0.2 });
+      content = result.text;
     }
+    const parsed = parseAiOps(content, provider.label);
+    if (!parsed.ok) return parsed;
+    return { ok:true, engine:`provider-${provider.id}`, ops:parsed.ops, summary:parsed.summary, note:`${provider.label} · ${provider.model || "modèle par défaut"}` };
+  } catch (error) {
+    return { ok:false, unavailable:true, error:`${provider.label} : ${error?.message || error}` };
+  }
+}
 
+export async function runVibe(text, project, { forceLocal = false, task = "patch" } = {}) {
+  const cfg = readAiConfig();
+  if (!forceLocal) {
+    const provider = await callConfiguredProvider(text, project, cfg, task);
+    if (provider.ok) return finalizeVibeResult(augmentRunnableSources(text, provider), project, provider.engine);
+    let localAi = null;
+    if (cfg.localEnabled !== false) {
+      localAi = await callLocalAi(text, project, cfg);
+      if (localAi.ok) return finalizeVibeResult(augmentRunnableSources(text, { ...localAi, providerError: provider.error }), project, "local-ai");
+    }
+    const delayed = localAi?.timedOut === true;
     const rules = localVibeParse(text, project);
-    const delayed = localAi.timedOut === true;
     return finalizeVibeResult(augmentRunnableSources(text, {
       ok: rules.ops.length > 0,
       engine: "local-planner-fallback",
@@ -408,20 +391,14 @@ export async function runVibe(text, project, { forceLocal = false } = {}) {
       coverage: rules.coverage,
       summary: rules.note,
       planner: rules.diagnostics,
-      ...(delayed ? {} : { aiError:localAi.error }),
+      ...(delayed ? {} : { aiError: localAi?.error || provider.error }),
       note: delayed
         ? `IA locale trop lente pour le mode instantané · patch créé par le Planner déterministe`
-        : `IA locale indisponible — ${localAi.error} · repli Planner déterministe`,
+        : `IA indisponible — ${localAi?.error || provider.error} · repli Planner déterministe`,
       aiUnavailable: !delayed,
       aiDelayed: delayed
     }), project, "local-planner-fallback");
   }
-
-  if (!forceLocal && cfg.enabled === true && cfg.endpoint) {
-    const remote = await callRemoteAi(text, project, cfg);
-    if (remote.ok) return finalizeVibeResult(augmentRunnableSources(text, remote), project, "remote-ai");
-  }
-
   const local = localVibeParse(text, project);
   return finalizeVibeResult(augmentRunnableSources(text, {
     ok: local.ops.length > 0,

@@ -92,17 +92,20 @@ figure{margin:18px 0}img{max-width:100%;border:1px solid var(--line);border-radi
 </section>
 
 <section>
-<h2>4. Vibe : demander au lieu de construire</h2>
-<p>Dans le champ <strong>Vibe</strong>, décris simplement ce que tu veux. No[co]de prépare d’abord un aperçu : rien n’est appliqué tant que tu n’as pas validé.</p>
+<h2>4. Vibe et Chat IA : demander au lieu de construire</h2>
+<p>Dans le champ <strong>Vibe</strong> ou l’onglet <strong>Chat IA</strong>, décris simplement ce que tu veux. No-de prépare d’abord un aperçu : rien n’est appliqué tant que tu n’as pas validé.</p>
 <div class="cards">
   <div class="card"><h3>Exemple simple</h3><p>« Fais un rideau de fils qui réagit à la souris et ajoute des ondes. »</p></div>
   <div class="card"><h3>Exemple spectacle</h3><p>« Crée une ombre de l’interprète capté à jardin et projette-la à cour. »</p></div>
 </div>
 <p><strong>Annuler :</strong> après application, Undo / ⌘Z / Ctrl+Z permet de revenir en arrière.</p>
 <p class="small">Les accès caméra, micro, Serial, OSC, Art-Net et autres sorties matérielles ne sont pas armés automatiquement par Vibe.</p>
-<details><summary>Agents locaux (facultatif)</summary>
-<p>Tu peux ignorer ce réglage au début. Si plusieurs modèles Ollama sont installés, ouvre <strong>Préférences → IA → Agents locaux → Détecter / actualiser</strong>. No[co]de les classe automatiquement : Code, Vision, Rapide, Chat, Embedding ou Utilitaire.</p>
-<p>Pour une consigne de patch, No[co]de privilégie un agent <strong>Code</strong>. Pour Image → Vibe, il privilégie un agent <strong>Vision</strong>. Les modèles d’embedding restent visibles mais ne sont pas utilisés comme générateurs.</p>
+<details><summary>Fournisseurs IA (facultatif)</summary>
+<p>Tu peux ignorer ce réglage au début : le Planner déterministe fonctionne sans modèle. Dans <strong>Préférences → IA / Vibe</strong>, choisis un fournisseur pour le Planner, la génération de patch et la relecture.</p>
+<p><strong>Ollama</strong> est le choix local. Clique « Installer Ollama (gratuit) » si nécessaire, installe ensuite un modèle, puis utilise « Détecter / actualiser » pour le choisir.</p>
+<p><strong>Endpoint compatible OpenAI</strong> convient à LM Studio, llama.cpp server, Hermes et LiteLLM. Indique l’URL, la clé seulement si le serveur en demande une, puis liste les modèles.</p>
+<p>Dans l’application Electron, Codex CLI, Claude CLI et Gemini CLI ne sont proposés que s’ils sont installés. Les clés OpenAI, Anthropic, Gemini et xAI / Grok sont conservées chiffrées par le système ; elles ne sont jamais affichées après enregistrement.</p>
+<p>La PWA propose uniquement Ollama et l’endpoint HTTP. Si un fournisseur ne répond pas ou renvoie un JSON invalide, No-de revient au Planner local. Toute proposition reste filtrée par le Safety Engine avant l’aperçu.</p>
 </details>
 </section>
 
@@ -177,7 +180,7 @@ figure{margin:18px 0}img{max-width:100%;border:1px solid var(--line);border-radi
 <h2>10. Pour aller plus loin</h2>
 <details><summary>Sous-patches et SuperNodes</summary><p>Un sous-patch regroupe plusieurs nodes dans une boîte. C’est la base des SuperNodes : interface simple à l’extérieur, moteur détaillé à l’intérieur.</p></details>
 <details><summary>Audio, MIDI, OSC, DMX et Serial</summary><p>Ces fonctions deviennent utiles quand la régie grandit. Teste toujours le matériel réel et ses permissions avant une représentation. Une passerelle ou un périphérique absent est signalé au lieu d’être simulé.</p></details>
-<details><summary>IA locale / endpoint</summary><p>Préférences → IA / Vibe permet d’utiliser un moteur local ou un endpoint distant autorisé. Ce réglage n’est pas nécessaire pour apprendre l’interface : le planner local reste disponible.</p></details>
+<details><summary>Chat IA / fournisseurs</summary><p>Préférences → IA / Vibe permet d’utiliser Ollama, un endpoint compatible OpenAI ou, dans Electron, un CLI ou une clé cloud chiffrée. Ce réglage n’est pas nécessaire pour apprendre l’interface : le Planner local reste disponible.</p></details>
 <details><summary>Développement et lancement local</summary><p>Les commandes de développement, builds PWA, Electron, Android et diagnostics sont documentés dans le dépôt. Elles ne sont pas nécessaires pour exploiter une régie déjà installée.</p></details>
 </section>
 

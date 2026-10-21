@@ -297,7 +297,7 @@ body[data-workspace="plateau"] .center{grid-template-rows:minmax(0,1fr) var(--ti
   #app{grid-template-rows:50px minmax(0,1fr) 100px;min-width:0}
   .topbar{gap:6px;padding:0 8px;overflow-x:auto;scrollbar-width:none}
   .topbar::-webkit-scrollbar{display:none}
-  .brand span:not(.co),.badge,.themes a[href$="show/"]{display:none}
+  .brand span:not(.co),.badge{display:none}
   .workspace{grid-template-columns:minmax(0,1fr);gap:6px;padding:6px;overflow:hidden}
   .library{display:none}
   .center{grid-template-rows:minmax(250px,1fr) minmax(168px,22vh) minmax(160px,25vh);gap:6px;min-width:0}
@@ -329,15 +329,16 @@ body.show-locked .nh,body.show-locked .port-dot{cursor:not-allowed}
 .pane-tab{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:3px 7px;font-size:10px;font-weight:700;cursor:pointer}
 .pane-tab.active{background:var(--accent);color:#111;border-color:var(--accent)}
 .pane-hidden{display:none !important}
-.cx-chat{display:flex;flex-direction:column;gap:8px;min-height:0}
-.cx-chat-log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;min-height:80px}
-.cx-msg{border:1px solid var(--line);border-radius:8px;padding:8px;white-space:pre-wrap;font-size:11px;line-height:1.4}
-.cx-msg.user{align-self:flex-end;max-width:96%;background:var(--panel2)}
-.cx-msg.assistant{align-self:flex-start;max-width:100%}
-.cx-msg.status{color:var(--muted)}
-.cx-chat-form{display:grid;gap:6px}
-.cx-chat-form textarea{min-height:68px;resize:vertical;background:var(--bg);color:inherit;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit}
-.cx-confirm{display:flex;gap:6px;margin-top:6px}
+.ai-chat{display:flex;flex-direction:column;gap:8px;min-height:0}
+.ai-chat-log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;min-height:80px}
+.ai-chat-msg{border:1px solid var(--line);border-radius:8px;padding:8px;white-space:pre-wrap;font-size:11px;line-height:1.4}
+.ai-chat-msg.user{align-self:flex-end;max-width:96%;background:var(--panel2)}
+.ai-chat-msg.assistant{align-self:flex-start;max-width:100%}
+.ai-chat-msg.status{color:var(--muted)}
+.ai-chat-form{display:grid;gap:6px}
+.ai-chat-form textarea{min-height:68px;resize:vertical;background:var(--bg);color:inherit;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit}
+.provider-routes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0}.provider-routes label,.provider-card label{display:grid;gap:5px;font-size:11px}.provider-routes select,.provider-card input,.provider-card select{min-width:0;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px}.provider-card{display:grid;gap:8px;margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.provider-cloud-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#aiCliList{display:grid;gap:6px}#aiCliList label{display:block}@media(max-width:760px){.provider-routes,.provider-cloud-grid{grid-template-columns:1fr}}
+.electron-only{display:none!important}.electron-runtime .electron-only{display:grid!important}
 
 
 /* Voice dictation · optional progressive enhancement for the Vibe prompt */

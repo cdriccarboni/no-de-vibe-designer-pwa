@@ -2,15 +2,13 @@
  * Conduite Show, indépendante du Designer.
  * Les cues passent par le moteur existant. Le langage naturel passe par la couche d'actions.
  * Le graphe et les cues restent dans ce dépôt.
- * Les agents et la mémoire CX passent par le pont local, jamais par le site public.
+ * La conduite reste locale : les cues et le graphe sont enregistrés dans le projet.
  */
 import { newProject, openProject, exportProject, createDemoProject } from "./ir.js";
 import { applyCue, listCues, setCuePlayhead, advanceCuePlayhead } from "./stage/cues.js";
 import { performAction } from "./action-intents.js";
 import { consultAgents } from "./agent-registry.js";
 
-export const CX_BRIDGE_URL = "http://127.0.0.1:4877/chat";
-export const CX_NOTE = "Le navigateur public ne peut pas importer le moteur CX ni joindre 127.0.0.1. Les agents et la mémoire tournent seulement si le pont local est lancé sur ce Mac.";
 
 export function createShowSession(raw) {
   const project = raw ? openProject(raw).project : newProject();
@@ -181,7 +179,7 @@ export function showMonitor(session) {
   };
 }
 
-export function askShow(session, text, cx = null, registry = null) {
+export function askShow(session, text, registry = null) {
   const consultation = consultAgents(text, registry);
   const before = session.project.nodes.length;
   const result = performAction("patch-from-text", { project: session.project, text });
@@ -191,12 +189,12 @@ export function askShow(session, text, cx = null, registry = null) {
   if (result.ok && requestedCue && added > 0) {
     const node = session.project.nodes.at(-1);
     if (node) {
-      const id = `cx-${node.id}`;
+      const id = `assistant-${node.id}`;
       if (!(session.project.cues || []).some(item => item.id === id)) {
         session.project.cues = [...(session.project.cues || []), {
           id,
           number: String((session.project.cues || []).length + 1),
-          label: "CX",
+          label: "Assistant",
           time: session.time,
           armed: true,
           actions: [{ type: "set-param", nodeId: node.id, key: "opacity", value: 1 }]
@@ -205,15 +203,12 @@ export function askShow(session, text, cx = null, registry = null) {
       cue = fireCue(session, id);
     }
   }
-  const linked = Boolean(cx?.ok && Array.isArray(cx.roles) && cx.roles.includes("Conductor"));
   return {
     ...result,
     added: session.project.nodes.length - before,
     cueId: cue?.cue?.id || null,
     cueOk: Boolean(cue?.ok),
-    cx: linked,
-    chain: linked ? cx.chain : "",
-    note: [linked ? `CX ${cx.chain}` : CX_NOTE, consultation.notice].filter(Boolean).join(" · "),
+    note: ["Planner local", consultation.notice].filter(Boolean).join(" · "),
     registryConsulted: consultation.consulted,
     claimsWebcam: false,
     experimental: consultation.notice || "",
