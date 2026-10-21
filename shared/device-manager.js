@@ -14,7 +14,7 @@ export class DeviceManager{
     this.lastProbe=null;
   }
 
-  async probe({autoReconnectSerial=true,autoConnectGrantedMidi=true}={}){
+  async probe({autoReconnectSerial=true,autoConnectGrantedMidi=true,scanSerial=true}={}){
     const result={
       midi:{supported:this.midi.supported(),permission:"unknown",connected:!!this.midi.access,inputs:this.midi.inputs.length,outputs:this.midi.outputs.length},
       serial:{supported:this.serial.supported(),authorized:0,connected:!!this.serial.port?.readable,reconnected:false},
@@ -42,7 +42,7 @@ export class DeviceManager{
       }catch(error){ result.media.error=String(error?.message||error); }
     }
 
-    if(result.serial.supported){
+    if(result.serial.supported && scanSerial){
       try{
         const ports=await navigator.serial.getPorts();
         result.serial.authorized=ports.length;

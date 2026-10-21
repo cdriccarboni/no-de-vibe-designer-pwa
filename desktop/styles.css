@@ -255,7 +255,7 @@ html.electron-macos .topbar{padding-left:84px}
 @media(max-width:760px){.local-agent-row{grid-template-columns:auto minmax(0,1fr)}.local-agent-row select{grid-column:2}}
 
 /* Panneaux déplaçables — Vibe, Timeline, Preview */
-.center{grid-template-rows:minmax(140px,1fr) var(--vibe-row,minmax(168px,26vh)) var(--timeline-row,minmax(156px,28vh))}
+.center{grid-template-rows:minmax(220px,1fr) var(--vibe-row,minmax(150px,21vh)) var(--timeline-row,minmax(150px,24vh))}
 .upper{grid-template-columns:minmax(220px,1.08fr) var(--preview-col,minmax(260px,.92fr))}
 body[data-workspace="plateau"] .center{grid-template-rows:minmax(0,1fr) var(--timeline-row,minmax(150px,32vh))}
 .panel{position:relative}
@@ -466,3 +466,9 @@ body.show-locked .nh,body.show-locked .port-dot{cursor:not-allowed}
 @media(max-width:760px){.conduite-dialog{width:100vw;height:100vh;border-radius:0}.cd-body{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}.cd-edit{border-left:0;border-top:1px solid var(--line,#30363d);max-height:45vh}}
 
 .cue-standby{font-size:10px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}.cue-standby.end{color:#e0a458}.smallbtn.go{font-weight:700;color:var(--ok,#7fd1a0)}
+
+/* 3.3.22 · outil tracé optionnel */
+.preview-overlay.path-tool-off .point{display:none}
+.preview-overlay.path-tool-off{cursor:default}
+#pathToolBtn.active{background:#d7b86a;color:#111}
+.term-tabs .io-state.live{color:#9be29b}

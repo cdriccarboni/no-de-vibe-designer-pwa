@@ -50,7 +50,7 @@
 <div id="app">
   <header class="topbar">
     <div class="brand"><span class="brandmark" aria-hidden="true"><img src="../icons/nocode-rings.svg" alt=""></span><div><b>No<span class="co">[co]</span>de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v3.3.21</span>
+    <span class="badge">v3.3.22</span>
     <span id="showLockBadge" class="show-lock-badge" role="status" aria-live="polite" hidden>Spectacle verrouillé</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
@@ -74,7 +74,7 @@
 
     <main class="center">
       <div class="upper">
-        <section class="panel patch resizable-both" id="patchPanel">
+        <section class="panel patch" id="patchPanel">
           <div class="panel-head">Patch Canvas <span class="sub" title="Molette : zoom · Clic milieu ou Alt + glisser : déplacer le canevas · Clic : sélectionner">Patch actuel</span>
             <div class="tools">
               <button type="button" id="zoomOut" class="iconbtn" title="Zoom −">−</button>
@@ -90,11 +90,11 @@
         </section>
 
         <section class="panel preview floatable" id="previewPanel" data-float-id="preview" data-dock-axis="float" data-min-w="300">
-          <div class="panel-head">Preview <span class="sub"><span class="live">● Aperçu</span> · clic : placer un point</span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
+          <div class="panel-head">Preview <span class="sub"><span class="live">● Aperçu</span></span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
           <div class="panel-body preview-body">
             <canvas id="previewCanvas" width="1280" height="720"></canvas>
             <div id="previewOverlay" class="preview-overlay"></div>
-            <div class="preview-foot"><span id="previewInfo">1280×720 · 60 fps</span><span class="spacer"></span><button id="magicFxBtn" class="smallbtn">✦ Magic FX</button><button id="clearPoints" class="smallbtn">Effacer les points</button></div>
+            <div class="preview-foot"><span id="previewInfo">1280×720 · 60 fps</span><span class="spacer"></span><button id="magicFxBtn" class="smallbtn">✦ Magic FX</button><button id="pathToolBtn" class="smallbtn" type="button" aria-pressed="false" title="Outil tracé de mouvement : clic dans l’aperçu pour poser des points (désactivé par défaut)">⟡ Tracé</button><button id="clearPoints" class="smallbtn" hidden>Effacer les points</button></div>
           </div>
           <div class="float-resize" title="Redimensionner"></div>
         </section>
@@ -198,7 +198,7 @@
   </section>
 
   <section class="terminal resizable-y">
-    <div class="term-tabs"><span>Console</span><span class="live">● READY</span><span>PATCH</span><span>OUTPUT</span><span>OSC</span><span>MIDI</span><span>DMX</span></div>
+    <div class="term-tabs"><span>Console</span><span class="live">● READY</span><span>PATCH</span><span>OUTPUT</span><span id="ioOsc" class="io-state">OSC · —</span><span id="ioMidi" class="io-state">MIDI · —</span><span id="ioDmx" class="io-state">DMX · —</span></div>
     <div id="termLog" class="term-log"></div>
     <div class="term-input"><input id="termCmd" placeholder="demo · midi connect · bridge connect ws://… · output"><button id="termSend">↵</button></div>
   </section>

@@ -348,7 +348,7 @@ export class Runtime {
     // Timeline overlays (points / legacy cues) — secondary to graph
     const active = this.activeClips();
     const wave = active.some(x => x.kind === "points");
-    (this.project.controls || []).forEach((pt, i) => {
+    if (this.showControls) (this.project.controls || []).forEach((pt, i) => {
       let x = pt.x * w, y = pt.y * h;
       if (wave) {
         y += Math.sin(this.time * 4 + i) * 18;

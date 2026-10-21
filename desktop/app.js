@@ -348,14 +348,14 @@ function renderPnpStatus() {
   btn.title = "Plug & Play · détecter / connecter les périphériques";
 }
 
-async function runPlugAndPlayProbe({ silent=false } = {}) {
+async function runPlugAndPlayProbe({ silent=false, userInitiated=false } = {}) {
   const prefs = readGeneralPrefsNow();
   if (prefs.plugAndPlay === false) {
     renderPnpStatus();
     return null;
   }
   try {
-    const result = await devices.probe({ autoReconnectSerial:true, autoConnectGrantedMidi:true });
+    const result = await devices.probe({ autoReconnectSerial:userInitiated, autoConnectGrantedMidi:true, scanSerial:userInitiated });
     pnpState = result;
     renderPnpStatus();
     if (!silent) {
@@ -399,7 +399,7 @@ $("#pnpBtn")?.addEventListener("click", event => {
 });
 $("#pnpRefresh")?.addEventListener("click", async () => {
   $("#pnpMenu")?.classList.add("hidden");
-  await runPlugAndPlayProbe();
+  await runPlugAndPlayProbe({ userInitiated:true });
 });
 $("#pnpMidi")?.addEventListener("click", async () => {
   $("#pnpMenu")?.classList.add("hidden");
@@ -2746,7 +2746,24 @@ $("#previewOverlay").addEventListener("pointermove", e => {
   const r = e.currentTarget.getBoundingClientRect();
   runtime.setPointer((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
 });
+let pathToolOn = localStorage.getItem("nvd.preview.pathTool") === "1";
+function syncPathTool() {
+  const btn = $("#pathToolBtn");
+  if (btn) { btn.setAttribute("aria-pressed", String(pathToolOn)); btn.classList.toggle("active", pathToolOn); }
+  $("#clearPoints")?.toggleAttribute("hidden", !pathToolOn);
+  $("#previewOverlay")?.classList.toggle("path-tool-off", !pathToolOn);
+  runtime.showControls = pathToolOn;
+  runtime.render?.();
+}
+$("#pathToolBtn")?.addEventListener("click", () => {
+  pathToolOn = !pathToolOn;
+  localStorage.setItem("nvd.preview.pathTool", pathToolOn ? "1" : "0");
+  syncPathTool();
+  log(pathToolOn ? "Tracé de mouvement · activé (clic dans l’aperçu = point)" : "Tracé de mouvement · désactivé");
+});
+syncPathTool();
 $("#previewOverlay").onclick = e => {
+  if (!pathToolOn) return;
   const r = e.currentTarget.getBoundingClientRect();
   addPoint((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
   log("Point image ajouté");
@@ -3293,6 +3310,27 @@ $("#vibeOutDownload")?.addEventListener("click", () => {
   downloadText(lastVibeOut.content, lastVibeOut.fileName, lastVibeOut.mime || "text/plain");
 });
 
+function refreshIoStatus() {
+  const nodes = project?.nodes || [];
+  const has = (types) => nodes.some(n => types.includes(n.type));
+  const set = (id, label, state, title, on) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = `${label} · ${state}`;
+    el.title = title;
+    el.classList.toggle("live", !!on);
+  };
+  const oscUdp = typeof window.nvdDesktop?.sendOscUdp === "function";
+  const oscNodes = has(["osc", "touchdesigner", "millumin", "chataigne", "twozero", "isadorabridge"]);
+  set("ioOsc", "OSC", oscNodes ? (oscUdp ? "UDP" : "bridge") : "—", oscUdp ? "OSC UDP natif disponible (localhost par défaut)" : "OSC via bridge WebSocket seulement", oscNodes && oscUdp);
+  const midiOk = !!devices?.midi?.access;
+  set("ioMidi", "MIDI", midiOk ? `${devices.midi.inputs.length} in / ${devices.midi.outputs.length} out` : "off", midiOk ? "Web MIDI connecté" : "MIDI non connecté · P&P ou console « midi connect »", midiOk);
+  const artnet = typeof window.nvdDesktop?.sendArtNetUdp === "function";
+  const dmxNodes = has(["dmx"]);
+  set("ioDmx", "DMX", dmxNodes ? (artnet ? "Art-Net" : "bridge") : "—", artnet ? "Art-Net UDP natif disponible" : "DMX via bridge seulement", dmxNodes && artnet);
+}
+setInterval(() => { try { refreshIoStatus(); } catch { /* barre d'état best effort */ } }, 1000);
+
 function currentShowDiagnostic() {
   const experimental = (project.nodes || []).filter(n => !isExecutable(n.type)).map(n => n.type);
   return buildDiagnosticSnapshot({
@@ -3570,6 +3608,13 @@ async function proposeVibe(rawText, { logPrefix = "Vibe", image = null } = {}) {
   if (result.aiUnavailable) log(`${logPrefix} · ${result.note}`);
   else log(`${logPrefix} · ${result.note || result.engine}`);
   const preview = showVibePreview(result, logPrefix);
+  if (result.coverage?.status === "unchanged" && result.coverage?.recipe) {
+    // 3.3.22 · « déjà présent » : on montre où sont les nodes au lieu de ne rien afficher.
+    graphPath = [];
+    redraw();
+    const existing = (project.nodes || []).filter(n => n.params?.vibeRecipe === result.coverage.recipe);
+    requestAnimationFrame(() => fitPatchView(existing));
+  }
   if (!preview?.ops?.length) return result;
   if (!$("#vibePreview")) await confirmPendingVibe();
   return result;
@@ -3616,6 +3661,8 @@ async function confirmPendingVibe() {
   $("#vibePreview")?.classList.add("hidden");
   graphPath = [];
   redraw();
+  const addedIds = new Set(applied.filter(a => a.op === "addNode" && !a.skipped && a.id).map(a => a.id));
+  if (addedIds.size) requestAnimationFrame(() => fitPatchView(project.nodes.filter(n => addedIds.has(n.id))));
   runtime.play();
   syncPlayButton();
   autosave();
@@ -3951,7 +3998,7 @@ async function openOutput(destination = "main-output") {
   }, 250);
   log("OUTPUT ouvert");
 }
-$("#outputBtn").onclick = openOutput;
+$("#outputBtn").onclick = () => openOutput("main-output");
 
 function setWorkspaceMode(mode) {
   document.body.dataset.workspace = mode;
@@ -4266,7 +4313,7 @@ function restoreWorkspaceLayout() {
   const targets = {
     library: $(".library"),
     inspector: $(".inspector"),
-    patch: $("#patchPanel"),
+    // patch retiré en 3.3.22 : sa taille suit la grille (plus de resize CSS couplé au Preview)
     terminal: $(".terminal")
   };
   for (const [key, el] of Object.entries(targets)) {
@@ -4364,6 +4411,21 @@ $("#zoomIn").onclick = () => setZoom(view.scale + 0.1);
 $("#zoomOut").onclick = () => setZoom(view.scale - 0.1);
 if ($("#wrapBtn")) $("#wrapBtn").onclick = () => wrapSelection();
 $("#zoomReset").onclick = () => { view.x = 0; view.y = 0; setZoom(1, { x: 0, y: 0 }); };
+
+// 3.3.22 · cadrer des nodes (ex. après une application Vibe) pour qu'ils soient visibles.
+function fitPatchView(nodes = activeGraph().nodes || []) {
+  const list = (nodes || []).filter(n => Number.isFinite(n?.x) && Number.isFinite(n?.y));
+  const space = $("#patchSpace");
+  if (!list.length || !space) return;
+  const minX = Math.min(...list.map(n => n.x)), minY = Math.min(...list.map(n => n.y));
+  const maxX = Math.max(...list.map(n => n.x + 190)), maxY = Math.max(...list.map(n => n.y + 120));
+  const pad = 24;
+  const scale = Math.max(0.4, Math.min(1, (space.clientWidth - pad * 2) / Math.max(1, maxX - minX), (space.clientHeight - pad * 2) / Math.max(1, maxY - minY)));
+  view.scale = scale;
+  view.x = pad - minX * scale;
+  view.y = pad - minY * scale;
+  setZoom(scale);
+}
 $("#patchSpace").addEventListener("wheel", e => {
   e.preventDefault();
   const delta = e.deltaY < 0 ? 0.08 : -0.08;
