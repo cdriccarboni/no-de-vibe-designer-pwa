@@ -31,7 +31,6 @@ main{width:min(980px,94vw);padding:30px;border:1px solid #2a3036;border-radius:2
   <p id="status" class="status">Choix automatique de l’interface…</p>
   <div class="grid">
     <a class="card" href="./desktop/index.html?surface=designer" data-surface="designer"><b>Designer</b><span>Canvas, Library, Inspector, Timeline, Preview et Vibe complets.</span></a>
-    <a class="card" href="./show/index.html?surface=show" data-surface="show"><b>Show</b><span>Ouvrir un projet, lancer, pause, cues, timeline et courbes.</span></a>
     <a class="card" href="./mobile/index.html?surface=mobile" data-surface="mobile"><b>Mobile</b><span>Interface compacte, capteurs, patch et conduite.</span></a>
     <a class="card" href="./studio/index.html?surface=regie" data-surface="regie"><b>Régie</b><span>Companion Studio · pages Son, Lumière, Vidéo, Plateau.</span></a>
     <a class="card" href="./companion/index.html?surface=camera" data-surface="camera"><b>Caméra</b><span>Remote Camera WebRTC · n’importe quel appareil avec caméra.</span></a>
@@ -55,7 +54,7 @@ let preferred="";
 try{preferred=localStorage.getItem(KEY)||""}catch{}
 if(!valid.includes(preferred))preferred="";
 let surface=valid.includes(forced)?forced:preferred||(mobileDevice?"mobile":"designer");
-const routes={designer:"./desktop/index.html?surface=designer",show:"./show/index.html?surface=show",mobile:"./mobile/index.html?surface=mobile",regie:"./studio/index.html?surface=regie",plateau:"./studio/index.html?surface=plateau",camera:"./companion/index.html?surface=camera"};
+const routes={designer:"./desktop/index.html?surface=designer",mobile:"./mobile/index.html?surface=mobile",regie:"./studio/index.html?surface=regie",plateau:"./studio/index.html?surface=plateau",camera:"./companion/index.html?surface=camera"};
 document.querySelector("#status").textContent=preferred&&!forced?`Préférence mémorisée · ${surface}`:`Interface proposée · ${surface}`;
 function openInternalRoute(target,{replace=false}={}){
   const url=new URL(target,location.href);

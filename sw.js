@@ -3,7 +3,7 @@
  * Le build injecte le nom de cache et la liste des fichiers.
  * Une mise à jour reste en attente tant que la page n'envoie pas SKIP_WAITING.
  */
-const CACHE = "nvd-3.3.20-multi-go-mdns-20261017";
+const CACHE = "nvd-3.3.23-multi-ai-providers-20261021b";
 const ASSETS = [
   "./companion/companion.css",
   "./companion/companion.js",
@@ -68,7 +68,8 @@ const ASSETS = [
   "./shared/composition.js",
   "./shared/connection-states.js",
   "./shared/creator-session.js",
-  "./shared/cx-source.js",
+  "./shared/runnable-source.js",
+  "./shared/ai-providers/index.js",
   "./shared/demos.js",
   "./shared/device-manager.js",
   "./shared/diagnostic.js",

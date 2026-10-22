@@ -1,5 +1,5 @@
 import { isExecutable, portLabels, portMeta, typesCompatible } from "./ports.js";
-import { mergeRunnableSources } from "./cx-source.js";
+import { mergeRunnableSources } from "./runnable-source.js";
 import { planFromRecipe } from "./vibe-recipes.js";
 
 export function normalizeVibeText(text) {
@@ -243,6 +243,201 @@ function livingShadowScenePlan(rawText, t) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Formes simples × comportements × sources (prompts courts FR/EN).
+// Uniquement des nodes exécutables existants : `sdf` dessine un cercle, `ripple`
+// des ondes (vague). Aucun node du catalogue ne dessine un carré, une ligne ou une
+// étoile : ces formes échouent clairement au lieu d'être remplacées en silence.
+// ---------------------------------------------------------------------------
+export const VIBE_PROMPT_EXAMPLES = Object.freeze([
+  "un cercle qui pulse sur le son",
+  "un cercle qui pulse avec le micro",
+  "cercle audio réactif",
+  "a circle pulsing to the audio",
+  "un cercle qui tourne avec le MIDI",
+  "une vague qui change de couleur avec la caméra",
+  "a wave that grows with the mic"
+]);
+
+const SHAPE_WORDS = [
+  ["circle", /\b(cercles?|ronds?|circles?)\b/],
+  ["square", /\b(carres?|squares?)\b/],
+  ["line", /\b(lignes?|lines?)\b/],
+  ["star", /\b(etoiles?|stars?)\b/],
+  ["wave", /\b(vagues?|waves?|ondes?)\b/]
+];
+const BEHAVIOR_WORDS = [
+  ["pulse", /\b(puls\w*|battements?|beats?)\b/],
+  ["rotate", /\b(tourn\w*|rotat\w*|spin\w*|pivot\w*)\b/],
+  ["grow", /\b(grossi\w*|grandi\w*|agrandi\w*|gonfl\w*|grow\w*|bigger)\b/],
+  ["color", /\b(couleurs?|colou?rs?|teintes?|hue)\b/]
+];
+const SOURCE_WORDS = [
+  ["mic", /\b(micro|microphone|mics?)\b/],
+  ["audio", /\b(son|sons|sonore|audio|musique|music|sound)\b/],
+  ["midi", /\bmidi\b/],
+  ["camera", /\b(camera|webcam)\b/]
+];
+const SHAPE_LABELS = { circle:"cercle", square:"carré", line:"ligne", star:"étoile", wave:"vague" };
+const BEHAVIOR_LABELS = { pulse:"pulse", rotate:"tourne", grow:"grossit", color:"change de couleur" };
+const SOURCE_LABELS = { mic:"micro", audio:"son", midi:"MIDI", camera:"caméra", lfo:"LFO (aucune source citée)" };
+// Formes réellement dessinées par un node exécutable du catalogue.
+const SHAPE_NODES = {
+  circle:{ type:"sdf", title:"Cercle (SDF)", params:{ x:.5, y:.5, radius:.24 }, out:3, size:2 },
+  wave:{ type:"ripple", title:"Vague (Ondes)", params:{ rings:12 }, out:3, size:2 }
+};
+
+function matchWords(t, list) {
+  return list
+    .map(([id, re]) => { const m = re.exec(t); return m ? { id, idx:m.index } : null; })
+    .filter(Boolean)
+    .sort((a, b) => a.idx - b.idx);
+}
+
+function shapeIntentPlan(t, project) {
+  const shapes = matchWords(t, SHAPE_WORDS);
+  if (!shapes.length) return null;
+  const behaviors = matchWords(t, BEHAVIOR_WORDS);
+  const sources = matchWords(t, SOURCE_WORDS);
+  const reactive = /\breacti\w*/.test(t);
+  if (!behaviors.length && !sources.length && !reactive) return null;
+
+  const shape = shapes[0].id;
+  const behavior = behaviors[0]?.id || "pulse";
+  const source = sources[0]?.id || "lfo";
+  const shapeNode = SHAPE_NODES[shape];
+  const examples = VIBE_PROMPT_EXAMPLES.slice(0, 4);
+
+  if (!shapeNode) {
+    const label = SHAPE_LABELS[shape];
+    return {
+      engine:"local-planner",
+      ops:[],
+      note:`Planner local : forme « ${label} » non réalisable avec les nodes existants. Aucun node inventé.`,
+      coverage:{
+        status:"none",
+        recipe:null,
+        label:"Combinaison non réalisable",
+        fulfilled:[],
+        missing:[{
+          need:`Forme « ${label} »`,
+          reason:`Aucun node exécutable du catalogue ne dessine un${shape === "square" ? "" : "e"} ${label} ; aucun node n'est inventé ni substitué.`,
+          alternative:`Formes disponibles : cercle (SDF) et vague (Ondes). Exemples : ${examples.map(x => `« ${x} »`).join(", ")}.`
+        }],
+        notes:[],
+        examples
+      },
+      diagnostics:{ shape, behavior, source, unsupported:"shape", notes:[] }
+    };
+  }
+
+  const recipeId = `shape-${shape}-${behavior}-${source}`;
+  const label = `${SHAPE_LABELS[shape]} qui ${BEHAVIOR_LABELS[behavior]} · ${SOURCE_LABELS[source]}`;
+  const already = (project?.nodes || []).filter(n => n?.params?.vibeRecipe === recipeId);
+  if (already.length) {
+    return {
+      engine:"local-planner",
+      ops:[],
+      note:`Forme « ${label} » déjà présente · aucune duplication`,
+      coverage:{
+        status:"unchanged", recipe:recipeId, label,
+        fulfilled:[`« ${label} » est déjà présent (${already.length} nœud(s)) : rien n'a été dupliqué.`],
+        missing:[], notes:["Pour recommencer, supprimez ces nœuds ou modifiez-les directement dans le graphe."]
+      },
+      diagnostics:{ recipe:recipeId, shape, behavior, source, notes:[] }
+    };
+  }
+
+  const ops = [];
+  const notes = [];
+  const add = (type, x, y, extra = {}) => ops.push({ op:"addNode", type, x, y, allowDuplicate:true, ...extra, params:{ ...(extra.params || {}), vibeRecipe:recipeId } });
+  const link = (fromType, fromPort, toType, toPort) => ops.push({ op:"connect", fromType, fromPort, toType, toPort });
+
+  // 1. Source → signal numérique.
+  let signal;
+  if (source === "mic" || source === "audio") {
+    add("audio-in", 60, 120, { title:source === "mic" ? "Micro (désarmé)" : "Entrée son (désarmée)", params:{ enabled:false } });
+    signal = ["audio-in", 1];
+    notes.push("L'entrée audio est ajoutée DÉSARMÉE : activez « enabled » dans l'inspecteur (autorisation navigateur requise).");
+  } else if (source === "midi") {
+    add("midi", 60, 120, { title:"MIDI (CC)" });
+    signal = ["midi", 1];
+    notes.push("Le CC MIDI pilote le comportement ; brancher un contrôleur Web MIDI.");
+  } else if (source === "camera") {
+    add("camera", 60, 120, { title:"Caméra" });
+    add("opticalflow", 280, 120, { title:"Mouvement caméra" });
+    link("camera", 0, "opticalflow", 0);
+    signal = ["opticalflow", 1];
+    notes.push("La caméra n'est pas démarrée automatiquement : l'autorisation du navigateur reste à votre main.");
+  } else {
+    add("automation", 60, 120, { title:"LFO", params:{ speed:.5, shape:behavior === "rotate" ? "saw" : "sine" } });
+    signal = ["automation", 2];
+    notes.push("Aucune source citée (son, micro, MIDI, caméra) : un LFO local anime la forme.");
+  }
+
+  // 2. Lissage (sauf LFO, déjà continu) puis mise à l'échelle vers le paramètre visé.
+  if (source !== "lfo") {
+    add("smooth", 500, 120, { title:"Lissage", params:{ amount:behavior === "pulse" ? .45 : .2 } });
+    link(signal[0], signal[1], "smooth", 0);
+    signal = ["smooth", 1];
+  }
+  const inMax = source === "mic" || source === "audio" ? .35 : source === "camera" ? .25 : 1;
+  const ranges = {
+    pulse: shape === "circle" ? [.12, .45] : [.2, 1],
+    grow: [.6, 1.8],
+    rotate: [0, Math.round(Math.PI * 2 * 1000) / 1000],
+    color: [0, 1]
+  };
+  const [outMin, outMax] = ranges[behavior];
+  add("inputmapper", 720, 120, { title:`Échelle · ${BEHAVIOR_LABELS[behavior]}`, params:{ inMin:0, inMax, outMin, outMax } });
+  link(signal[0], signal[1], "inputmapper", 0);
+
+  // 3. Forme + effet éventuel + sortie.
+  add(shapeNode.type, 500, 320, {
+    title:shapeNode.title,
+    params:{ ...shapeNode.params, ...(behavior === "rotate" && shape === "circle" ? { x:.66 } : {}) }
+  });
+  let visual = [shapeNode.type, shapeNode.out];
+  if (behavior === "pulse") {
+    link("inputmapper", 3, shapeNode.type, shapeNode.size);
+  } else if (behavior === "grow" || behavior === "rotate") {
+    add("transform", 760, 320, { title:behavior === "grow" ? "Grossit (Transform)" : "Rotation (Transform)" });
+    link(visual[0], visual[1], "transform", 0);
+    link("inputmapper", 3, "transform", behavior === "grow" ? 1 : 2);
+    visual = ["transform", 3];
+    if (behavior === "rotate" && shape === "circle") notes.push("Un cercle centré serait invisible en rotation : il est décalé et tourne autour du centre.");
+  } else {
+    add("transmute", 760, 320, { title:"Change de couleur (Transmute)" });
+    link(visual[0], visual[1], "transmute", 0);
+    link("inputmapper", 3, "transmute", 1);
+    visual = ["transmute", 2];
+  }
+  add("stage-output", 1020, 320, { title:`Sortie · ${SHAPE_LABELS[shape]}` });
+  link(visual[0], visual[1], "stage-output", 0);
+
+  if (behaviors.length > 1) notes.push(`Un seul comportement est appliqué (« ${BEHAVIOR_LABELS[behavior]} ») ; les autres sont ignorés.`);
+  if (sources.length > 1) notes.push(`Une seule source est utilisée (« ${SOURCE_LABELS[source]} »).`);
+
+  return {
+    engine:"local-planner",
+    ops,
+    note:`Forme « ${label} » · patch complet`,
+    coverage:{
+      status:"complete",
+      recipe:recipeId,
+      label:`Forme · ${label}`,
+      fulfilled:[
+        `${SHAPE_LABELS[shape]} dessiné par le node ${shapeNode.type}`,
+        `${BEHAVIOR_LABELS[behavior]} piloté par ${SOURCE_LABELS[source]}`,
+        "sortie vidéo"
+      ],
+      missing:[],
+      notes
+    },
+    diagnostics:{ recipe:recipeId, shape, behavior, source, notes }
+  };
+}
+
 export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
   const t = normalizeVibeText(text);
   const scenePlan = livingShadowScenePlan(text, t);
@@ -258,6 +453,9 @@ export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
       diagnostics:{ recipe:recipePlan.coverage.recipe, notes:recipePlan.coverage.notes }
     };
   }
+  // Prompts courts « forme + comportement + source » (« un cercle qui pulse sur le son »).
+  const shapePlan = shapeIntentPlan(t, project);
+  if (shapePlan) return shapePlan;
   const ops = [];
   const notes = [];
   const existing = new Set((project.nodes || []).map(n => n.type));
@@ -428,10 +626,10 @@ export function deterministicVibePlan(text, project = { nodes:[], edges:[] }) {
         alternative:"Préciser le prompt (source → traitement → sortie) ou utiliser l'IA locale."
       }],
       notes:[]
-    } : { status:"none", recipe:null, label:"Aucune intention reconnue", fulfilled:[], missing:[{ need:"Intention non reconnue", reason:"Aucun nœud exécutable ne correspond au prompt.", alternative:"Reformuler en citant des sources, effets ou sorties du catalogue." }], notes:[] },
+    } : { status:"none", recipe:null, label:"Aucune intention reconnue", fulfilled:[], missing:[{ need:"Intention non reconnue", reason:"Aucun nœud exécutable ne correspond au prompt.", alternative:`Reformuler en citant des sources, effets ou sorties du catalogue. Exemples qui marchent : ${VIBE_PROMPT_EXAMPLES.map(x => `« ${x} »`).join(", ")}.` }], notes:[], examples:[...VIBE_PROMPT_EXAMPLES] },
     ops:opsOut,
     note:[
-      merged.ops.length ? "Planner local déterministe · intentions + câblage typé." : "Planner local : aucune intention reconnue.",
+      merged.ops.length ? "Planner local déterministe · intentions + câblage typé." : `Planner local : aucune intention reconnue. Exemples : ${VIBE_PROMPT_EXAMPLES.slice(0, 3).map(x => `« ${x} »`).join(", ")}.`,
       merged.summary
     ].filter(Boolean).join(" · "),
     diagnostics:{ requested:requested.map(x => x.type), notes, engines:merged.engines, unavailable:merged.unavailable }

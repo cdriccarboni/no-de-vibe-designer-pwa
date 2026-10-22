@@ -11,10 +11,10 @@ export const WAVE_PARAMS = Object.freeze({
 
 const BLOCKED = ["faust", "rust", "touchdesigner", "cpp", "webgpu", "wgsl"];
 
-export function nativeBridgeLabel(health) {
+export function nativeFeatureLabel(health) {
   return health?.ok && health.commit
-    ? `CX ${health.commit}`
-    : "Pont local arrêté : fonctions natives indisponibles";
+    ? `Service local ${health.commit}`
+    : "Fonctions natives indisponibles";
 }
 
 export function activeAgents(doc, probes = {}) {

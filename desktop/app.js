@@ -5,11 +5,12 @@ import { DESTINATIONS, ROUTE_MODES, ensureRouting, effectiveRoute } from "../sha
 import { DeviceManager } from "../shared/device-manager.js";
 import { portDirection, portLabels, portDataType, isExecutable } from "../shared/ports.js";
 import { validateEdge } from "../shared/graph-engine.js";
-import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, assertAiProviderAllowed, probeLocalAi } from "../shared/vibe.js";
+import { runVibe, applyVibeOps, readAiConfig, saveAiConfig, probeLocalAi } from "../shared/vibe.js";
 import { createCreatorSession } from "../shared/creator-session.js";
 import { instantiateElement, listElements, saveElement } from "../shared/show-elements.js";
 import { installScenicPack, scenicPackElements } from "../shared/scenic/scenic-adapter.js";
-import { cxChatReply } from "../shared/cx-source.js";
+import { chatPanelReply } from "../shared/runnable-source.js";
+import { AI_TASKS, listOpenAiModels, normalizeProviderSettings, providerIsPwaSafe, providerList } from "../shared/ai-providers/index.js";
 import { directOllamaProbe } from "../shared/local-ai-core.js";
 import { assessLocalModels, classifyLocalAiFailure, factsFromLocalAiError } from "../shared/local-ai-diagnostic.js";
 import { renderBackendReport } from "../shared/backend-registry.js";
@@ -24,7 +25,7 @@ import { planManualSave, planManualOpen, saveStatusMessage, announceManualSave, 
 import { nestedBoxSelfTest } from "../shared/self-test.js";
 import { connectRemote } from "../shared/remote-client.js";
 import { REMOTE_PORT } from "../shared/remote-protocol.js";
-import { applyCue, listCues, nextCue, previousCue, dispatchPanicEffects, formatPanicResult } from "../shared/stage/cues.js";
+import { applyCue, listCues, nextCue, previousCue, setCuePlayhead, dispatchPanicEffects, formatPanicResult } from "../shared/stage/cues.js";
 import { mountConduitePanel } from "../shared/stage/conduite-panel.js";
 import { createGoController } from "../shared/stage/go-controller.js";
 import { exportMax, exportTouchDesigner, exportPureData, exportMilluminOscMap } from "../shared/exporters.js";
@@ -348,14 +349,14 @@ function renderPnpStatus() {
   btn.title = "Plug & Play · détecter / connecter les périphériques";
 }
 
-async function runPlugAndPlayProbe({ silent=false } = {}) {
+async function runPlugAndPlayProbe({ silent=false, userInitiated=false } = {}) {
   const prefs = readGeneralPrefsNow();
   if (prefs.plugAndPlay === false) {
     renderPnpStatus();
     return null;
   }
   try {
-    const result = await devices.probe({ autoReconnectSerial:true, autoConnectGrantedMidi:true });
+    const result = await devices.probe({ autoReconnectSerial:userInitiated, autoConnectGrantedMidi:true, scanSerial:userInitiated });
     pnpState = result;
     renderPnpStatus();
     if (!silent) {
@@ -399,7 +400,7 @@ $("#pnpBtn")?.addEventListener("click", event => {
 });
 $("#pnpRefresh")?.addEventListener("click", async () => {
   $("#pnpMenu")?.classList.add("hidden");
-  await runPlugAndPlayProbe();
+  await runPlugAndPlayProbe({ userInitiated:true });
 });
 $("#pnpMidi")?.addEventListener("click", async () => {
   $("#pnpMenu")?.classList.add("hidden");
@@ -2312,12 +2313,15 @@ function saveSelectedElement() {
 }
 
 function addElementTop(elementId) {
+  const wasAtEnd = !goController.standingBy();
   const clip = placeElementInTimeline(elementId);
   if (!clip) return null;
   const cueTrack = Math.max(0, (project.layers || []).findIndex(layer => layer.type === "cue"));
   const cue = addClip(cueTrack, clip.start, 0.1, `TOP · ${clip.label}`, "cue", {
     actions:[{ type:"element-instance", elementId:clip.elementId, instanceId:clip.id }]
   });
+  if (wasAtEnd) setCuePlayhead(project, cue.id);
+  updateStandbyLabel();
   autosave();
   log(`TOP · ${clip.label} prêt`);
   return cue;
@@ -2552,9 +2556,13 @@ function placeScenicInCanvas(elementId) {
   else if (cat.includes("créature") || cat.includes("creature") || cat.includes("lumière")) nodeType = "whale";
   else if (cat.includes("shader") || cat.includes("effet")) nodeType = "shader";
   else if (el.snapshot?.source === "local-file") {
-    nodeType = el.snapshot.mimeType?.startsWith("video/") ? "videofile" : el.snapshot.mimeType?.startsWith("audio/") ? "audio" : "image";
+    nodeType = el.snapshot.mimeType?.startsWith("video/") ? "videofile" : el.snapshot.mimeType?.startsWith("audio/") ? "audio" : null;
   }
 
+  if (!nodeType) {
+    log(`Canvas · Image « ${el.name} » conservée dans la Timeline · aucun node sans moteur ajouté`);
+    return null;
+  }
   const n = addNode(nodeType);
   if (n) {
     n.title = el.name;
@@ -2606,8 +2614,8 @@ function handleDroppedMediaFiles(files, targetTrack = selectedElementTrack(), cl
 
     const duration = isVideo ? 12 : isAudio ? 10 : 8;
 
-    const nodeType = isVideo ? "videofile" : isAudio ? "audio" : isImage ? "image" : "videofile";
-    const n = addNode(nodeType);
+    const nodeType = isVideo ? "videofile" : isAudio ? "audio" : null;
+    const n = nodeType ? addNode(nodeType) : null;
     if (n) {
       n.title = file.name;
       n.params.src = objectUrl;
@@ -2633,7 +2641,7 @@ function handleDroppedMediaFiles(files, targetTrack = selectedElementTrack(), cl
       }
     });
 
-    addClip(track, start, duration, file.name, isVideo ? "video" : "effect", {
+    addClip(track, start, duration, file.name, mediaType === "media" ? "effect" : mediaType, {
       elementId: element.id,
       nodeId: n?.id,
       mediaUrl: objectUrl,
@@ -2746,7 +2754,24 @@ $("#previewOverlay").addEventListener("pointermove", e => {
   const r = e.currentTarget.getBoundingClientRect();
   runtime.setPointer((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
 });
+let pathToolOn = localStorage.getItem("nvd.preview.pathTool") === "1";
+function syncPathTool() {
+  const btn = $("#pathToolBtn");
+  if (btn) { btn.setAttribute("aria-pressed", String(pathToolOn)); btn.classList.toggle("active", pathToolOn); }
+  $("#clearPoints")?.toggleAttribute("hidden", !pathToolOn);
+  $("#previewOverlay")?.classList.toggle("path-tool-off", !pathToolOn);
+  runtime.showControls = pathToolOn;
+  runtime.render?.();
+}
+$("#pathToolBtn")?.addEventListener("click", () => {
+  pathToolOn = !pathToolOn;
+  localStorage.setItem("nvd.preview.pathTool", pathToolOn ? "1" : "0");
+  syncPathTool();
+  log(pathToolOn ? "Tracé de mouvement · activé (clic dans l’aperçu = point)" : "Tracé de mouvement · désactivé");
+});
+syncPathTool();
 $("#previewOverlay").onclick = e => {
+  if (!pathToolOn) return;
   const r = e.currentTarget.getBoundingClientRect();
   addPoint((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
   log("Point image ajouté");
@@ -3293,6 +3318,27 @@ $("#vibeOutDownload")?.addEventListener("click", () => {
   downloadText(lastVibeOut.content, lastVibeOut.fileName, lastVibeOut.mime || "text/plain");
 });
 
+function refreshIoStatus() {
+  const nodes = project?.nodes || [];
+  const has = (types) => nodes.some(n => types.includes(n.type));
+  const set = (id, label, state, title, on) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = `${label} · ${state}`;
+    el.title = title;
+    el.classList.toggle("live", !!on);
+  };
+  const oscUdp = typeof window.nvdDesktop?.sendOscUdp === "function";
+  const oscNodes = has(["osc", "touchdesigner", "millumin", "chataigne", "twozero", "isadorabridge"]);
+  set("ioOsc", "OSC", oscNodes ? (oscUdp ? "UDP" : "bridge") : "—", oscUdp ? "OSC UDP natif disponible (localhost par défaut)" : "OSC via bridge WebSocket seulement", oscNodes && oscUdp);
+  const midiOk = !!devices?.midi?.access;
+  set("ioMidi", "MIDI", midiOk ? `${devices.midi.inputs.length} in / ${devices.midi.outputs.length} out` : "off", midiOk ? "Web MIDI connecté" : "MIDI non connecté · P&P ou console « midi connect »", midiOk);
+  const artnet = typeof window.nvdDesktop?.sendArtNetUdp === "function";
+  const dmxNodes = has(["dmx"]);
+  set("ioDmx", "DMX", dmxNodes ? (artnet ? "Art-Net" : "bridge") : "—", artnet ? "Art-Net UDP natif disponible" : "DMX via bridge seulement", dmxNodes && artnet);
+}
+setInterval(() => { try { refreshIoStatus(); } catch { /* barre d'état best effort */ } }, 1000);
+
 function currentShowDiagnostic() {
   const experimental = (project.nodes || []).filter(n => !isExecutable(n.type)).map(n => n.type);
   return buildDiagnosticSnapshot({
@@ -3547,7 +3593,7 @@ function cancelPendingVibe(logPrefix = "Vibe") {
   log(`${logPrefix} · aperçu annulé (aucune modification)`);
 }
 
-async function proposeVibe(rawText, { logPrefix = "Vibe", image = null } = {}) {
+async function proposeVibe(rawText, { logPrefix = "Vibe", image = null, task = "patch" } = {}) {
   const text = String(rawText || "").trim();
   if (!text && !image?.analysis) {
     log(`${logPrefix} · texte ou image requis`);
@@ -3556,7 +3602,7 @@ async function proposeVibe(rawText, { logPrefix = "Vibe", image = null } = {}) {
   log(image?.analysis ? `${logPrefix} · analyse + génération…` : `${logPrefix} · analyse…`);
   const target = image?.target || "auto";
   const promptText = image?.analysis ? imageVibePrompt(text, image.analysis, target) : text;
-  let result = await runVibe(promptText, project);
+  let result = await runVibe(promptText, project, { task });
   if (image?.analysis) {
     const seedOps = imageVibeOps(image.analysis, target, text);
     result = {
@@ -3570,6 +3616,13 @@ async function proposeVibe(rawText, { logPrefix = "Vibe", image = null } = {}) {
   if (result.aiUnavailable) log(`${logPrefix} · ${result.note}`);
   else log(`${logPrefix} · ${result.note || result.engine}`);
   const preview = showVibePreview(result, logPrefix);
+  if (result.coverage?.status === "unchanged" && result.coverage?.recipe) {
+    // 3.3.22 · « déjà présent » : on montre où sont les nodes au lieu de ne rien afficher.
+    graphPath = [];
+    redraw();
+    const existing = (project.nodes || []).filter(n => n.params?.vibeRecipe === result.coverage.recipe);
+    requestAnimationFrame(() => fitPatchView(existing));
+  }
   if (!preview?.ops?.length) return result;
   if (!$("#vibePreview")) await confirmPendingVibe();
   return result;
@@ -3616,6 +3669,8 @@ async function confirmPendingVibe() {
   $("#vibePreview")?.classList.add("hidden");
   graphPath = [];
   redraw();
+  const addedIds = new Set(applied.filter(a => a.op === "addNode" && !a.skipped && a.id).map(a => a.id));
+  if (addedIds.size) requestAnimationFrame(() => fitPatchView(project.nodes.filter(n => addedIds.has(n.id))));
   runtime.play();
   syncPlayButton();
   autosave();
@@ -3713,15 +3768,15 @@ $("#vibeText").addEventListener("keydown", e => {
 
 function showRightPane(id) {
   const inspector = $("#inspectorBody");
-  const chat = $("#cxChatPane");
+  const chat = $("#aiChatPane");
   const elements = $("#elementsPane");
   if (!inspector || !chat || !elements) return;
   inspector.classList.toggle("pane-hidden", id !== "inspector");
   inspector.hidden = id !== "inspector";
   elements.classList.toggle("pane-hidden", id !== "elements");
   elements.hidden = id !== "elements";
-  chat.classList.toggle("pane-hidden", id !== "cx");
-  chat.hidden = id !== "cx";
+  chat.classList.toggle("pane-hidden", id !== "chat-ia");
+  chat.hidden = id !== "chat-ia";
   if (id === "elements") renderElementsPane();
   qall("[data-right-pane]").forEach(btn => {
     const on = btn.dataset.rightPane === id;
@@ -3733,26 +3788,34 @@ qall("[data-right-pane]").forEach(btn => btn.addEventListener("click", () => sho
 const urlPane = new URLSearchParams(location.search).get("pane");
 if (urlPane) showRightPane(urlPane);
 
-function appendCxMessage(role, text) {
-  const logEl = $("#cxChatLog");
+function openExternalUrl(url) {
+  if (typeof window.nvdDesktop?.openExternal === "function") {
+    return window.nvdDesktop.openExternal(url).catch(error => log(`Téléchargement · ${error?.message || error}`));
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+  return Promise.resolve();
+}
+
+function appendAiChatMessage(role, text) {
+  const logEl = $("#aiChatLog");
   if (!logEl) return null;
   const row = document.createElement("div");
-  row.className = `cx-msg ${role}`;
+  row.className = `ai-chat-msg ${role}`;
   row.textContent = text;
   logEl.append(row);
   logEl.scrollTop = logEl.scrollHeight;
   return row;
 }
 
-function appendCxDownloadActions(proposals = []) {
-  const logEl = $("#cxChatLog");
+function appendAiChatDownloadActions(proposals = []) {
+  const logEl = $("#aiChatLog");
   if (!logEl) return null;
   const links = proposals
     .filter(item => item?.downloadUrl && /^https?:\/\//i.test(item.downloadUrl))
     .map(item => ({ title: String(item.title || "moteur"), url: String(item.downloadUrl) }));
   if (!links.length) return null;
   const row = document.createElement("div");
-  row.className = "cx-msg assistant";
+  row.className = "ai-chat-msg assistant";
   for (const { title, url } of links) {
     const button = document.createElement("button");
     button.type = "button";
@@ -3761,7 +3824,7 @@ function appendCxDownloadActions(proposals = []) {
     button.title = `Ouvrir le téléchargement officiel de ${title}`;
     button.onclick = () => {
       if (typeof window.nvdDesktop?.openExternal === "function") {
-        window.nvdDesktop.openExternal(url).catch(error => appendCxMessage("assistant", `Téléchargement · ${error?.message || error}`));
+        window.nvdDesktop.openExternal(url).catch(error => appendAiChatMessage("assistant", `Téléchargement · ${error?.message || error}`));
       } else {
         window.open(url, "_blank", "noopener,noreferrer");
       }
@@ -3773,19 +3836,19 @@ function appendCxDownloadActions(proposals = []) {
   return row;
 }
 
-let cxHostProbePromise = null;
-function probeCxInstalledHosts() {
+let chatHostProbePromise = null;
+function probeChatInstalledHosts() {
   if (agentRegistryDoc) return Promise.resolve(agentRegistryDoc);
   if (typeof globalThis.nvdDesktop?.agentRegistry !== "function") return Promise.resolve(null);
-  if (!cxHostProbePromise) {
-    cxHostProbePromise = globalThis.nvdDesktop.agentRegistry()
+  if (!chatHostProbePromise) {
+    chatHostProbePromise = globalThis.nvdDesktop.agentRegistry()
       .then(doc => { agentRegistryDoc = doc; return doc; })
       .catch(() => null);
   }
-  return cxHostProbePromise;
+  return chatHostProbePromise;
 }
 
-function filterInstalledCxProposals(proposals = [], registry = null) {
+function filterInstalledChatProposals(proposals = [], registry = null) {
   const rows = new Map((registry?.rows || []).map(row => [row.id, row]));
   return proposals.filter(item => {
     const row = rows.get(item?.id);
@@ -3798,53 +3861,69 @@ function filterInstalledCxProposals(proposals = [], registry = null) {
   });
 }
 
-async function sendCxChat() {
-  const input = $("#cxChatInput");
+function appendOllamaInstallAction() {
+  const logEl = $("#aiChatLog");
+  if (!logEl || logEl.querySelector("[data-install-ollama]")) return;
+  const row = document.createElement("div");
+  row.className = "ai-chat-msg assistant";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "smallbtn";
+  button.dataset.installOllama = "true";
+  button.textContent = "Installer Ollama (gratuit)";
+  button.onclick = () => openExternalUrl("https://ollama.com/download");
+  row.append(button);
+  logEl.append(row);
+}
+
+async function sendAiChat() {
+  const input = $("#aiChatInput");
   const text = input?.value.trim() || "";
   if (!text) return;
-  appendCxMessage("user", text);
+  appendAiChatMessage("user", text);
   creatorSession.saveDraft(text);
   if ($("#vibeText")) $("#vibeText").value = text;
   if (input) input.value = "";
-  const send = $("#cxChatSend");
+  const send = $("#aiChatSend");
   if (send) send.disabled = true;
-  const status = appendCxMessage("status", "Génération…");
+  const status = appendAiChatMessage("status", "Génération…");
   try {
     const [result, hostRegistry] = await Promise.all([
-      proposeVibe(text, { logPrefix: "CX Chat" }),
-      probeCxInstalledHosts()
+      proposeVibe(text, { logPrefix: "Chat IA", task:"planner" }),
+      probeChatInstalledHosts()
     ]);
-    const unavailableHosts = filterInstalledCxProposals(result?.unavailableHosts || [], hostRegistry);
+    const unavailableHosts = filterInstalledChatProposals(result?.unavailableHosts || [], hostRegistry);
     status?.remove();
-    appendCxMessage("assistant", cxChatReply({
+    appendAiChatMessage("assistant", chatPanelReply({
       ops: result?.ops || [],
       note: result?.note || "",
       unavailable: unavailableHosts
     }));
-    appendCxDownloadActions(unavailableHosts);
-    if (result?.ops?.length) appendCxMessage("assistant", "Aperçu prêt dans le Créateur : applique ou annule une seule fois depuis le même panneau.");
+    appendAiChatDownloadActions(unavailableHosts);
+    if (/ollama/i.test(result?.aiError || "")) appendOllamaInstallAction();
+    if (result?.ops?.length) appendAiChatMessage("assistant", "Aperçu prêt dans le Créateur : applique ou annule une seule fois depuis le même panneau.");
   } catch (e) {
     status?.remove();
-    appendCxMessage("assistant", `Échec · ${e.message || e}`);
+    appendAiChatMessage("assistant", `Échec · ${e.message || e}`);
   } finally {
     if (send) send.disabled = false;
   }
 }
-$("#cxChatForm")?.addEventListener("submit", e => {
+$("#aiChatForm")?.addEventListener("submit", e => {
   e.preventDefault();
-  sendCxChat();
+  sendAiChat();
 });
-$("#cxChatInput")?.addEventListener("keydown", e => {
+$("#aiChatInput")?.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    sendCxChat();
+    sendAiChat();
   }
 });
 
 const restoredCreatorDraft = creatorSession.loadDraft();
 if (restoredCreatorDraft && $("#vibeText")) $("#vibeText").value = restoredCreatorDraft;
 $("#vibeText")?.addEventListener("input", event => creatorSession.saveDraft(event.currentTarget.value));
-$("#cxChatInput")?.addEventListener("input", event => creatorSession.saveDraft(event.currentTarget.value));
+$("#aiChatInput")?.addEventListener("input", event => creatorSession.saveDraft(event.currentTarget.value));
 
 function runtimeFacts() {
   return {
@@ -3868,6 +3947,7 @@ async function loadProjectText(data, label) {
   project = next;
   graphPath = [];
   redraw();
+  updateStandbyLabel();
   // Nouveau point de départ d'historique : un Undo ne doit pas ramener l'ancien projet.
   history.clear();
   commitHistory();
@@ -3951,7 +4031,7 @@ async function openOutput(destination = "main-output") {
   }, 250);
   log("OUTPUT ouvert");
 }
-$("#outputBtn").onclick = openOutput;
+$("#outputBtn").onclick = () => openOutput("main-output");
 
 function setWorkspaceMode(mode) {
   document.body.dataset.workspace = mode;
@@ -3996,7 +4076,7 @@ function renderLocalAgentRegistry(agents = []) {
     ? `${stats.active}/${stats.total} actif(s)`
     : "Non détectés";
   if (!rows.length) {
-    list.innerHTML = '<p class="hint">Détecte automatiquement les modèles Ollama disponibles, comme CX hub, puis choisis leur rôle.</p>';
+    list.innerHTML = '<p class="hint">Détecte automatiquement les modèles Ollama disponibles puis choisis leur rôle.</p>';
     return;
   }
   list.innerHTML = rows.map((agent, index) => {
@@ -4014,10 +4094,15 @@ function renderLocalAgentRegistry(agents = []) {
 
 function routedAgentConfig(cfg, agents) {
   const selected = selectLocalAgents(agents, { task:"patch", limit:2 });
+  const localModel = selected[0]?.model || cfg.localModel || "qwen2.5-coder:7b";
+  const settings = normalizeProviderSettings(cfg);
+  setProvider(settings, "ollama", { model:localModel });
   return {
     ...cfg,
+    providers:settings.providers,
+    routes:settings.routes,
     localAgents:agents,
-    localModel:selected[0]?.model || cfg.localModel || "qwen2.5-coder:7b",
+    localModel,
     localSecondaryModel:selected[1]?.model || cfg.localSecondaryModel || "gemma3:1b"
   };
 }
@@ -4048,22 +4133,105 @@ function persistAgentRegistryFromUi() {
   return next;
 }
 
+function currentProvider(settings, id) {
+  return providerList(settings).find(provider => provider.id === id) || null;
+}
+
+async function migrateLegacyEndpointSecret() {
+  if (window.nvdDesktop?.runtime !== "electron" || typeof window.nvdDesktop.saveAiProviderSecret !== "function") return;
+  let raw;
+  try { raw = JSON.parse(localStorage.getItem("nvd.ai") || "{}"); }
+  catch { return; }
+  const legacy = String(raw?.apiKey || raw?.providers?.find(provider => provider?.id === "endpoint")?.apiKey || "").trim();
+  if (!legacy) return;
+  try {
+    await window.nvdDesktop.saveAiProviderSecret("endpoint", legacy);
+    delete raw.apiKey;
+    if (Array.isArray(raw.providers)) {
+      raw.providers = raw.providers.map(provider => provider?.id === "endpoint" ? { ...provider, apiKey:"" } : provider);
+    }
+    localStorage.setItem("nvd.ai", JSON.stringify(raw));
+  } catch { /* Keep the old local setting until encrypted storage is available. */ }
+}
+
+void migrateLegacyEndpointSecret();
+
+function setProvider(settings, id, values = {}) {
+  const provider = currentProvider(settings, id);
+  if (provider) Object.assign(provider, values);
+  return provider;
+}
+
+function renderProviderRoutes(settings) {
+  const providers = providerList(settings).filter(provider => window.nvdDesktop?.runtime === "electron" || providerIsPwaSafe(provider));
+  for (const task of AI_TASKS) {
+    const select = $("#aiRoute" + task.id[0].toUpperCase() + task.id.slice(1));
+    if (!select) continue;
+    select.innerHTML = providers.map(provider => `<option value="${htmlSafe(provider.id)}">${htmlSafe(provider.label)}${provider.enabled ? "" : " · désactivé"}</option>`).join("");
+    const wanted = settings.routes?.[task.id];
+    select.value = providers.some(provider => provider.id === wanted) ? wanted : "ollama";
+  }
+}
+
+function renderCliProviders(cli = [], settings = readAiConfig()) {
+  const list = $("#aiCliList");
+  const status = $("#aiCliStatus");
+  if (!list) return;
+  const providers = providerList(settings);
+  list.innerHTML = (cli || []).map(item => {
+    const provider = providers.find(row => row.id === item.id);
+    const checked = provider?.enabled ? " checked" : "";
+    const disabled = item.available ? "" : " disabled";
+    return `<label><input type="checkbox" data-cli-provider="${htmlSafe(item.id)}"${checked}${disabled}> ${htmlSafe(provider?.label || item.id)} · ${item.available ? "disponible" : "absent"}</label>`;
+  }).join("") || '<p class="hint">Aucun CLI détecté.</p>';
+  if (status) status.textContent = (cli || []).filter(item => item.available).length ? "CLI locaux détectés." : "Aucun CLI local détecté.";
+}
+
+async function refreshProviderStatus(settings = readAiConfig()) {
+  if (window.nvdDesktop?.runtime !== "electron" || typeof window.nvdDesktop.aiProviderStatus !== "function") {
+    $("#aiCloudProviders")?.setAttribute("hidden", "");
+    $("#aiCliProviders")?.setAttribute("hidden", "");
+    return { configured:{}, cli:[] };
+  }
+  document.documentElement.classList.add("electron-runtime");
+  $("#aiCloudProviders")?.removeAttribute("hidden");
+  $("#aiCliProviders")?.removeAttribute("hidden");
+  const status = await window.nvdDesktop.aiProviderStatus();
+  const configured = status?.configured || {};
+  for (const [id, input] of Object.entries({ openai:"aiOpenaiKey", anthropic:"aiAnthropicKey", gemini:"aiGeminiKey", xai:"aiXaiKey", endpoint:"aiEndpointKey" })) {
+    const field = $("#" + input);
+    if (field && configured[id] && !field.value) field.placeholder = "clé enregistrée";
+    const provider = currentProvider(settings, id);
+    if (provider) provider.configured = configured[id] === true;
+  }
+  renderCliProviders(status?.cli || [], settings);
+  return status;
+}
+
 function openPreferences(tab = "general") {
   $("#preferencesModal").classList.remove("hidden");
   qall("[data-pref-tab]").forEach(b => b.classList.toggle("active", b.dataset.prefTab === tab));
   qall("[data-pref-panel]").forEach(p => p.classList.toggle("hidden", p.dataset.prefPanel !== tab));
   const ai = readAiConfig();
-  if ($("#aiLocalEnabled")) $("#aiLocalEnabled").checked = ai.localEnabled !== false;
-  if ($("#aiLocalBase")) $("#aiLocalBase").value = ai.localBaseUrl || "http://127.0.0.1:11434";
-  if ($("#aiLocalModel")) $("#aiLocalModel").value = ai.localModel || "qwen2.5-coder:7b";
+  const settings = normalizeProviderSettings(ai);
+  const ollama = currentProvider(settings, "ollama");
+  const endpoint = currentProvider(settings, "endpoint");
+  if ($("#aiLocalEnabled")) $("#aiLocalEnabled").checked = ollama?.enabled === true;
+  if ($("#aiLocalBase")) $("#aiLocalBase").value = ollama?.baseUrl || "http://127.0.0.1:11434";
+  if ($("#aiLocalModel")) $("#aiLocalModel").value = ollama?.model || "qwen2.5-coder:7b";
   if ($("#aiLocalSecondaryModel")) $("#aiLocalSecondaryModel").value = ai.localSecondaryModel || "gemma3:1b";
   if ($("#aiLocalParallel")) $("#aiLocalParallel").checked = ai.localParallel !== false;
-  if ($("#aiEnabled")) $("#aiEnabled").checked = ai.enabled === true;
-  if ($("#aiEndpoint")) $("#aiEndpoint").value = ai.endpoint || "";
-  if ($("#aiKey")) $("#aiKey").value = ai.apiKey || "";
-  if ($("#aiModel")) $("#aiModel").value = ai.model || "gpt-4o-mini";
+  if ($("#aiEndpointEnabled")) $("#aiEndpointEnabled").checked = endpoint?.enabled === true;
+  if ($("#aiEndpoint")) $("#aiEndpoint").value = endpoint?.baseUrl || "";
+  if ($("#aiModel")) $("#aiModel").value = endpoint?.model || "";
+  if (window.nvdDesktop?.runtime !== "electron" && $("#aiEndpointKey")) $("#aiEndpointKey").value = endpoint?.apiKey || "";
+  for (const [id, control] of Object.entries({ openai:"aiOpenaiEnabled", anthropic:"aiAnthropicEnabled", gemini:"aiGeminiEnabled", xai:"aiXaiEnabled" })) {
+    const field = $("#" + control); if (field) field.checked = currentProvider(settings, id)?.enabled === true;
+  }
+  renderProviderRoutes(settings);
+  refreshProviderStatus(settings).catch(() => { /* status remains explicit in the UI */ });
   renderLocalAgentRegistry(ai.localAgents || []);
-  if (tab === "ai" && ai.localEnabled !== false && !(ai.localAgents || []).length && !agentAutoScanAttempted) {
+  if (tab === "ai" && ollama?.enabled === true && !(ai.localAgents || []).length && !agentAutoScanAttempted) {
     agentAutoScanAttempted = true;
     queueMicrotask(() => $("#aiAgentsScan")?.click());
   }
@@ -4112,30 +4280,89 @@ $("#appearanceReset").onclick = () => {
 };
 
 function collectAiConfig() {
+  const previous = readAiConfig();
+  const settings = normalizeProviderSettings(previous);
+  const electron = window.nvdDesktop?.runtime === "electron";
+  const ollama = setProvider(settings, "ollama", {
+    enabled: $("#aiLocalEnabled")?.checked === true,
+    baseUrl: $("#aiLocalBase")?.value?.trim() || "http://127.0.0.1:11434",
+    model: $("#aiLocalModel")?.value?.trim() || "qwen2.5-coder:7b"
+  });
+  setProvider(settings, "endpoint", {
+    enabled: $("#aiEndpointEnabled")?.checked === true,
+    baseUrl: $("#aiEndpoint")?.value?.trim() || "",
+    model: $("#aiModel")?.value?.trim() || "",
+    apiKey: electron ? "" : ($("#aiEndpointKey")?.value?.trim() || "")
+  });
+  for (const [id, control] of Object.entries({ openai:"aiOpenaiEnabled", anthropic:"aiAnthropicEnabled", gemini:"aiGeminiEnabled", xai:"aiXaiEnabled" })) {
+    setProvider(settings, id, { enabled: $("#" + control)?.checked === true });
+  }
+  qall("[data-cli-provider]").forEach(input => setProvider(settings, input.dataset.cliProvider, { enabled: input.checked === true }));
+  for (const task of AI_TASKS) {
+    const select = $("#aiRoute" + task.id[0].toUpperCase() + task.id.slice(1));
+    if (select?.value) settings.routes[task.id] = select.value;
+  }
   return {
-    localEnabled: $("#aiLocalEnabled")?.checked !== false,
-    localBaseUrl: $("#aiLocalBase")?.value?.trim() || "http://127.0.0.1:11434",
-    localModel: $("#aiLocalModel")?.value?.trim() || "qwen2.5-coder:7b",
+    ...previous,
+    providers:settings.providers,
+    routes:settings.routes,
+    localEnabled:ollama?.enabled === true,
+    localBaseUrl:ollama?.baseUrl || "http://127.0.0.1:11434",
+    localModel:ollama?.model || "qwen2.5-coder:7b",
     localSecondaryModel: $("#aiLocalSecondaryModel")?.value?.trim() || "gemma3:1b",
     localParallel: $("#aiLocalParallel")?.checked !== false,
-    localAgents: Array.isArray(readAiConfig().localAgents) ? readAiConfig().localAgents : [],
-    enabled: $("#aiEnabled")?.checked === true,
-    endpoint: $("#aiEndpoint")?.value?.trim() || "",
-    apiKey: $("#aiKey")?.value?.trim() || "",
-    model: $("#aiModel")?.value?.trim() || "gpt-4o-mini"
+    localAgents: Array.isArray(previous.localAgents) ? previous.localAgents : []
   };
 }
 
-$("#aiSave")?.addEventListener("click", () => {
-  const cfg = collectAiConfig();
-  const check = assertAiProviderAllowed(cfg);
-  if (!check.ok) {
-    log(`ERREUR · ${check.error}`);
-    alert(check.error);
-    return;
+$("#aiSave")?.addEventListener("click", async () => {
+  const status = $("#aiProviderStatus");
+  const button = $("#aiSave");
+  if (button) button.disabled = true;
+  try {
+    let cfg = collectAiConfig();
+    if (window.nvdDesktop?.runtime === "electron" && typeof window.nvdDesktop.saveAiProviderSecret === "function") {
+      for (const [id, input] of Object.entries({ endpoint:"aiEndpointKey", openai:"aiOpenaiKey", anthropic:"aiAnthropicKey", gemini:"aiGeminiKey", xai:"aiXaiKey" })) {
+        const key = $("#" + input)?.value?.trim() || "";
+        if (!key) continue;
+        await window.nvdDesktop.saveAiProviderSecret(id, key);
+        $("#" + input).value = "";
+      }
+      const native = await refreshProviderStatus(cfg);
+      for (const provider of cfg.providers) provider.configured = native?.configured?.[provider.id] === true;
+    }
+    saveAiConfig(cfg);
+    if (status) status.textContent = "Fournisseurs enregistrés";
+    log(`Fournisseurs IA enregistrés · ${cfg.providers.filter(provider => provider.enabled).map(provider => provider.label).join(", ") || "aucun"}`);
+  } catch (error) {
+    if (status) status.textContent = `Échec · ${error?.message || error}`;
+    log(`Fournisseurs IA · ${error?.message || error}`);
+  } finally {
+    if (button) button.disabled = false;
   }
-  saveAiConfig(cfg);
-  log(`Préférences IA enregistrées · local ${cfg.localEnabled ? cfg.localModel : "désactivé"}`);
+});
+
+$("#aiOllamaDownload")?.addEventListener("click", () => openExternalUrl("https://ollama.com/download"));
+
+$("#aiEndpointModels")?.addEventListener("click", async () => {
+  const status = $("#aiEndpointStatus");
+  const endpoint = $("#aiEndpoint")?.value?.trim() || "";
+  if (!endpoint) { if (status) status.textContent = "URL requise"; return; }
+  if (status) status.textContent = "Lecture des modèles…";
+  try {
+    let models;
+    if (window.nvdDesktop?.runtime === "electron" && typeof window.nvdDesktop.aiProviderModels === "function") {
+      models = await window.nvdDesktop.aiProviderModels({ providerId:"endpoint", baseUrl:endpoint });
+    } else {
+      models = await listOpenAiModels({ baseUrl:endpoint, apiKey:$("#aiEndpointKey")?.value?.trim() || "" });
+    }
+    const list = Array.isArray(models?.models) ? models.models : models;
+    if (!Array.isArray(list) || !list.length) throw new Error("Aucun modèle retourné");
+    if ($("#aiModel") && !$("#aiModel").value) $("#aiModel").value = list[0];
+    if (status) status.textContent = `${list.length} modèle(s) · ${list.join(", ")}`;
+  } catch (error) {
+    if (status) status.textContent = `Échec · ${error?.message || error}`;
+  }
 });
 
 $("#aiInstallQwen")?.addEventListener("click", async () => {
@@ -4266,7 +4493,7 @@ function restoreWorkspaceLayout() {
   const targets = {
     library: $(".library"),
     inspector: $(".inspector"),
-    patch: $("#patchPanel"),
+    // patch retiré en 3.3.22 : sa taille suit la grille (plus de resize CSS couplé au Preview)
     terminal: $(".terminal")
   };
   for (const [key, el] of Object.entries(targets)) {
@@ -4364,6 +4591,21 @@ $("#zoomIn").onclick = () => setZoom(view.scale + 0.1);
 $("#zoomOut").onclick = () => setZoom(view.scale - 0.1);
 if ($("#wrapBtn")) $("#wrapBtn").onclick = () => wrapSelection();
 $("#zoomReset").onclick = () => { view.x = 0; view.y = 0; setZoom(1, { x: 0, y: 0 }); };
+
+// 3.3.22 · cadrer des nodes (ex. après une application Vibe) pour qu'ils soient visibles.
+function fitPatchView(nodes = activeGraph().nodes || []) {
+  const list = (nodes || []).filter(n => Number.isFinite(n?.x) && Number.isFinite(n?.y));
+  const space = $("#patchSpace");
+  if (!list.length || !space) return;
+  const minX = Math.min(...list.map(n => n.x)), minY = Math.min(...list.map(n => n.y));
+  const maxX = Math.max(...list.map(n => n.x + 190)), maxY = Math.max(...list.map(n => n.y + 120));
+  const pad = 24;
+  const scale = Math.max(0.4, Math.min(1, (space.clientWidth - pad * 2) / Math.max(1, maxX - minX), (space.clientHeight - pad * 2) / Math.max(1, maxY - minY)));
+  view.scale = scale;
+  view.x = pad - minX * scale;
+  view.y = pad - minY * scale;
+  setZoom(scale);
+}
 $("#patchSpace").addEventListener("wheel", e => {
   e.preventDefault();
   const delta = e.deltaY < 0 ? 0.08 : -0.08;
@@ -4517,9 +4759,11 @@ async function runCmd() {
     } else if (v.startsWith("ai endpoint ")) {
       const endpoint = raw.slice(12).trim();
       if (!/^https?:\/\//i.test(endpoint)) throw new Error("Endpoint HTTP/HTTPS requis");
-      const cfg = { ...readAiConfig(), enabled:true, endpoint };
-      const allowed = assertAiProviderAllowed(cfg);
-      if (!allowed.ok) throw new Error(allowed.error);
+      const cfg = readAiConfig();
+      const settings = normalizeProviderSettings(cfg);
+      setProvider(settings, "endpoint", { enabled:true, baseUrl:endpoint });
+      cfg.providers = settings.providers;
+      cfg.routes = settings.routes;
       saveAiConfig(cfg);
       log(`AI · endpoint externe = ${endpoint}`);
     } else if (v === "ai add" || v === "node ai") {
@@ -4617,6 +4861,7 @@ if (!recoveredFromCrash && generalPrefs.restoreAutosave !== false && autosaved) 
   try {
     const opened = openProject(JSON.parse(autosaved));
     project = opened.project;
+    updateStandbyLabel();
     log(opened.changed ? `Autosave restaurée · migration ${opened.migratedFrom}→${opened.migratedTo}` : "Autosave restaurée");
   } catch { /* */ }
 }

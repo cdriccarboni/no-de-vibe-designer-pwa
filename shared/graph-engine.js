@@ -188,7 +188,8 @@ export function evaluateGraph(project, nodeFns, ctx, previousOutputs = new Map()
 }
 
 export function findVideoOutput(project, outputs) {
-  const prefer = ["transform", "composite", "ghost", "bodyclone", "shadow", "threshold", "mirror", "blackhole", "shader", "blob", "whale", "videofile", "camera", "phone-camera-front", "phone-camera-back"];
+  // 3.3.22 · la Sortie Scène est la sortie explicite : elle passe en premier.
+  const prefer = ["stage-output", "mapping", "transmute", "transform", "composite", "ghost", "bodyclone", "shadow", "threshold", "mirror", "blackhole", "shader", "blob", "whale", "videofile", "camera", "phone-camera-front", "phone-camera-back"];
   for (const type of prefer) {
     for (const n of project.nodes || []) {
       if (n.type !== type || n.params?.enabled === false) continue;
@@ -200,6 +201,15 @@ export function findVideoOutput(project, outputs) {
           return { node: n, value: v, source: type };
         }
       }
+    }
+  }
+  // Repli : n'importe quel node actif qui produit un visuel (SDF, ondes, particules…).
+  for (const n of project.nodes || []) {
+    if (n.params?.enabled === false) continue;
+    const bag = outputs.get(n.id);
+    if (!bag) continue;
+    for (const v of bag.values()) {
+      if (v && (v.kind === "video" || v.el || v.canvas || v.pixels)) return { node: n, value: v, source: n.type };
     }
   }
   return null;
