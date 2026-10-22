@@ -1,9 +1,9 @@
 import {
   loadExampleScene, loadScene, startShow, pauseShow, stopShow, tickShow,
-  fireCue, saveShow, restoreShow, askShow, setKeyframe, timelineRows, showMonitor, CX_NOTE, CX_BRIDGE_URL
+  fireCue, saveShow, restoreShow, askShow, setKeyframe, timelineRows, showMonitor
 } from "../shared/show-session.js";
 import { browserProbeRegistry, selectAgentsForRequest } from "../shared/agent-registry.js";
-import { executeWaveShader, nativeBridgeLabel, runShaderAgent } from "../shared/shader-agent.js";
+import { executeWaveShader, runShaderAgent } from "../shared/shader-agent.js";
 import { LIVE_TITLE_PRESETS, loadLiveTitleControlAddress, saveLiveTitleControlAddress, publishLiveTitle } from "../shared/live-title-broadcast.js";
 import { Runtime } from "../shared/runtime.js";
 
@@ -66,7 +66,6 @@ function paint() {
     if (row.kind === "curve") return `courbe ${row.label} · ${row.keys.map(key => key.time + ":" + key.value + " " + key.ease).join(" → ")}`;
     return `${row.kind} ${row.number || ""} ${row.label || row.id} · ${row.time ?? 0}s`;
   }).join("\n");
-  $("cxNote").textContent = CX_NOTE;
   paintMonitor();
 }
 
@@ -92,15 +91,6 @@ async function registryForChat() {
   }
   const gl = getProbeGl();
   return browserProbeRegistry(gl);
-}
-
-async function refreshNative() {
-  let health = null;
-  try {
-    const res = await fetch(CX_BRIDGE_URL.replace(/\/chat$/, "/health"), { signal: AbortSignal.timeout(800) });
-    if (res.ok) health = await res.json();
-  } catch { health = null; }
-  $("native").textContent = nativeBridgeLabel(health?.ok ? health : null);
 }
 
 function paintMonitor() {
@@ -198,21 +188,9 @@ $("restore").onclick = () => {
 $("ask").onclick = async () => {
   const text = $("chat").value.trim();
   if (!text) return;
-  let cx = null;
-  try {
-    const res = await fetch(CX_BRIDGE_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text }),
-      signal: AbortSignal.timeout(2500)
-    });
-    if (res.ok) cx = await res.json();
-  } catch {
-    cx = null;
-  }
   const registry = await registryForChat();
   const chosen = selectAgentsForRequest(text, registry);
-  const result = askShow(session, text, cx, registry);
+  const result = askShow(session, text, registry);
   const shader = await runShaderAgent(session, text, compileInBrowser, { eligible: chosen.some(agent => agent.id === "glsl") });
   const cue = result.cueOk ? ` · cue ${result.cueId}` : "";
   const wave = shader.ran
@@ -282,5 +260,4 @@ $("liveTitleAddress").value = loadLiveTitleControlAddress();
 if ($("liveTitleAddress").value) setLiveTitleStatus("Adresse de régie prête · en attente d’un top.");
 paintLiveTitle();
 paint();
-refreshNative();
 installUpdateNotice();

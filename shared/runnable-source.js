@@ -293,7 +293,7 @@ export function mergeRunnableSources(text = "", ops = []) {
   if (engines.includes("p5")) labels.push("Processing/p5");
   if (engines.includes("sketch")) labels.push("Sketch");
   const summary = changed && labels.length
-    ? `CX · ${labels.join(" + ")} exécutable dans le même patch`
+    ? `${labels.join(" + ")} exécutable dans le même patch`
     : "";
   return { ops: next, engines, unavailable, summary };
 }
@@ -307,7 +307,7 @@ function videoProducers(ops) {
   return types;
 }
 
-export function cxChatReply({ ops = [], note = "", unavailable = [], proposals = null } = {}) {
+export function chatPanelReply({ ops = [], note = "", unavailable = [], proposals = null } = {}) {
   const hosts = (proposals || unavailable || []).map(item => item.reason).filter(Boolean);
   if (!ops.length) {
     return hosts.length ? `Rien n'a été généré pour le patch. ${hosts.join("\n")}` : "Rien n'a été généré.";

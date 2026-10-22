@@ -50,11 +50,11 @@
 <div id="app">
   <header class="topbar">
     <div class="brand"><span class="brandmark" aria-hidden="true"><img src="../icons/nocode-rings.svg" alt=""></span><div><b>No<span class="co">[co]</span>de Vibe Designer</b><span>VIBE · PATCH · STAGE</span></div></div>
-    <span class="badge">v3.3.21</span>
+    <span class="badge">v3.3.23</span>
     <span id="showLockBadge" class="show-lock-badge" role="status" aria-live="polite" hidden>Spectacle verrouillé</span>
     <div class="pnp-wrap"><button id="pnpBtn" class="btn pnp-chip" type="button" title="Plug & Play · détection automatique">P&P · AUTO</button><div id="pnpMenu" class="pnp-menu hidden"><button type="button" id="pnpRefresh">↻ Détecter à nouveau</button><button type="button" id="pnpMidi">MIDI · connecter</button><button type="button" id="pnpSerial">USB / Arduino / ESP · connecter</button><small id="pnpSummary">Les périphériques déjà autorisés se reconnectent automatiquement.</small></div></div>
     <div class="spacer"></div>
-    <button type="button" id="libraryToggle" class="btn library-toggle" aria-controls="libraryList" aria-expanded="false" title="Afficher la Library des objets">＋ Objets</button><div class="themes workspace-modes"><button type="button" id="modeBureau" class="btn active">Bureau</button><button type="button" id="modePlateau" class="btn">Plateau</button><a class="active" href="./index.html">Designer</a><a href="../show/index.html">Show</a><a href="../radio/index.html" target="_blank" title="Radio Paillettes · Écoute Live">Radio ↗</a></div>
+    <button type="button" id="libraryToggle" class="btn library-toggle" aria-controls="libraryList" aria-expanded="false" title="Afficher la Library des objets">＋ Objets</button><div class="themes workspace-modes"><button type="button" id="modeBureau" class="btn active">Bureau</button><button type="button" id="modePlateau" class="btn">Plateau</button><a class="active" href="./index.html">Designer</a></div>
     <button id="controlsBtn" class="btn">Controls</button>
     <button id="preferencesBtn" class="btn">Préférences</button>
     <button id="saveProject" class="btn">Enregistrer</button>
@@ -74,7 +74,7 @@
 
     <main class="center">
       <div class="upper">
-        <section class="panel patch resizable-both" id="patchPanel">
+        <section class="panel patch" id="patchPanel">
           <div class="panel-head">Patch Canvas <span class="sub" title="Molette : zoom · Clic milieu ou Alt + glisser : déplacer le canevas · Clic : sélectionner">Patch actuel</span>
             <div class="tools">
               <button type="button" id="zoomOut" class="iconbtn" title="Zoom −">−</button>
@@ -90,18 +90,18 @@
         </section>
 
         <section class="panel preview floatable" id="previewPanel" data-float-id="preview" data-dock-axis="float" data-min-w="300">
-          <div class="panel-head">Preview <span class="sub"><span class="live">● Aperçu</span> · clic : placer un point</span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
+          <div class="panel-head">Preview <span class="sub"><span class="live">● Aperçu</span></span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
           <div class="panel-body preview-body">
             <canvas id="previewCanvas" width="1280" height="720"></canvas>
             <div id="previewOverlay" class="preview-overlay"></div>
-            <div class="preview-foot"><span id="previewInfo">1280×720 · 60 fps</span><span class="spacer"></span><button id="magicFxBtn" class="smallbtn">✦ Magic FX</button><button id="clearPoints" class="smallbtn">Effacer les points</button></div>
+            <div class="preview-foot"><span id="previewInfo">1280×720 · 60 fps</span><span class="spacer"></span><button id="magicFxBtn" class="smallbtn">✦ Magic FX</button><button id="pathToolBtn" class="smallbtn" type="button" aria-pressed="false" title="Outil tracé de mouvement : clic dans l’aperçu pour poser des points (désactivé par défaut)">⟡ Tracé</button><button id="clearPoints" class="smallbtn" hidden>Effacer les points</button></div>
           </div>
           <div class="float-resize" title="Redimensionner"></div>
         </section>
       </div>
 
       <section class="panel vibe floatable" id="vibePanel" data-float-id="vibe" data-min-w="320">
-        <div class="panel-head">Créateur <span class="sub">Vibe + CX · entrée : envoyer · Maj+Entrée : nouvelle ligne</span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
+        <div class="panel-head">Créateur <span class="sub">Vibe · entrée : envoyer · Maj+Entrée : nouvelle ligne</span><div class="tools"><button type="button" class="iconbtn float-dock" title="Ancrer" hidden>Ancrer</button><button type="button" class="iconbtn collapse" title="Réduire">−</button></div></div>
         <div class="panel-body vibe-body">
           <div class="vibe-reference">
             <label for="vibeImageFile" class="smallbtn vibe-image-pick">＋ Image</label>
@@ -178,7 +178,7 @@
         <div class="pane-tabs" role="tablist">
           <button type="button" class="pane-tab active" data-right-pane="inspector" role="tab" aria-selected="true">Inspecteur</button>
           <button type="button" class="pane-tab" data-right-pane="elements" role="tab" aria-selected="false">Éléments</button>
-          <button type="button" class="pane-tab" data-right-pane="cx" role="tab" aria-selected="false">Historique CX</button>
+          <button type="button" class="pane-tab" data-right-pane="chat-ia" role="tab" aria-selected="false">Chat IA</button>
         </div>
         <span id="inspectorType" class="sub">Aucun</span>
         <div class="tools"><button type="button" class="iconbtn collapse" title="Réduire">−</button></div>
@@ -187,18 +187,18 @@
         <p>Sélectionne un node.</p>
       </div>
       <div id="elementsPane" class="panel-body elements-pane pane-hidden" role="tabpanel" hidden></div>
-      <div id="cxChatPane" class="panel-body cx-chat pane-hidden" role="tabpanel" hidden>
-        <div id="cxChatLog" class="cx-chat-log" role="log" aria-live="polite"></div>
-        <form id="cxChatForm" class="cx-chat-form">
-          <textarea id="cxChatInput" rows="3" placeholder="Décris le résultat. Ex. : un shader GLSL mélangé avec Processing"></textarea>
-          <button id="cxChatSend" class="generate" type="submit">Envoyer</button>
+      <div id="aiChatPane" class="panel-body ai-chat pane-hidden" role="tabpanel" hidden>
+        <div id="aiChatLog" class="ai-chat-log" role="log" aria-live="polite"></div>
+        <form id="aiChatForm" class="ai-chat-form">
+          <textarea id="aiChatInput" rows="3" placeholder="Décris le résultat. Ex. : un shader GLSL mélangé avec Processing"></textarea>
+          <button id="aiChatSend" class="generate" type="submit">Envoyer</button>
         </form>
       </div>
     </aside>
   </section>
 
   <section class="terminal resizable-y">
-    <div class="term-tabs"><span>Console</span><span class="live">● READY</span><span>PATCH</span><span>OUTPUT</span><span>OSC</span><span>MIDI</span><span>DMX</span></div>
+    <div class="term-tabs"><span>Console</span><span class="live">● READY</span><span>PATCH</span><span>OUTPUT</span><span id="ioOsc" class="io-state">OSC · —</span><span id="ioMidi" class="io-state">MIDI · —</span><span id="ioDmx" class="io-state">DMX · —</span></div>
     <div id="termLog" class="term-log"></div>
     <div class="term-input"><input id="termCmd" placeholder="demo · midi connect · bridge connect ws://… · output"><button id="termSend">↵</button></div>
   </section>
@@ -239,9 +239,18 @@
         <label>Zoom par défaut <input id="prefDefaultZoom" type="range" min="50" max="150" value="100"></label>
       </div>
       <div data-pref-panel="ai" class="hidden">
-        <p class="hint"><b>IA locale prioritaire</b> : No[co]de utilise d’abord Ollama sur cette machine pour générer des opérations de patch JSON. Si elle est indisponible, repli automatique sur le moteur local déterministe.</p>
+        <p class="hint"><b>Fournisseurs IA optionnels</b> : aucune requête n’est envoyée sans fournisseur activé. Sans réponse valide, Vibe revient au Planner déterministe local.</p>
+        <div class="provider-routes">
+          <label>Planner <select id="aiRoutePlanner"></select></label>
+          <label>Génération de patch <select id="aiRoutePatch"></select></label>
+          <label>Relecture <select id="aiRouteReview"></select></label>
+        </div>
         <div class="local-agents" style="margin-top:8px"><b>Agent ISF / Shader</b><p class="hint" style="margin-top:4px">Routage automatique pour les demandes ISF, GLSL interactif ou shader réaliste : le modèle spécialisé produit un node Shader avec fragment GLSL et métadonnées ISF, sans armer de périphérique.</p></div>
-        <label>Activer l’IA générative locale <input id="aiLocalEnabled" type="checkbox" checked></label>
+        <div class="provider-card">
+          <label><b>Ollama local</b> <input id="aiLocalEnabled" type="checkbox"></label>
+          <p class="hint">Modèles présents sur cette machine via <code>/api/tags</code>. Aucun modèle n’est fourni par No-de.</p>
+          <button id="aiOllamaDownload" class="smallbtn" type="button">Installer Ollama (gratuit)</button>
+        </div>
         <label class="stack">Serveur local / LAN<input id="aiLocalBase" type="url" value="http://127.0.0.1:11434" placeholder="http://192.168.1.20:11434"></label>
         <div class="local-agents">
           <div class="local-agents-head">
@@ -249,7 +258,7 @@
             <button id="aiAgentsScan" class="smallbtn" type="button">↻ Détecter / actualiser</button>
           </div>
           <div id="aiAgentsList" class="local-agents-list">
-            <p class="hint">Détecte automatiquement les modèles Ollama disponibles, comme CX hub, puis choisis leur rôle.</p>
+            <p class="hint">Détecte les modèles Ollama disponibles puis choisis leur rôle.</p>
           </div>
         </div>
         <details class="ai-legacy">
@@ -264,14 +273,25 @@
             <span id="aiLocalStatus" class="hint">Non testée</span>
           </div>
         </details>
-        <hr>
-        <p class="hint">Cloud optionnel : utilisé seulement si l’IA locale échoue et qu’un endpoint distant est activé.</p>
-        <p class="hint bad">Grok / xAI est exclu et sera refusé.</p>
-        <label>Autoriser le secours IA distant <input id="aiEnabled" type="checkbox"></label>
-        <label class="stack">Endpoint (OpenAI-compatible)<input id="aiEndpoint" type="url" placeholder="https://api.openai.com/v1/chat/completions"></label>
-        <label class="stack">Clé API<input id="aiKey" type="password" placeholder="sk-… (stockée localement)"></label>
-        <label class="stack">Modèle distant<input id="aiModel" type="text" value="gpt-4o-mini"></label>
-        <div class="preferences-actions"><button id="aiSave" class="smallbtn" type="button">Enregistrer IA</button></div>
+        <div class="provider-card">
+          <label><b>Endpoint compatible OpenAI</b> <input id="aiEndpointEnabled" type="checkbox"></label>
+          <p class="hint">LM Studio, llama.cpp server, Hermes ou LiteLLM. Teste <code>/v1/models</code> avant l’usage.</p>
+          <label class="stack">URL<input id="aiEndpoint" type="url" placeholder="http://127.0.0.1:1234/v1"></label>
+          <label class="stack">Modèle<input id="aiModel" type="text" placeholder="nom du modèle"></label>
+          <label class="stack">Clé optionnelle<input id="aiEndpointKey" type="password" autocomplete="off" placeholder="jamais affichée après enregistrement"></label>
+          <button id="aiEndpointModels" class="smallbtn" type="button">Lister les modèles</button><span id="aiEndpointStatus" class="hint">Non testé</span>
+        </div>
+        <div id="aiCloudProviders" class="provider-card electron-only">
+          <b>Clés API cloud (Electron uniquement)</b><p class="hint">Une clé chiffrée dans le trousseau système n’est utilisée que si son fournisseur est activé et routé.</p>
+          <div class="provider-cloud-grid">
+            <label>OpenAI <input id="aiOpenaiEnabled" type="checkbox"><input id="aiOpenaiKey" type="password" autocomplete="off" placeholder="nouvelle clé"></label>
+            <label>Anthropic <input id="aiAnthropicEnabled" type="checkbox"><input id="aiAnthropicKey" type="password" autocomplete="off" placeholder="nouvelle clé"></label>
+            <label>Gemini <input id="aiGeminiEnabled" type="checkbox"><input id="aiGeminiKey" type="password" autocomplete="off" placeholder="nouvelle clé"></label>
+            <label>xAI / Grok <input id="aiXaiEnabled" type="checkbox"><input id="aiXaiKey" type="password" autocomplete="off" placeholder="nouvelle clé"></label>
+          </div>
+        </div>
+        <div id="aiCliProviders" class="provider-card electron-only"><b>CLI locaux (Electron)</b><p id="aiCliStatus" class="hint">Détection à l’ouverture des préférences.</p><div id="aiCliList"></div></div>
+        <div class="preferences-actions"><button id="aiSave" class="smallbtn" type="button">Enregistrer les fournisseurs</button><span id="aiProviderStatus" class="hint"></span></div>
       </div>
       <div data-pref-panel="io" class="hidden">
         <p class="hint">MIDI / Serial / OSC passent par le graphe lorsque les nodes sont connectés.</p>
