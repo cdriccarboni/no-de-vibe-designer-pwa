@@ -119,7 +119,6 @@ export function installSurfaceSwitcher({current="designer",label="Interface"}={}
 export function getSurfaceList() {
   return [
     ...SURFACES.map(s => ({ id:s.id, label:s.label, url:"/" + s.path })),
-    { id:"show", label:"Show", url:"/show/index.html?surface=show" },
     { id:"auto", label:"Auto", url:"/index.html?auto=1" }
   ];
 }

@@ -1,5 +1,5 @@
 /**
- * Local Agent Registry — adapté du scan d'engines de CX hub.
+ * Local Agent Registry — scan local des moteurs disponibles.
  * Registre local-first pour No[co]de Vibe Designer.
  */
 

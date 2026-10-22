@@ -1,10 +1,10 @@
 {
   "name": "No[co]de Vibe Designer",
-  "version": "3.3.21",
+  "version": "3.3.23",
   "sourceRevision": "8c99d07",
   "builtAt": "2026-10-20T19:00:00.000Z",
   "files": 186,
-  "cacheRevision": "3.3.21-vibe-intents-20261020",
+  "cacheRevision": "3.3.23-multi-ai-providers-20261021b",
   "surfaces": [
     "designer",
     "show",

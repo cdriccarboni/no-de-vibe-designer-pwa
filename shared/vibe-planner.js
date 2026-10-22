@@ -1,5 +1,5 @@
 import { isExecutable, portLabels, portMeta, typesCompatible } from "./ports.js";
-import { mergeRunnableSources } from "./cx-source.js";
+import { mergeRunnableSources } from "./runnable-source.js";
 import { planFromRecipe } from "./vibe-recipes.js";
 
 export function normalizeVibeText(text) {
