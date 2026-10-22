@@ -76,16 +76,42 @@ Instruction utilisateur: ${text}
 Nodes déjà présents: ${JSON.stringify(executable)}`;
 }
 
+// Les modèles locaux (ex. qwen2.5-coder) entourent souvent le JSON de ```json … ```
+// ou d'une phrase : on extrait l'objet JSON avant de parser.
+export function extractJsonText(value) {
+  const raw = String(value ?? "").trim();
+  const fenced = raw.match(/```(?:json|JSON)?\s*([\s\S]*?)```/);
+  const body = (fenced ? fenced[1] : raw).trim();
+  if (body.startsWith("{") || body.startsWith("[")) return body;
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  return start >= 0 && end > start ? body.slice(start, end + 1) : body;
+}
+
 function parseAiOps(content, label = "IA") {
   let parsed = content;
   if (typeof parsed === "string") {
-    try { parsed = JSON.parse(parsed); }
+    try { parsed = JSON.parse(extractJsonText(parsed)); }
     catch { return { ok:false, unavailable:true, error:`${label} : JSON invalide` }; }
   }
   if (!parsed?.ops || !Array.isArray(parsed.ops)) {
     return { ok:false, unavailable:true, error:`${label} : réponse sans tableau ops` };
   }
-  return { ok:true, ops:parsed.ops, summary:parsed.summary || "" };
+  return { ok:true, ops:parsed.ops.map(normalizeAiOpTypes), summary:parsed.summary || "" };
+}
+
+// Les modèles locaux écrivent parfois « Threshold » au lieu de « threshold » : on ne corrige la casse
+// que si la version minuscule est un type connu (sinon le Safety Engine refuse l’op comme avant).
+function normalizeAiOpTypes(op) {
+  if (!op || typeof op !== "object") return op;
+  const next = { ...op };
+  for (const key of ["type", "fromType", "toType"]) {
+    const value = typeof next[key] === "string" ? next[key].trim() : next[key];
+    if (typeof value !== "string") continue;
+    const known = t => ALLOWED_TYPES.has(t) || isExecutable(t);
+    next[key] = !known(value) && known(value.toLowerCase()) ? value.toLowerCase() : value;
+  }
+  return next;
 }
 
 function localAgentTaskForText(text = "") {
